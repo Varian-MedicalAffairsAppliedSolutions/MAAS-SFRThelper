@@ -47,6 +47,9 @@ jobs:
       with:
         nuget-version: latest
 
+    - name: Download nuget packages
+      run: nuget install .\gridScripts\MAAS-SFRThelper\Projects\MAAS-SFRThelper\packages.config -OutputDirectory packages
+
     - name: Add VIC GitHub NuGet repository
       run: nuget source add
         -Name github `
