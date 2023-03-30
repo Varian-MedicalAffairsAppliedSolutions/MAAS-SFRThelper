@@ -24,18 +24,6 @@ namespace VMS.TPS
 {
   public class Script
   {
-    /*
-    public Script()
-    {
-
-    }
-
-    
-
-    int getImagePlaneFromZCoordinate(Image image, double zCoord)
-    {
-        return (int)Math.Round((zCoord - image.Origin.z) / image.ZRes);
-    }*/
 
     VVector[]  CreateContour(VVector center, double radius, int nOfPoints)
     {
@@ -53,21 +41,6 @@ namespace VMS.TPS
 
         return contour;
     }
-
-    void addContoursToStructure(VVector[] gridPoints, Image image, ref Structure gridStructure, double radius, int zLayer)
-    {
-        double zCoord = (double)(zLayer) * image.ZRes + image.Origin.z;
-
-        const int contourSegmentCount = 8;
-
-        foreach(var contourCenter in gridPoints)
-        {
-            //VVector center = new VVector(contourCenter.x, contourCenter.y, zCoord);
-            var contour = CreateContour(contourCenter, radius, contourSegmentCount);
-            gridStructure.AddContourOnImagePlane(contour, zLayer);
-        }
-    }
-
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     public void Execute(ScriptContext context)
@@ -102,9 +75,6 @@ namespace VMS.TPS
         var mainWindow = new GridBlockCreator.MainWindow(context);
         
         mainWindow.ShowDialog();
-
-
-
     }
   }
 }

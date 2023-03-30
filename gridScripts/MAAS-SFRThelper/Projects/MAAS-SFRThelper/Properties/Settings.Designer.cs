@@ -40,5 +40,14 @@ namespace MAAS_SFRThelper.Properties {
                 return ((global::System.DateTime)(this["ExpDate"]));
             }
         }
+        
+        [global::System.Configuration.ApplicationScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool EULAAgreed {
+            get {
+                return ((bool)(this["EULAAgreed"]));
+            }
+        }
     }
 }
