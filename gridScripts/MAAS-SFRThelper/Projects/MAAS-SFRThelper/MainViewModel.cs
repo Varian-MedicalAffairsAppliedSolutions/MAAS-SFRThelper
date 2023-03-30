@@ -1,4 +1,5 @@
 ﻿using NLog.Layouts;
+using Prism.Commands;
 using Prism.Mvvm;
 using System;
 using System.Collections.Generic;
@@ -14,12 +15,12 @@ using System.Windows.Documents;
 
 namespace GridBlockCreator
 {
-	
 
-	public class MainViewModel: BindableBase
+    public class MainViewModel: BindableBase
     {
 
-
+        public DelegateCommand HyperlinkCmd { get; private set; }
+        
         private string postText;
 
         public string PostText
@@ -29,23 +30,29 @@ namespace GridBlockCreator
         }
 
 
-        private void Hyperlink_RequestNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
-        {
-            System.Diagnostics.Process.Start(
-                new System.Diagnostics.ProcessStartInfo(e.Uri.AbsoluteUri)
-             );
-            e.Handled = true;
-        }
-
-
         public MainViewModel()
         {
             var isDebug = MAAS_SFRThelper.Properties.Settings.Default.Debug;
             //MessageBox.Show($"Display Terms {isDebug}");
             PostText = "";
             if ( isDebug ) { PostText += " *** Not Validated For Clinical Use ***"; }
-            
 
+            HyperlinkCmd = new DelegateCommand(OnHyperlink, CanHyperlink);
+
+
+        }
+
+        private void OnHyperlink()
+        {
+            var url = "http://medicalaffairs.varian.com/download/VarianLUSLA.pdf";
+            System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo(url)
+                );
+        }
+
+        private bool CanHyperlink()
+        {
+            return true;
         }
 
     }

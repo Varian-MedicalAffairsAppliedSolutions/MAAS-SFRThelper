@@ -18,9 +18,9 @@
             </TabControl>
 
             <TextBlock Grid.Row="1" Name="Footer" Background="PaleVioletRed">    
-                <Label Margin="0"><Hyperlink NavigateUri="http://medicalaffairs.varian.com/download/VarianLUSLA.pdf" RequestNavigate="Hyperlink_RequestNavigate">
-                    Bound by the terms of the Varian LUSLA
-                </Hyperlink></Label>
+                <Label Margin="0">
+                    <Hyperlink Command="{Binding HyperlinkCmd}">Bound by the terms of the Varian LUSLA</Hyperlink>
+                </Label>
                 <Label Margin="0" Content="{Binding PostText}"/>
             </TextBlock>
         </Grid>
