@@ -30,9 +30,9 @@ namespace GridBlockCreator
         }
 
 
-        public MainViewModel()
+        public MainViewModel(SettingsClass settings)
         {
-            var isDebug = MAAS_SFRThelper.Properties.Settings.Default.Debug;
+            var isDebug = settings.Debug;
             //MessageBox.Show($"Display Terms {isDebug}");
             PostText = "";
             if ( isDebug ) { PostText += " *** Not Validated For Clinical Use ***"; }

@@ -9,12 +9,23 @@ using VMS.TPS.Common.Model.API;
 using VMS.TPS.Common.Model.Types;
 using GridBlockCreator;
 using System.Windows.Input;
-using MAAS_SFRThelper.Properties;
+using System.Configuration;
+using System.Diagnostics;
+using System.IO;
+using Newtonsoft.Json;
+using System.Globalization;
 
-// TODO: Replace the following version attributes by creating AssemblyInfo.cs. You can do this in the properties of the Visual Studio project.
-[assembly: AssemblyVersion("1.0.0.1")]
-[assembly: AssemblyFileVersion("1.0.0.1")]
-[assembly: AssemblyInformationalVersion("1.0")]
+
+// Create serialized verion of settings
+/*
+var settings = new SettingsClass();
+settings.Debug = false;
+settings.EULAAgreed = false;
+settings.Validated = false;
+File.WriteAllText(Path.Combine(path, "config.json"), JsonConvert.SerializeObject(settings));
+*/
+
+
 
 // TODO: Uncomment the following line if the script requires write access.
 //15.x or later:
@@ -24,56 +35,79 @@ namespace VMS.TPS
 {
   public class Script
   {
-
-    VVector[]  CreateContour(VVector center, double radius, int nOfPoints)
-    {
-        VVector[] contour = new VVector[nOfPoints + 1];
-        double angleIncrement = Math.PI * 2.0 / Convert.ToDouble(nOfPoints);
-        for(int i = 0; i < nOfPoints; ++i)
-        {
-            double angle = Convert.ToDouble(i) * angleIncrement;
-            double xDelta = radius * Math.Cos(angle);
-            double yDelta = radius * Math.Sin(angle);
-            VVector delta = new VVector(xDelta, yDelta, 0.0);
-            contour[i] = center + delta;
-        }
-        contour[nOfPoints] = contour[0]; // Last pt is same as first
-
-        return contour;
-    }
+    public string newBuildURL = $"https://github.com/Varian-Innovation-Center/MAAS-UncertaintyClinicalGoals";
 
     [MethodImpl(MethodImplOptions.NoInlining)]
+
     public void Execute(ScriptContext context)
     {
 
+        // Check that we have a patient open
         if (context.Patient == null || context.PlanSetup == null)
         {
             MessageBox.Show("No active plan selected - exiting.");
             return;
         }
 
-        // Check exp date
-        DateTime exp = MAAS_SFRThelper.Properties.Settings.Default.ExpDate;
-        if (exp < DateTime.Now)
+        // Check NOEXPIRE FILE
+        var path = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+        var noexp_path = Path.Combine(path, "NOEXPIRE");
+        bool foundNoExpire = System.IO.File.Exists(noexp_path);
+
+        // search for json config in current dir, NOTE: see instructions on how to create this at the top of the file.
+        var json_path = Path.Combine(path, "config.json");
+        if (!File.Exists(json_path)) { throw new Exception($"Could not locate json path {json_path}"); }
+        var settings = JsonConvert.DeserializeObject<SettingsClass>(File.ReadAllText(json_path));
+
+        // Get expiration date from Assembly
+        var asmCa = Assembly.GetExecutingAssembly().CustomAttributes.FirstOrDefault(ca => ca.AttributeType == typeof(AssemblyExpirationDate));
+        DateTime exp;
+        var provider = new CultureInfo("en-US");
+        DateTime.TryParse(asmCa.ConstructorArguments.FirstOrDefault().Value as string, provider, DateTimeStyles.None, out exp);
+
+        // Check expiration date
+        if (exp < DateTime.Now && !foundNoExpire)
         {
-            MessageBox.Show($"Application has expired");
+            MessageBox.Show("Application has expired. Newer builds with future expiration dates can be found here: https://github.com/Varian-Innovation-Center/MAAS-PlanComplexity");
             return;
+        }
+
+        // Check that they have agreed to EULA
+        if (!settings.EULAAgreed)
+        {
+            var msg0 = "You are bound by the terms of the Varian Limited Use Software License Agreement (LULSA). \"To stop viewing this message set EULA to \"true\" in DoseRateEditor.exe.config\"\nShow license agreement?";
+            string title = "Varian LULSA";
+            var buttons = MessageBoxButton.YesNo;
+            var result = MessageBox.Show(msg0, title, buttons);
+            if (result == MessageBoxResult.Yes)
+            {
+                Process.Start("notepad.exe", Path.Combine(path, "license.txt"));
+            }
+
+            // Save that they have seen EULA
+            settings.EULAAgreed = true;
+            File.WriteAllText(Path.Combine(path, "config.json"), JsonConvert.SerializeObject(settings));
         }
 
         // Display opening msg
         string msg = $"The current MAAS-SFRThelper application is provided AS IS as a non-clinical, research only tool in evaluation only. The current " +
         $"application will only be available until {exp.Date} after which the application will be unavailable. " +
         $"By Clicking 'Yes' you agree that this application will be evaluated and not utilized in providing planning decision support\n\n" +
-        "Newer builds with future expiration dates can be found here: https://github.com/Varian-Innovation-Center/MAAS-SFRThelper\n\n" +
+        $"Newer builds with future expiration dates can be found here: {newBuildURL}\n\n" +
         "See the FAQ for more information on how to remove this pop-up and expiration";
         var res = MessageBox.Show(msg, "Agreement  ", MessageBoxButton.YesNo);
        
+        // If they don't agree close window
         if (res == MessageBoxResult.No) {
             return;
         }
-          
-        var mainWindow = new GridBlockCreator.MainWindow(context);
         
+        // Create and show main window
+        var mainWindow = new MainWindow(context)
+        {
+            // Create view model and pass settings
+            DataContext = new MainViewModel(settings) 
+        };
         mainWindow.ShowDialog();
     }
   }
