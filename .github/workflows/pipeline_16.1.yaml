@@ -11,18 +11,17 @@ on:
       dateInput:
         description: 'Expiration Date'
         required: true
-        default: '1/1/2024'
+        default: '7/11/2022'
 
 jobs:
   build:
-    name: Build ESAPI Script - v16.1
     runs-on: windows-2019
     env:
       GITHUB_WORKSPACE_PACKAGES_PATH: ..\..\..\..\packages\ESAPI.16.1.0\lib\net461\
-      PROJECT_NAME: PlanComplexity
-      MAJOR_VERSION: 1
-      MINOR_VERSION: 0
-      PATCH_VERSION: 0
+      PROJECT_NAME: MAAS-SFRThelper
+      MAJOR_VERSION: 2
+      MINOR_VERSION: 5
+      PATCH_VERSION: 6
       BUILD_NUMBER: ${{ github.run_number }}
 
     steps:
@@ -32,7 +31,7 @@ jobs:
         fetch-depth: 0
 
     - name: Setup MSBuild
-      uses: microsoft/setup-msbuild@v1
+      uses: microsoft/setup-msbuild@v1.0.2
 
     - name: Navigate to Workspace
       run: cd $GITHUB_WORKSPACE
@@ -40,7 +39,7 @@ jobs:
     - name: Update Target Framework Version to 4.6.1
       uses: Nambers/ReplaceStringInFile@v1.1
       with:
-        path: .\ModulationComplexity\ModulationComplexity.csproj
+        path: .\${{ env.PROJECT_NAME}}\${{ env.PROJECT_NAME}}.csproj
         oldString: "TargetFrameworkVersion>v[\\d\\.]+<"
         newString: 'TargetFrameworkVersion>v4.6.1<'
 
@@ -48,14 +47,17 @@ jobs:
       id: update_assembly_info
       run: |
         .\.github\workflows\Update-AssemblyInfo.ps1 `
-          -AssemblyInfoFilePath .\ModulationComplexity\Properties\AssemblyInfo.cs `
+          -AssemblyInfoFilePath .\gridScripts\MAAS-SFRThelper\Projects\MAAS-SFRThelper\Properties\AssemblyInfo.cs `
           -ExpirationDate "${{ github.event.inputs.dateInput }}" `
           -MajorVersion ${{ env.MAJOR_VERSION }} `
           -MinorVersion ${{ env.MINOR_VERSION }} `
           -PatchVersion ${{ env.PATCH_VERSION }} `
           -BuildNumber ${{ env.BUILD_NUMBER }}
-    - name: Download nuget packages
-      run: nuget install .\ModulationComplexity\packages.config -OutputDirectory ModulationComplexity\packages
+
+    - name: Setup NuGet.exe for use with actions
+      uses: NuGet/setup-nuget@v1.0.6
+      with:
+        nuget-version: latest
 
     - name: Add VIC GitHub NuGet repository
       run: nuget source add
@@ -65,34 +67,35 @@ jobs:
         -Password ${{ secrets.GITHUB_TOKEN }} `
         -StorePasswordInClearText
 
-    - name: Download ESAPI package
-      run: nuget install ESAPI -Version 16.1.0 -OutputDirectory ModulationComplexity\packages
-
+    - name: Download nuget package
+      run: nuget install ESAPI -Version 16.1.0 -OutputDirectory packages
 
     - name: Update hint paths in the csproj file
       run: |
         .\.github\workflows\Update-EsapiHintPaths.ps1 `
-        -CsprojFilePath .\ModulationComplexity\ `
-        -CsprojFileName ModulationComplexity.csproj
-    - name: Build Solution
-      run: msbuild.exe .\ModulationComplexity\ModulationComplexity.sln /nologo /nr:false /p:DeleteExistingFiles=True /p:platform="x64" /p:configuration="Release"
+        -CsprojFilePath .\gridScripts\MAAS-SFRThelper\Projects\MAAS-SFRThelper\ `
+        -CsprojFileName MAAS-SFRThelper.csproj 
 
+    - name: Build Solution
+      run: msbuild.exe .\gridScripts\MAAS-SFRThelper\Projects\MAAS-SFRThelper\MAAS-SFRThelper.sln /nologo /nr:false /p:DeleteExistingFiles=True /p:platform="x64" /p:configuration="Release"
+        
     - name: Zip
       run: |
         Compress-Archive `
-          -Path ".\ModulationComplexity\bin\Debug\*" `
-          -DestinationPath "${{ github.workspace }}/${{env.PROJECT_NAME}}${{ steps.update_assembly_info.outputs.RELEASE_FILE_NAME }}-EclipseV161.zip"
+          -Path ".\gridScripts\MAAS-SFRThelper\plugins\*" `
+          -DestinationPath "${{ github.workspace }}/${{ steps.update_assembly_info.outputs.RELEASE_FILE_NAME }}-EclipseV161.zip"
     
     - name: Create Release
-      uses: softprops/action-gh-release@v0.1.13
+      uses: softprops/action-gh-release@v1
       with:
-        name: ${{env.PROJECT_NAME}}${{ steps.update_assembly_info.outputs.RELEASE_NAME }}-EclipseV16.1
-        tag_name: ${{env.PROJECT_NAME}}${{ steps.update_assembly_info.outputs.RELEASE_NAME }}-EclipseV16.1
+        name: ${{ steps.update_assembly_info.outputs.RELEASE_NAME }}-EclipseV16.1
+        tag_name: ${{ steps.update_assembly_info.outputs.RELEASE_NAME }}-EclipseV16.1
         token: ${{ secrets.GITHUB_TOKEN }}
         draft: false
         prerelease: false
         body: |
+          # ${{ env.PROJECT_NAME }} - V${{ steps.update_assembly_info.outputs.RELEASE_VERSION }}
           This is an official release of the **`${{ env.PROJECT_NAME }}`** project.
           Supported Eclipse version: `v16.1`.
           The generated dll is valid until `${{ github.event.inputs.dateInput }}`.
-        files: ${{ github.workspace }}/${{env.PROJECT_NAME}}${{ steps.update_assembly_info.outputs.RELEASE_FILE_NAME }}-EclipseV161.zip
+        files: ${{ github.workspace }}/${{ steps.update_assembly_info.outputs.RELEASE_FILE_NAME }}-EclipseV161.zip

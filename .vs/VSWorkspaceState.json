@@ -1,6 +1,11 @@
 {
   "ExpandedNodes": [
-    ""
+    "",
+    "\\.github",
+    "\\.github\\workflows",
+    "\\gridScripts",
+    "\\gridScripts\\MAAS-SFRThelper"
   ],
+  "SelectedNode": "\\.github\\workflows\\pipeline_15.6.yaml",
   "PreviewInSolutionExplorer": false
 }
