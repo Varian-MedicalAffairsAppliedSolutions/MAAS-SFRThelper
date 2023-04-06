@@ -42,9 +42,7 @@ jobs:
   build:
     runs-on: windows-2019
     env:
-      # USER MUST SET PACKAGES DIRECTORY
-      PACKAGES_PATH: ..\..\..\..\packages
-      GITHUB_WORKSPACE_PACKAGES_PATH: ${{ env.PACKAGES_PATH }}\ESAPI.${{ github.event.inputs.ESAPI_VERSION }}\lib\${{ github.event.inputs.FRAMEWORK_VERSION }}\
+      GITHUB_WORKSPACE_PACKAGES_PATH: ..\..\..\..\packages\ESAPI.${{ github.event.inputs.ESAPI_VERSION }}\lib\${{ github.event.inputs.FRAMEWORK_VERSION }}\
       # USER MUST SET PROJECT NAME
       PROJECT_NAME: MAAS-SFRThelper
       MAJOR_VERSION: 2
