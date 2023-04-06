@@ -19,7 +19,7 @@ on:
         default: '7/11/2022'
 
       # SELECTABLE BUILD CONFIG
-      buildConfig:
+      esapiVersion:
         type: choice
         required: true
         description: ESAPI version
@@ -27,28 +27,40 @@ on:
         - '15.6.0' 
         - '16.1.0'
         - '17.0.0'
+        
+      # SELECTABLE BUILD CONFIG
+      netVersion:
+        type: choice
+        required: true
+        description: Net version
+        options:
+        - '4.5.0' 
+        - '4.6.1'
+        - '4.8.0'
+        
+      netAbbrev:
+        type: choice
+        required: true
+        description: Net abbreviation
+        options:
+        - 'net45'
+        - 'net461'
+        - 'net48'
+
 
 jobs:
   build:
     runs-on: windows-2019
     env:
-      GITHUB_WORKSPACE_PACKAGES_PATH: ..\..\..\..\packages\
+      GITHUB_WORKSPACE_PACKAGES_PATH: ..\..\..\..\packages\ESAPI.15.6.0\lib\${{ github.event.inputs.netAbbrev }}
       # USER MUST SET PROJECT NAME
       PROJECT_NAME: MAAS-SFRThelper
       MAJOR_VERSION: 2
       MINOR_VERSION: 5
       PATCH_VERSION: 6
       BUILD_NUMBER: ${{ github.run_number }}
-
+      
     steps:
-    - name: Set Environment Variables
-      if: ${{ contains(github.event.inputs.buildConfig, '15.6.0') }}
-      run: |
-        echo "Setting 15.6.0"
-        echo "ESAPI_VERSION=15.6.0" >> $GITHUB_ENV
-    - name: Show Variables
-      run: |
-        echo "ESAPI_VERSION=$ESAPI_VERSION"
 
     - name: Checkout
       uses: actions/checkout@v3
@@ -61,12 +73,12 @@ jobs:
     - name: Navigate to Workspace
       run: cd $GITHUB_WORKSPACE
 
-    - name: Update Target Framework Version to ${{env.ESAPI_VERSION}}
+    - name: Update Target Framework Version to ${{ github.event.inputs.netVersion }}
       uses: Nambers/ReplaceStringInFile@v1.1
       with:
         path: .\${{ env.PROJECT_NAME}}\${{ env.PROJECT_NAME}}.csproj
         oldString: "TargetFrameworkVersion>v[\\d\\.]+<"
-        newString: 'TargetFrameworkVersion>v${{ env.ESAPI_VERSION }}<'
+        newString: 'TargetFrameworkVersion>v${{ github.event.inputs.netVersion }}<'
 
     - name: Update AssemblyInfo.cs
       id: update_assembly_info
@@ -93,7 +105,7 @@ jobs:
         -StorePasswordInClearText
 
     - name: Download nuget package
-      run: nuget install ESAPI -Version ${{ env.ESAPI_VERSION }} -OutputDirectory packages
+      run: nuget install ESAPI -Version ${{ github.event.inputs.netVersion }} -OutputDirectory packages
 
     - name: Update hint paths in the csproj file
       run: |
@@ -108,19 +120,19 @@ jobs:
       run: |
         Compress-Archive `
           -Path ".\gridScripts\MAAS-SFRThelper\plugins\*" `
-          -DestinationPath "${{ github.workspace }}/${{ steps.update_assembly_info.outputs.RELEASE_FILE_NAME }}-EclipseV${{ env.ESAPI_VERSION }}.zip"
+          -DestinationPath "${{ github.workspace }}/${{ steps.update_assembly_info.outputs.RELEASE_FILE_NAME }}-EclipseV${{ github.event.inputs.esapiVersion }}.zip"
     
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
-        name: ${{ steps.update_assembly_info.outputs.RELEASE_NAME }}-EclipseV${{ env.ESAPI_VERSION }}
-        tag_name: ${{ steps.update_assembly_info.outputs.RELEASE_NAME }}-EclipseV${{ env.ESAPI_VERSION }}
+        name: ${{ steps.update_assembly_info.outputs.RELEASE_NAME }}-EclipseV${{ github.event.inputs.esapiVersion }}
+        tag_name: ${{ steps.update_assembly_info.outputs.RELEASE_NAME }}-EclipseV${{ github.event.inputs.esapiVersion }}
         token: ${{ secrets.GITHUB_TOKEN }}
         draft: false
         prerelease: false
         body: |
           # ${{ env.PROJECT_NAME }} - V${{ steps.update_assembly_info.outputs.RELEASE_VERSION }}
           This is an official release of the **`${{ env.PROJECT_NAME }}`** project.
-          Supported Eclipse version: `v${{ env.ESAPI_VERSION }}`.
+          Supported Eclipse version: `v${{ github.event.inputs.esapiVersion }}`.
           The generated dll is valid until `${{ github.event.inputs.dateInput }}`.
-        files: ${{ github.workspace }}/${{ steps.update_assembly_info.outputs.RELEASE_FILE_NAME }}-EclipseV${{ env.ESAPI_VERSION }}.zip
+        files: ${{ github.workspace }}/${{ steps.update_assembly_info.outputs.RELEASE_FILE_NAME }}-EclipseV${{ github.event.inputs.esapiVersion }}.zip
