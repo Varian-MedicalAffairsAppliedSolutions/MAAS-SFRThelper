@@ -51,6 +51,27 @@ jobs:
       BUILD_NUMBER: ${{ github.run_number }}
 
     steps:
+
+    - name: Set Variables
+      run: |
+        if [[ "${{ github.event.inputs.ESAPI_VERSION }}" == "15.6.0" ]]; then
+          echo "::set-env name=ESAPI_VERSION::15.6.0"
+          echo "::set-env name=NET_VERSION::4.5.0"
+          echo "::set-env name=NET_ABREVIATION::net45"
+
+        elif [[ "${{ steps.choice.outputs.choice }}" == "16.1.0" ]]; then
+          echo "::set-env name=ESAPI_VERSION::16.1.0"
+          echo "::set-env name=NET_VERSION::4.6.1"
+          echo "::set-env name=NET_ABREVIATION::net461"
+
+        fi
+
+    - name: Show Variables
+      run: |
+        echo "ESAPI_VERSION: ${{ env.ESAPI_VERSION }}"
+        echo "NET_VERSION: ${{ env.NET_VERSION }}"
+        echo "NET_ABREVIATION: ${{ env.NET_ABREVIATION }}
+
     - name: Checkout
       uses: actions/checkout@v3
       with:
