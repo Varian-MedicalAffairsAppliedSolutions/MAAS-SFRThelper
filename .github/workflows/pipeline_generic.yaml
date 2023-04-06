@@ -42,29 +42,16 @@ jobs:
 
 
     steps:
-    - name: Select Choice
-      id: choice
+    - name: Set Environment Variables
+      if: ${{ contains(github.event.inputs.buildConfig, '15.6.0') }}
       run: |
-        echo "::set-output name=CONFIG::${{ github.event.inputs.buildConfig }}"
-    - name: Set Variables
-      run: |
-        if [ "${{ github.event.inputs.buildConfig }}" = "15.6.0" ]; then
-          echo "Setting VAR1 and VAR2 for option1"
-          export VAR1="value1"
-          export VAR2="value2"
-        elif [ "${{ github.event.inputs.buildConfig }}" = "16.1.0" ]; then
-          echo "Setting VAR1 and VAR2 for option2"
-          export VAR1="value3"
-          export VAR2="value4"
-        else
-          echo "Setting VAR1 and VAR2 for option3"
-          export VAR1="value5"
-          export VAR2="value6"
-        fi
+       echo "Setting esapi verison to 15.6.0"
+       echo "::set-env name=WINDOWS_ENV_VAR::true"
+
     - name: Show Variables
       run: |
-        echo "VAR1: $VAR1"
-        echo "VAR2: $VAR2"
+        echo "LINUX_ENV_VAR=$LINUX_ENV_VAR"
+        echo "WINDOWS_ENV_VAR=$WINDOWS_ENV_VAR"
 
     - name: Checkout
       uses: actions/checkout@v3
