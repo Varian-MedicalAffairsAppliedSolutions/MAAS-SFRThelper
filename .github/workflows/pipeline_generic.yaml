@@ -19,7 +19,7 @@ on:
         default: '7/11/2022'
 
       # SELECTABLE BUILD CONFIG
-      ESAPI_VERSION:
+      buildConfig:
         type: choice
         required: true
         description: ESAPI version
@@ -28,21 +28,14 @@ on:
         - '16.1.0'
         - '17.0.0'
 
-      FRAMEWORK_VERSION:
-        type: choice
-        required: true
-        description: .NET framework version
-        options:
-        - 'net45'
-        - 'net461'
-        - 'net48'
+     
 
      
 jobs:
   build:
     runs-on: windows-2019
     env:
-      GITHUB_WORKSPACE_PACKAGES_PATH: ..\..\..\..\packages\ESAPI.${{ github.event.inputs.ESAPI_VERSION }}\lib\${{ github.event.inputs.FRAMEWORK_VERSION }}\
+      GITHUB_WORKSPACE_PACKAGES_PATH: ..\..\..\..\packages\
       # USER MUST SET PROJECT NAME
       PROJECT_NAME: MAAS-SFRThelper
       MAJOR_VERSION: 2
@@ -50,27 +43,31 @@ jobs:
       PATCH_VERSION: 6
       BUILD_NUMBER: ${{ github.run_number }}
 
+
     steps:
-
+    - name: Select build configuration
+        id: buildConfig
+        run: |
+          echo "::set-output name=buildConfig::${{ github.event.inputs.buildConfig }}"
     - name: Set Variables
-      run: |
-        if [[ "${{ github.event.inputs.ESAPI_VERSION }}" == "15.6.0" ]]; then
-          echo "::set-env name=ESAPI_VERSION::15.6.0"
-          echo "::set-env name=NET_VERSION::4.5.0"
-          echo "::set-env name=NET_ABREVIATION::net45"
-
-        elif [[ "${{ steps.choice.outputs.choice }}" == "16.1.0" ]]; then
-          echo "::set-env name=ESAPI_VERSION::16.1.0"
-          echo "::set-env name=NET_VERSION::4.6.1"
-          echo "::set-env name=NET_ABREVIATION::net461"
-
-        fi
-
-    - name: Show Variables
-      run: |
-        echo "ESAPI_VERSION: ${{ env.ESAPI_VERSION }}"
-        echo "NET_VERSION: ${{ env.NET_VERSION }}"
-        echo "NET_ABREVIATION: ${{ env.NET_ABREVIATION }}
+        shell: powershell
+        run: |
+          if ($env:buildConfig -eq "15.6.0") {
+            Set-Variable -Name VAR1 -Value "value1"
+            Set-Variable -Name VAR2 -Value "value2"
+          }
+          elseif ($env:buildConfig -eq "16.1.0") {
+            Set-Variable -Name VAR1 -Value "value3"
+            Set-Variable -Name VAR2 -Value "value4"
+          }
+          else {
+            Set-Variable -Name VAR1 -Value "value5"
+            Set-Variable -Name VAR2 -Value "value6"
+          }
+      - name: Show Variables
+        run: |
+          echo "VAR1: $env:VAR1"
+          echo "VAR2: $env:VAR2"
 
     - name: Checkout
       uses: actions/checkout@v3
