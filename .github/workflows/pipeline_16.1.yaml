@@ -1,0 +1,98 @@
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+
+name: Build ESAPI Script - v16.1
+
+on:
+  workflow_dispatch:
+    inputs:
+      dateInput:
+        description: 'Expiration Date'
+        required: true
+        default: '1/1/2024'
+
+jobs:
+  build:
+    name: Build ESAPI Script - v16.1
+    runs-on: windows-2019
+    env:
+      GITHUB_WORKSPACE_PACKAGES_PATH: ..\..\..\..\packages\ESAPI.16.1.0\lib\net461\
+      PROJECT_NAME: PlanComplexity
+      MAJOR_VERSION: 1
+      MINOR_VERSION: 0
+      PATCH_VERSION: 0
+      BUILD_NUMBER: ${{ github.run_number }}
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v1
+
+    - name: Navigate to Workspace
+      run: cd $GITHUB_WORKSPACE
+
+    - name: Update Target Framework Version to 4.6.1
+      uses: Nambers/ReplaceStringInFile@v1.1
+      with:
+        path: .\ModulationComplexity\ModulationComplexity.csproj
+        oldString: "TargetFrameworkVersion>v[\\d\\.]+<"
+        newString: 'TargetFrameworkVersion>v4.6.1<'
+
+    - name: Update AssemblyInfo.cs
+      id: update_assembly_info
+      run: |
+        .\.github\workflows\Update-AssemblyInfo.ps1 `
+          -AssemblyInfoFilePath .\ModulationComplexity\Properties\AssemblyInfo.cs `
+          -ExpirationDate "${{ github.event.inputs.dateInput }}" `
+          -MajorVersion ${{ env.MAJOR_VERSION }} `
+          -MinorVersion ${{ env.MINOR_VERSION }} `
+          -PatchVersion ${{ env.PATCH_VERSION }} `
+          -BuildNumber ${{ env.BUILD_NUMBER }}
+    - name: Download nuget packages
+      run: nuget install .\ModulationComplexity\packages.config -OutputDirectory ModulationComplexity\packages
+
+    - name: Add VIC GitHub NuGet repository
+      run: nuget source add
+        -Name github `
+        -Source "https://nuget.pkg.github.com/Varian-Innovation-Center/index.json" `
+        -UserName craman96 `
+        -Password ${{ secrets.GITHUB_TOKEN }} `
+        -StorePasswordInClearText
+
+    - name: Download ESAPI package
+      run: nuget install ESAPI -Version 16.1.0 -OutputDirectory ModulationComplexity\packages
+
+
+    - name: Update hint paths in the csproj file
+      run: |
+        .\.github\workflows\Update-EsapiHintPaths.ps1 `
+        -CsprojFilePath .\ModulationComplexity\ `
+        -CsprojFileName ModulationComplexity.csproj
+    - name: Build Solution
+      run: msbuild.exe .\ModulationComplexity\ModulationComplexity.sln /nologo /nr:false /p:DeleteExistingFiles=True /p:platform="x64" /p:configuration="Release"
+
+    - name: Zip
+      run: |
+        Compress-Archive `
+          -Path ".\ModulationComplexity\bin\Debug\*" `
+          -DestinationPath "${{ github.workspace }}/${{env.PROJECT_NAME}}${{ steps.update_assembly_info.outputs.RELEASE_FILE_NAME }}-EclipseV161.zip"
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v0.1.13
+      with:
+        name: ${{env.PROJECT_NAME}}${{ steps.update_assembly_info.outputs.RELEASE_NAME }}-EclipseV16.1
+        tag_name: ${{env.PROJECT_NAME}}${{ steps.update_assembly_info.outputs.RELEASE_NAME }}-EclipseV16.1
+        token: ${{ secrets.GITHUB_TOKEN }}
+        draft: false
+        prerelease: false
+        body: |
+          This is an official release of the **`${{ env.PROJECT_NAME }}`** project.
+          Supported Eclipse version: `v16.1`.
+          The generated dll is valid until `${{ github.event.inputs.dateInput }}`.
+        files: ${{ github.workspace }}/${{env.PROJECT_NAME}}${{ steps.update_assembly_info.outputs.RELEASE_FILE_NAME }}-EclipseV161.zip

@@ -12,7 +12,7 @@ jobs:
   build:
     runs-on: windows-2019
     env:
-      GITHUB_WORKSPACE_PACKAGES_PATH: packages\ESAPI.17.0.0\lib\net48\
+      GITHUB_WORKSPACE_PACKAGES_PATH: ..\..\..\..\packages\ESAPI.17.0.0\lib\net48\
       PROJECT_NAME: MAAS-SFRThelper
       MAJOR_VERSION: 2
       MINOR_VERSION: 5
