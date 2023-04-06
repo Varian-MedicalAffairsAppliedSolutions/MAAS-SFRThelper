@@ -47,6 +47,7 @@ jobs:
       run: |
         echo "Setting 15.6.0"
         echo "WINDOWS_ENV_VAR=true" >> $GITHUB_ENV
+        echo "Value of WINDOWS_ENV_VAR environment variable: $WINDOWS_ENV_VAR"
     - name: Show Variables
       run: |
         echo "LINUX_ENV_VAR=$LINUX_ENV_VAR"
