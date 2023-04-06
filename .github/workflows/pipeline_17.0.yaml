@@ -48,18 +48,18 @@ jobs:
           -MinorVersion ${{ env.MINOR_VERSION }} `
           -PatchVersion ${{ env.PATCH_VERSION }} `
           -BuildNumber ${{ env.BUILD_NUMBER }}
+
     - name: Setup NuGet.exe for use with actions
       uses: NuGet/setup-nuget@v1.0.6
       with:
         nuget-version: latest
 
-
-
     - name: Add VIC GitHub NuGet repository
-      run: nuget source add -Name github `
+      run: nuget source add
+        -Name github `
         -Source "https://nuget.pkg.github.com/Varian-Innovation-Center/index.json" `
         -UserName craman96 `
-        -Password ${{ secrets.ESAPI_READ_TOKEN }} `
+        -Password ${{ secrets.GITHUB_TOKEN }} `
         -StorePasswordInClearText
 
     - name: Download nuget package
