@@ -45,9 +45,8 @@ jobs:
     - name: Set Environment Variables
       if: ${{ contains(github.event.inputs.buildConfig, '15.6.0') }}
       run: |
-       echo "Setting esapi verison to 15.6.0"
-       echo "::set-env name=WINDOWS_ENV_VAR::true"
-
+        echo "Setting 15.6.0"
+        echo "WINDOWS_ENV_VAR=true" >> $GITHUB_ENV
     - name: Show Variables
       run: |
         echo "LINUX_ENV_VAR=$LINUX_ENV_VAR"
