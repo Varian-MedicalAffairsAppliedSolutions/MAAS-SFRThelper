@@ -120,7 +120,7 @@ jobs:
       run: |
         Compress-Archive `
           -Path ".\gridScripts\MAAS-SFRThelper\plugins\*" `
-          -DestinationPath "${{ github.workspace }}/${{ steps.update_assembly_info.outputs.RELEASE_FILE_NAME }}-EclipseV${{ github.event.inputs.esapiVersion }}.zip"
+          -DestinationPath "${{ github.workspace }}/${{env.PROJECT_NAME}}${{ steps.update_assembly_info.outputs.RELEASE_FILE_NAME }}-EclipseV${{ github.event.inputs.esapiVersion }}.zip"
     
     - name: Create Release
       uses: softprops/action-gh-release@v1
@@ -135,4 +135,4 @@ jobs:
           This is an official release of the **`${{ env.PROJECT_NAME }}`** project.
           Supported Eclipse version: `v${{ github.event.inputs.esapiVersion }}`.
           The generated dll is valid until `${{ github.event.inputs.dateInput }}`.
-        files: ${{ github.workspace }}/${{ steps.update_assembly_info.outputs.RELEASE_FILE_NAME }}-EclipseV${{ github.event.inputs.esapiVersion }}.zip
+        files: "${{ github.workspace }}/${{env.PROJECT_NAME}}${{ steps.update_assembly_info.outputs.RELEASE_FILE_NAME }}-EclipseV${{ github.event.inputs.esapiVersion }}.zip"
