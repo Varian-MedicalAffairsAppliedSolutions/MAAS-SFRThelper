@@ -19,14 +19,22 @@ on:
         default: '7/11/2022'
 
       # SELECTABLE BUILD CONFIG
-      buildConfig:
+      ESAPI_VERSION:
         type: choice
         required: true
-        description: ESAPI build configuration
+        description: ESAPI version
         options:
-        - ESAPI 15.6.0 net45
-        - ESAPI 16.1.0 net461
-        - ESAPI 17.0.0 net48
+        - '15.6.0' 
+        - '16.1.0'
+        - '17.0.0'
+
+      FRAMEWORK_VERSION:
+        type: choice
+        required: true
+        description: .NET framework version
+        - 'net45'
+        - 'net461'
+        - 'net48'
 
      
 jobs:
@@ -35,9 +43,7 @@ jobs:
     env:
       # USER MUST SET PACKAGES DIRECTORY
       PACKAGES_PATH: ..\..\..\..\packages
-      ESAPI_VERSION: ${{ split(github.events.inputs.buildConfig, ' ')[1] }}
-      NET_VERSION: ${{ split(github.events.inputs.buildConfig, ' ')[2] }}
-      GITHUB_WORKSPACE_PACKAGES_PATH: ${{ env.PACKAGES_PATH }}\ESAPI.${{ env.ESAPI_VERSION }}\lib\${{ env.NET_VERSION }}\
+      GITHUB_WORKSPACE_PACKAGES_PATH: ${{ env.PACKAGES_PATH }}\ESAPI.${{ github.event.inputs.ESAPI_VERSION }}\lib\${{ github.event.inputs.FRAMEWORK_VERSION }}\
       # USER MUST SET PROJECT NAME
       PROJECT_NAME: MAAS-SFRThelper
       MAJOR_VERSION: 2
