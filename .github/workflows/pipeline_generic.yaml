@@ -46,28 +46,28 @@ jobs:
 
     steps:
     - name: Select build configuration
-        id: buildConfig
-        run: |
-          echo "::set-output name=buildConfig::${{ github.event.inputs.buildConfig }}"
+      id: buildConfig
+      run: |
+        echo "::set-output name=buildConfig::${{ github.event.inputs.buildConfig }}"
     - name: Set Variables
-        shell: powershell
-        run: |
-          if ($env:buildConfig -eq "15.6.0") {
-            Set-Variable -Name VAR1 -Value "value1"
-            Set-Variable -Name VAR2 -Value "value2"
-          }
-          elseif ($env:buildConfig -eq "16.1.0") {
-            Set-Variable -Name VAR1 -Value "value3"
-            Set-Variable -Name VAR2 -Value "value4"
-          }
-          else {
-            Set-Variable -Name VAR1 -Value "value5"
-            Set-Variable -Name VAR2 -Value "value6"
-          }
-      - name: Show Variables
-        run: |
-          echo "VAR1: $env:VAR1"
-          echo "VAR2: $env:VAR2"
+      shell: powershell
+      run: |
+        if ($env:buildConfig -eq "15.6.0") {
+          Set-Variable -Name VAR1 -Value "value1"
+          Set-Variable -Name VAR2 -Value "value2"
+        }
+        elseif ($env:buildConfig -eq "16.1.0") {
+          Set-Variable -Name VAR1 -Value "value3"
+          Set-Variable -Name VAR2 -Value "value4"
+        }
+        else {
+          Set-Variable -Name VAR1 -Value "value5"
+          Set-Variable -Name VAR2 -Value "value6"
+        }
+    - name: Show Variables
+      run: |
+        echo "VAR1: $env:VAR1"
+        echo "VAR2: $env:VAR2"
 
     - name: Checkout
       uses: actions/checkout@v3
