@@ -105,7 +105,7 @@ jobs:
         -StorePasswordInClearText
 
     - name: Download nuget package
-      run: nuget install ESAPI -Version ${{ github.event.inputs.netVersion }} -OutputDirectory packages
+      run: nuget install ESAPI -Version ${{ github.event.inputs.esapiVersion }} -OutputDirectory packages
 
     - name: Update hint paths in the csproj file
       run: |
