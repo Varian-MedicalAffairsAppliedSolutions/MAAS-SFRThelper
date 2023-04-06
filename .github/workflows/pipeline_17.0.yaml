@@ -13,7 +13,7 @@ jobs:
     runs-on: windows-2019
     env:
       GITHUB_WORKSPACE_PACKAGES_PATH: packages\ESAPI.17.0.0\lib\net48\
-      PROJECT_NAME: Doserate Editor
+      PROJECT_NAME: MAAS-SFRThelper
       MAJOR_VERSION: 2
       MINOR_VERSION: 5
       PATCH_VERSION: 6
@@ -42,7 +42,7 @@ jobs:
       id: update_assembly_info
       run: |
         .\.github\workflows\Update-AssemblyInfo.ps1 `
-          -AssemblyInfoFilePath ${{ github.workspace }}/DoseRateEditor/Properties/AssemblyInfo.cs `
+          -AssemblyInfoFilePath .\gridScripts\MAAS-SFRThelper\Projects\MAAS-SFRThelper\Properties\AssemblyInfo.cs `
           -ExpirationDate "${{ github.event.inputs.dateInput }}" `
           -MajorVersion ${{ env.MAJOR_VERSION }} `
           -MinorVersion ${{ env.MINOR_VERSION }} `
@@ -66,15 +66,18 @@ jobs:
       run: nuget install ESAPI -Version 17.0.0 -OutputDirectory packages
 
     - name: Update hint paths in the csproj file
-      run: .\.github\workflows\Update-EsapiHintPaths.ps1 -CsprojFilePath ./DoseRateEditor -CsprojFileName DoseRateEditor.csproj 
+      run: |
+        .\.github\workflows\Update-EsapiHintPaths.ps1 `
+        -CsprojFilePath .\gridScripts\MAAS-SFRThelper\Projects\MAAS-SFRThelper\ `
+        -CsprojFileName MAAS-SFRThelper.csproj 
 
     - name: Build Solution
-      run: msbuild.exe DoseRateEditor.sln /nologo /nr:false /p:DeleteExistingFiles=True /p:Configuration=Debug /p:Platform="Any CPU"
+      run: msbuild.exe .\gridScripts\MAAS-SFRThelper\Projects\MAAS-SFRThelper\MAAS-SFRThelper.sln /nologo /nr:false /p:DeleteExistingFiles=True /p:platform="x64" /p:configuration="Release"
         
     - name: Zip
       run: |
         Compress-Archive `
-          -Path "${{ github.workspace }}\DoseRateEditor\bin\Debug\*" `
+          -Path ".\gridScripts\MAAS-SFRThelper\plugins\*" `
           -DestinationPath "${{ github.workspace }}/${{ steps.update_assembly_info.outputs.RELEASE_FILE_NAME }}-EclipseV170.zip"
     
     - name: Create Release
