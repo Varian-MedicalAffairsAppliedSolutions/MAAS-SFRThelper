@@ -32,11 +32,11 @@ jobs:
       run: cd $GITHUB_WORKSPACE
 
     - name: Update Target Framework Version to 4.8
-      uses: rshillington/file-content-replacer@master
+      uses: Nambers/ReplaceStringInFile@v1.1
       with:
-        files: ${{ github.workspace }}/DoseRateEditor/DoseRateEditor.csproj
-        from: "TargetFrameworkVersion>v[\\d\\.]+<"
-        to: 'TargetFrameworkVersion>v4.8<'
+        path: .\${{ env.PROJECT_NAME}}\${{ env.PROJECT_NAME}}.csproj
+        oldString: "TargetFrameworkVersion>v[\\d\\.]+<"
+        newString: 'TargetFrameworkVersion>v4.8<'
 
     - name: Update AssemblyInfo.cs
       id: update_assembly_info
