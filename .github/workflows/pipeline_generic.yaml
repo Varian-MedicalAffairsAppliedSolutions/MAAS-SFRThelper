@@ -61,7 +61,7 @@ jobs:
     - name: Navigate to Workspace
       run: cd $GITHUB_WORKSPACE
 
-    - name: Update Target Framework Version to $ESAPI_VERSION
+    - name: Update Target Framework Version to ${{env.ESAPI_VERSION}}
       uses: Nambers/ReplaceStringInFile@v1.1
       with:
         path: .\${{ env.PROJECT_NAME}}\${{ env.PROJECT_NAME}}.csproj
