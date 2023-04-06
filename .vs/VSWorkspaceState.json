@@ -4,8 +4,9 @@
     "\\.github",
     "\\.github\\workflows",
     "\\gridScripts",
-    "\\gridScripts\\MAAS-SFRThelper"
+    "\\gridScripts\\MAAS-SFRThelper",
+    "\\gridScripts\\MAAS-SFRThelper\\Projects",
+    "\\gridScripts\\MAAS-SFRThelper\\Projects\\MAAS-SFRThelper"
   ],
-  "SelectedNode": "\\.github\\workflows\\pipeline_15.6.yaml",
   "PreviewInSolutionExplorer": false
 }

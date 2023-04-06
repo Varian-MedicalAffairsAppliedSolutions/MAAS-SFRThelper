@@ -1,0 +1,122 @@
+#====================================#
+# craman96                           #
+# 4.6.23                             #
+# Generic pipeline for VIC Projects  #
+#====================================#
+
+# DEFINE PIPELINE NAME
+name: Build ESAPI Script - Generic
+
+# DEFINE WORKFLOW INPUTS
+on:
+  workflow_dispatch:
+    inputs:
+
+      # EXPIRATION DATE
+      dateInput:
+        description: 'Expiration Date'
+        required: true
+        default: '7/11/2022'
+
+      # SELECTABLE BUILD CONFIG
+      buildConfig:
+        type: choice
+        required: true
+        description: ESAPI build configuration
+        options:
+        - ESAPI 15.6.0 net45
+        - ESAPI 16.1.0 net461
+        - ESAPI 17.0.0 net48
+
+     
+jobs:
+  build:
+    runs-on: windows-2019
+    env:
+      # USER MUST SET PACKAGES DIRECTORY
+      PACKAGES_PATH: ..\..\..\..\packages
+      ESAPI_VERSION: ${{ split(github.events.inputs.buildConfig, ' ')[1] }}
+      NET_VERSION: ${{ split(github.events.inputs.buildConfig, ' ')[2] }}
+      GITHUB_WORKSPACE_PACKAGES_PATH: ${{ env.PACKAGES_PATH }}\ESAPI.${{ env.ESAPI_VERSION }}\lib\${{ env.NET_VERSION }}\
+      # USER MUST SET PROJECT NAME
+      PROJECT_NAME: MAAS-SFRThelper
+      MAJOR_VERSION: 2
+      MINOR_VERSION: 5
+      PATCH_VERSION: 6
+      BUILD_NUMBER: ${{ github.run_number }}
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v1.0.2
+
+    - name: Navigate to Workspace
+      run: cd $GITHUB_WORKSPACE
+
+    - name: Update Target Framework Version to ${{ env.ESAPI_VERSION }}
+      uses: Nambers/ReplaceStringInFile@v1.1
+      with:
+        path: .\${{ env.PROJECT_NAME}}\${{ env.PROJECT_NAME}}.csproj
+        oldString: "TargetFrameworkVersion>v[\\d\\.]+<"
+        newString: 'TargetFrameworkVersion>v${{ env.ESAPI_VERSION }}<'
+
+    - name: Update AssemblyInfo.cs
+      id: update_assembly_info
+      run: |
+        .\.github\workflows\Update-AssemblyInfo.ps1 `
+          -AssemblyInfoFilePath .\gridScripts\MAAS-SFRThelper\Projects\MAAS-SFRThelper\Properties\AssemblyInfo.cs `
+          -ExpirationDate "${{ github.event.inputs.dateInput }}" `
+          -MajorVersion ${{ env.MAJOR_VERSION }} `
+          -MinorVersion ${{ env.MINOR_VERSION }} `
+          -PatchVersion ${{ env.PATCH_VERSION }} `
+          -BuildNumber ${{ env.BUILD_NUMBER }}
+
+    - name: Setup NuGet.exe for use with actions
+      uses: NuGet/setup-nuget@v1.0.6
+      with:
+        nuget-version: latest
+
+    - name: Add VIC GitHub NuGet repository
+      run: nuget source add
+        -Name github `
+        -Source "https://nuget.pkg.github.com/Varian-Innovation-Center/index.json" `
+        -UserName craman96 `
+        -Password ${{ secrets.GITHUB_TOKEN }} `
+        -StorePasswordInClearText
+
+    - name: Download nuget package
+      run: nuget install ESAPI -Version ${{ env.ESAPI_VERSION }} -OutputDirectory packages
+
+    - name: Update hint paths in the csproj file
+      run: |
+        .\.github\workflows\Update-EsapiHintPaths.ps1 `
+        -CsprojFilePath .\gridScripts\MAAS-SFRThelper\Projects\MAAS-SFRThelper\ `
+        -CsprojFileName MAAS-SFRThelper.csproj 
+
+    - name: Build Solution
+      run: msbuild.exe .\gridScripts\MAAS-SFRThelper\Projects\MAAS-SFRThelper\MAAS-SFRThelper.sln /nologo /nr:false /p:DeleteExistingFiles=True /p:platform="x64" /p:configuration="Release"
+        
+    - name: Zip
+      run: |
+        Compress-Archive `
+          -Path ".\gridScripts\MAAS-SFRThelper\plugins\*" `
+          -DestinationPath "${{ github.workspace }}/${{ steps.update_assembly_info.outputs.RELEASE_FILE_NAME }}-EclipseV${{ env.ESAPI_VERSION }}.zip"
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        name: ${{ steps.update_assembly_info.outputs.RELEASE_NAME }}-EclipseV${{ env.ESAPI_VERSION }}
+        tag_name: ${{ steps.update_assembly_info.outputs.RELEASE_NAME }}-EclipseV${{ env.ESAPI_VERSION }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+        draft: false
+        prerelease: false
+        body: |
+          # ${{ env.PROJECT_NAME }} - V${{ steps.update_assembly_info.outputs.RELEASE_VERSION }}
+          This is an official release of the **`${{ env.PROJECT_NAME }}`** project.
+          Supported Eclipse version: `v${{ env.ESAPI_VERSION }}`.
+          The generated dll is valid until `${{ github.event.inputs.dateInput }}`.
+        files: ${{ github.workspace }}/${{ steps.update_assembly_info.outputs.RELEASE_FILE_NAME }}-EclipseV${{ env.ESAPI_VERSION }}.zip
