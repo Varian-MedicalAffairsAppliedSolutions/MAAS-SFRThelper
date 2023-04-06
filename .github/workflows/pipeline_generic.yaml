@@ -32,6 +32,7 @@ on:
         type: choice
         required: true
         description: .NET framework version
+        options:
         - 'net45'
         - 'net461'
         - 'net48'
