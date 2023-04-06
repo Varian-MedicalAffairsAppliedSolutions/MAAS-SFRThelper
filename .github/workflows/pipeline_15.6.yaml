@@ -76,8 +76,8 @@ jobs:
     - name: Create Release
       uses: softprops/action-gh-release@v0.1.13
       with:
-        name: ${{ steps.update_assembly_info.outputs.RELEASE_NAME }}-EclipseV15.6
-        tag_name: ${{ steps.update_assembly_info.outputs.RELEASE_NAME }}-EclipseV15.6
+        name: ${{env.PROJECT_NAME}}${{ steps.update_assembly_info.outputs.RELEASE_NAME }}-EclipseV15.6
+        tag_name: ${{env.PROJECT_NAME}}${{ steps.update_assembly_info.outputs.RELEASE_NAME }}-EclipseV15.6
         token: ${{ secrets.GITHUB_TOKEN }}
         draft: false
         prerelease: false
@@ -85,4 +85,4 @@ jobs:
           This is an official release of the **`${{ env.PROJECT_NAME }}`** project.
           Supported Eclipse version: `v15.6`.
           The generated dll is valid until `${{ github.event.inputs.dateInput }}`.
-        files: ${{ github.workspace }}/${{ steps.update_assembly_info.outputs.RELEASE_FILE_NAME }}-EclipseV156.zip
+        files: ${{ github.workspace }}/${{env.PROJECT_NAME}}${{ steps.update_assembly_info.outputs.RELEASE_FILE_NAME }}-EclipseV156.zip
