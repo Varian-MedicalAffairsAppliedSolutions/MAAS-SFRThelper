@@ -4,19 +4,14 @@ Tools to aid in the creation of structure patterns (spheres) or irregular stuctu
 ![image](https://user-images.githubusercontent.com/78000769/208208126-4f09074f-26c7-480d-b6c4-e39e48f5a51d.png)
 
 TO DO (sphere lattice)
-- [x] In app PTV margin for spheres (currently disabled)
-- [x] OK/cancel option when distance between spheres is < radius * 2 (currently, just acknowledge) 
-- [ ] check appropriate hex or rec spacing -- below spheres do overlap (is hex spacing aaccurate?)
+- [ ] check appropriate hex or rec spacing -- below spheres do overlap (is hex spacing accurate?)
 ![image](https://user-images.githubusercontent.com/78000769/208203204-f994c36a-5f87-457b-b798-429d7170fa16.png)
-- [x] hyperlink to license
 - [ ] config file spash warning screen / expiration
 - [ ] test estimating total sphere volume with formula (or lookup table) rather than finding the volume of each sphere for largest (speed up?)
-- [x] cancel button does nothing (remove?)
-- [x] put licence file in build directory
 
 
-![image](https://user-images.githubusercontent.com/78000769/208208510-55806c56-9353-43d2-ad0c-a4ed6652ab57.png)
+![image](https://user-images.githubusercontent.com/78000769/230758343-ae3d1334-f64c-4a13-919c-07731ebce0e1.png)
+
 
 TO DO (RapidRods)
-- [ ] correct window size to display buttons
-- [ ] further testing (ID already in use)
+- [ ] further testing
