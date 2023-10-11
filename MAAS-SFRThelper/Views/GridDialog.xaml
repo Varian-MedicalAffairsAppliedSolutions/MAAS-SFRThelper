@@ -1,0 +1,77 @@
+﻿<UserControl x:Class="MAAS_SFRThelper.Views.GridDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:MAAS_SFRThelper.Views"
+        xmlns:models="clr-namespace:MAAS_SFRThelper.Models"
+        xmlns:converters="clr-namespace:MAAS_SFRThelper.Views.Converters"
+        Height="580" Width="580">
+    <UserControl.Resources>
+        <converters:BoolToBlueConverter x:Key="BoolToBlue"/>
+        <converters:BoolToStrikeConverter x:Key="BoolToStrike"/>
+        <converters:RadiusToDiameterConverter x:Key="RadiusToDiameter"/>
+    </UserControl.Resources>
+
+    <StackPanel Orientation="Vertical" Margin="0,0,0,0" IsEnabled="True">
+        <StackPanel Orientation="Horizontal" >
+            <Label Height="26" Width="100" Margin="10,10,10,10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Target" />
+            <ComboBox x:Name="TargetList" ItemsSource="{Binding TargetStructures}" SelectedIndex="{Binding TargetSelected}" HorizontalAlignment="Left" Height="26" Margin="0, 10, 10, 10" VerticalAlignment="Top" Width="123" />
+            <Label Height="26" Width="100"  Margin="10,10,10,10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Radius (mm)" />
+            <TextBox x:Name="Radius" Text="{Binding Radius}" HorizontalAlignment="Left" Height="26" Margin="0, 10, 10, 10" VerticalAlignment="Top" Width="123"/>
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" >
+            <Label Height="26" Width="100" Margin="10,10,10,10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="X Spacing (mm)" />
+            <TextBox x:Name="XSpacing" Text="{Binding SpacingX}" HorizontalAlignment="Left" Height="26" Margin="0, 10, 10, 10" VerticalAlignment="Top" Width="123"/>
+            <Label Height="26" Width="100" Margin="10,10,10,10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Y Spacing (mm)" />
+            <TextBox x:Name="YSpacing"  Text="{Binding SpacingY}" HorizontalAlignment="Left" Height="26" Margin="0, 10, 10, 10" VerticalAlignment="Top" Width="123"/>
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" >
+            <Label Height="26" Width="100" Margin="10,10,10,10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="x Offset (mm)" />
+            <TextBox x:Name="XOffset" Text="{Binding OffsetX}" HorizontalAlignment="Left" Height="26" Margin="0, 10, 10, 10" VerticalAlignment="Top" Width="123"/>
+            <Label Height="26" Width="100" Margin="10,10,10,10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Y Offset (mm)" />
+            <TextBox x:Name="YOffset" Text="{Binding OffsetY}" HorizontalAlignment="Left" Height="26" Margin="0, 10, 10, 10" VerticalAlignment="Top" Width="123"/>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" >
+            <Label Height="26" Width="100" Margin="10,10,10,10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Angle ZX (deg)" />
+            <TextBox x:Name="XTilt" Text="{Binding TiltX}" HorizontalAlignment="Left" Height="26" Margin="0, 10, 10, 10" VerticalAlignment="Top" Width="123"/>
+            <Label Height="26" Width="100" Margin="10,10,10,10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Angle ZY (deg)" />
+            <TextBox x:Name="YTilt" Text="{Binding TiltY}" HorizontalAlignment="Left" Height="26" Margin="0, 10, 10, 10" VerticalAlignment="Top" Width="123"/>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" >
+            <ItemsControl ItemsSource="{Binding Path=DrawingObjects}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <Canvas Margin="30,10,10,10" Background="Gray" Width="{Binding CanvasWidth}" Height="{Binding CanvasHeight}" ClipToBounds="true" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.Resources>
+                    <DataTemplate DataType="{x:Type models:Circle}" >
+                        <Ellipse Width="{Binding R, Converter={StaticResource RadiusToDiameter}}"
+                                 Height="{Binding R, Converter={StaticResource RadiusToDiameter}}" 
+                                 Fill="{Binding Selected, Converter={StaticResource BoolToBlue}}" 
+                                 MouseUp="ToggleCircle" 
+                                 Stroke="Black" 
+                                 StrokeDashArray="{Binding Selected, Converter={StaticResource BoolToStrike}}" 
+                                 StrokeThickness="4" />
+                    </DataTemplate>
+
+                    <DataTemplate DataType="{x:Type models:Polygon}" >
+                        <Polygon  Points="{Binding Points}" Stroke="Red" StrokeThickness="3"/>
+                    </DataTemplate>
+
+                    <Style TargetType="ContentPresenter">
+                        <Setter Property="Canvas.Left" Value="{Binding XTilted}" />
+                        <Setter Property="Canvas.Top" Value="{Binding YTilted}" />
+                    </Style>
+                </ItemsControl.Resources>
+            </ItemsControl>
+            <Slider Orientation="Vertical" Margin="20,10,10,10" Maximum="{Binding ZEnd}" Minimum="{Binding ZStart}" Value="{Binding ZShown, Mode=TwoWay}"/>
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" >
+            <Button Height="26" Width="130" Margin="10,10,10,10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Create" Click="CreateGrid"/>
+            <Button Height="26" Width="130" Margin="20,10,10,10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Create with inverse" Click="CreateGridAndInverse"/>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

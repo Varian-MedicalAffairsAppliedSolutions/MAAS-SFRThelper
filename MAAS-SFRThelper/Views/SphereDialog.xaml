@@ -1,0 +1,62 @@
+﻿<UserControl x:Class="MAAS_SFRThelper.Views.SphereDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:MAAS_SFRThelper.Views" 
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        Height="580" Width="580">
+
+
+    <StackPanel Orientation="Vertical" Margin="0,0,0,0" IsEnabled="True">
+        <StackPanel Orientation="Horizontal" >
+            <Label Height="26" Width="100" Margin="10,10,10,10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Target" />
+            <ComboBox x:Name="TargetList" ItemsSource="{Binding TargetStructures}" SelectedIndex="{Binding TargetSelected}" HorizontalAlignment="Left" Height="26" Margin="0, 10, 10, 10" VerticalAlignment="Top" Width="123"/>
+            <Label Height="26" Width="100"  Margin="10,10,10,10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Radius (mm)" />
+            <TextBox x:Name="Radius" Text="{Binding Radius}" HorizontalAlignment="Left" Height="26" Margin="10, 10, 10, 10" VerticalAlignment="Top" Width="123"/>
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" >
+            <Label Height="26" Width="100" Margin="10,10,10,10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Spacing (mm)" />
+            <!--TextBox x:Name=MinSpacing" Text="{Binding MinSpacing}" HorizontalAlignment="Left" Height="26" Margin="0, 10, 10, 10" VerticalAlignment="Top" Width="123"/-->
+            <ComboBox x:Name="SpacingCombo" ItemsSource="{Binding ValidSpacings}" SelectedItem="{Binding SpacingSelected}" HorizontalAlignment="Left" Height="26" Margin="0, 10, 10, 10" VerticalAlignment="Top" Width="123"></ComboBox>
+            <Label Height="26" Width="58" Margin="10,10,10,10" VerticalAlignment="Top" Content="Pattern" />
+            <RadioButton IsChecked="{Binding IsHex}" GroupName="Pattern" Margin="5,15">Hexagonal</RadioButton>
+            <RadioButton IsChecked="{Binding IsRect}" GroupName="Pattern" Margin="5, 15">Rectangular</RadioButton>
+
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" >
+            <!--Label Height="26" Width="100" Margin="10,10,10,10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Border (mm)" />
+            <TextBox IsEnabled="False" x:Name="TargetBorder" Text="{Binding TargetBorder}" HorizontalAlignment="Left" Height="26" Margin="0, 10, 10, 10" VerticalAlignment="Top" Width="123"/-->
+            <Label Height="26" Width="107" Margin="3,10,10,10" VerticalAlignment="Top" Content="Vol Threshold (%)" />
+            <TextBox x:Name="VThresh" Text="{Binding VThresh}" IsEnabled="True" Height="26" Width="123"/>
+            <CheckBox Margin="20,10,10,10" IsChecked="{Binding CreateIndividual}">Create Individual Spheres</CheckBox>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal"/>
+
+        <StackPanel Orientation="Horizontal" >
+            <Label Height="26" Width="100" Margin="10,10,10,10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="X Shift (mm)" />
+            <TextBox x:Name="XShift" Text="{Binding XShift}" IsEnabled="True" HorizontalAlignment="Left" Height="26" Margin="0, 10, 10, 10" VerticalAlignment="Top" Width="123"/>
+            <Label Height="26" Width="107" Margin="10,10,10,10" VerticalAlignment="Top" Content="Y Shift (mm)" />
+            <TextBox x:Name="Yshift" Text="{Binding YShift}" IsEnabled="True" HorizontalAlignment="Left" Height="26" Margin="0, 10, 10, 10" VerticalAlignment="Top" Width="123"/>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal"/>
+
+        <StackPanel Orientation="Horizontal" >
+            
+        </StackPanel>
+
+
+        <StackPanel Orientation="Horizontal" >
+            <Button Height="26" Width="130" Margin="10,10,10,10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Create" Click="CreateLattice"/>
+        </StackPanel>
+        
+
+        <StackPanel>
+            <TextBlock Margin="10" Text="{Binding Output}">
+                
+            </TextBlock>
+        </StackPanel>
+
+
+    </StackPanel>
+</UserControl>

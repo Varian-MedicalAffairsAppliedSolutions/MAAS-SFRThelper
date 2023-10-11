@@ -6,17 +6,17 @@ on:
       dateInput:
         description: 'Expiration Date'
         required: true
-        default: '7/11/2023'
+        default: '1/1/2024'
 
 jobs:
   build:
     runs-on: windows-2019
     env:
-      GITHUB_WORKSPACE_PACKAGES_PATH: ..\..\..\..\packages\ESAPI.15.6.0\lib\net45\
+      GITHUB_WORKSPACE_PACKAGES_PATH: ..\packages\ESAPI.15.6.0\lib\net45\
       PROJECT_NAME: MAAS-SFRThelper
-      MAJOR_VERSION: 2
-      MINOR_VERSION: 5
-      PATCH_VERSION: 6
+      PROJECT_ROOT: ${{ github.workspace }}/MAAS-SFRThelper
+      CSPROJ_FILE_NAME: MAAS-SFRThelper.csproj
+      SOLUTION_NAME: MAAS-SFRThelper.sln
       BUILD_NUMBER: ${{ github.run_number }}
 
     steps:
@@ -35,12 +35,10 @@ jobs:
       id: update_assembly_info
       run: |
         .\.github\workflows\Update-AssemblyInfo.ps1 `
-          -AssemblyInfoFilePath .\gridScripts\MAAS-SFRThelper\Projects\MAAS-SFRThelper\Properties\AssemblyInfo.cs `
+          -AssemblyInfoFilePath ${{ env.PROJECT_ROOT }}/Properties/AssemblyInfo.cs `
           -ExpirationDate "${{ github.event.inputs.dateInput }}" `
-          -MajorVersion ${{ env.MAJOR_VERSION }} `
-          -MinorVersion ${{ env.MINOR_VERSION }} `
-          -PatchVersion ${{ env.PATCH_VERSION }} `
-          -BuildNumber ${{ env.BUILD_NUMBER }}
+          -BuildNumber ${{ env.BUILD_NUMBER }} `
+          -ProjectName ${{ env.PROJECT_NAME }}
 
     - name: Setup NuGet.exe for use with actions
       uses: NuGet/setup-nuget@v1
@@ -48,33 +46,37 @@ jobs:
         nuget-version: latest
 
     - name: Download nuget packages
-      run: nuget install .\gridScripts\MAAS-SFRThelper\Projects\MAAS-SFRThelper\packages.config -OutputDirectory packages
+      run: nuget install ${{ env.PROJECT_ROOT }}/packages.config -OutputDirectory packages
 
     - name: Add VIC GitHub NuGet repository
-      run: nuget source add
+      run: nuget source add `
         -Name github `
-        -Source "https://nuget.pkg.github.com/Varian-Innovation-Center/index.json" `
+        -Source "https://nuget.pkg.github.com/Varian-MedicalAffairsAppliedSolutions/index.json" `
         -UserName craman96 `
         -Password ${{ secrets.GITHUB_TOKEN }} `
         -StorePasswordInClearText
 
-    - name: Download nuget package
+    - name: Download internal ESAPI nuget package
       run: nuget install ESAPI -Version 15.6.0 -OutputDirectory packages
 
     - name: Update hint paths in the csproj file
       run: |
         .\.github\workflows\Update-EsapiHintPaths.ps1 `
-        -CsprojFilePath .\gridScripts\MAAS-SFRThelper\Projects\MAAS-SFRThelper\ `
-        -CsprojFileName MAAS-SFRThelper.csproj 
+        -CsprojFilePath ${{ env.PROJECT_ROOT }} `
+        -CsprojFileName ${{ env.CSPROJ_FILE_NAME }}
 
     - name: Build Solution
-      run: msbuild.exe .\gridScripts\MAAS-SFRThelper\Projects\MAAS-SFRThelper\MAAS-SFRThelper.sln /nologo /nr:false /p:DeleteExistingFiles=True /p:platform="x64" /p:configuration="Release"
+      run: msbuild.exe ${{ env.SOLUTION_NAME }} /nologo /nr:false /p:DeleteExistingFiles=True /p:platform="x64" /p:configuration="Release"
         
     - name: Zip
+      id: zip_release
       run: |
-        Compress-Archive `
-          -Path ".\gridScripts\MAAS-SFRThelper\plugins\*" `
-          -DestinationPath "${{ github.workspace }}/${{ steps.update_assembly_info.outputs.RELEASE_FILE_NAME }}-EclipseV156.zip"
+        $normalizedFilePath = "${{ github.workspace }}/V15.6-${{ steps.update_assembly_info.outputs.RELEASE_FILE_NAME }}.zip" -replace '\\', '/'
+        
+        Get-ChildItem -Path "${{ env.PROJECT_ROOT }}\bin\x64\Release\*" -Recurse |
+          Compress-Archive -DestinationPath $normalizedFilePath
+        
+        "NORMALIZED_FILE_PATH=$($normalizedFilePath)" >> $env:GITHUB_OUTPUT
     
     - name: Create Release
       uses: softprops/action-gh-release@v0.1.13
@@ -88,4 +90,4 @@ jobs:
           This is an official release of the **`${{ env.PROJECT_NAME }}`** project.
           Supported Eclipse version: `v15.6`.
           The generated dll is valid until `${{ github.event.inputs.dateInput }}`.
-        files: ${{ github.workspace }}/${{env.PROJECT_NAME}}${{ steps.update_assembly_info.outputs.RELEASE_FILE_NAME }}-EclipseV156.zip
+        files: ${{ steps.zip_release.outputs.NORMALIZED_FILE_PATH }}

@@ -1,0 +1,28 @@
+﻿<Window x:Class="MAAS_SFRThelper.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:MAAS_SFRThelper.Views"
+        mc:Ignorable="d"
+        Title="MAAS-SFRThelper" Height="635" Width="580">
+    <DockPanel LastChildFill="False">
+        <Grid DockPanel.Dock="Top">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"></RowDefinition>
+                <RowDefinition Height="Auto"></RowDefinition>
+            </Grid.RowDefinitions>
+            <TabControl>
+                <TabItem Name="SphereLatticeTab" Header="SphereLattice" />
+                <TabItem Name="RapidRodsTab" Header="RapidRods"/>
+            </TabControl>
+
+            <TextBlock Grid.Row="1" Name="Footer" Background="PaleVioletRed">
+                <Label Margin="0"><Hyperlink NavigateUri="http://medicalaffairs.varian.com/download/VarianLUSLA.pdf" RequestNavigate="Hyperlink_RequestNavigate">
+                    Bound by the terms of the Varian LUSLA
+                </Hyperlink></Label>
+                <Label Margin="0" Content="{Binding PostText}"/>
+            </TextBlock>
+        </Grid>
+    </DockPanel>
+</Window>
