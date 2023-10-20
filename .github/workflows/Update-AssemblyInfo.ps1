@@ -2,6 +2,9 @@
 param (
     [Parameter(Mandatory=$true)]
     [String]
+    $ProjectName,
+    [Parameter(Mandatory=$true)]
+    [String]
     $AssemblyInfoFilePath,
     [Parameter(Mandatory=$true)]
     [String]
@@ -58,12 +61,12 @@ Foreach-Object {
         Write-Host "Updated $_ to $updatedLine"
         $updatedLine
     }
-    elseif ($_ -match '^\[assembly: ExpirationDateAsmAttribute')
+    elseif ($_ -match '^\[assembly: AssemblyExpirationDate')
     {
-        $_ -match "ExpirationDateAsmAttribute\(`"(?<CurrentExpiration>\S+)`"\)" | Out-Null
+        $_ -match "AssemblyExpirationDate\(`"(?<CurrentExpiration>\S+)`"\)" | Out-Null
         Write-Host "Changing expiration date from $($matches.CurrentExpiration) to $ExpirationDate"
         
-        $updatedLine = $_ -replace "ExpirationDateAsmAttribute\(\S+\)","ExpirationDateAsmAttribute(`"$ExpirationDate`")"
+        $updatedLine = $_ -replace "AssemblyExpirationDate\(\S+\)","AssemblyExpirationDate(`"$ExpirationDate`")"
         Write-Host "Updated $_ to $updatedLine"
 
         $updatedLine
@@ -77,8 +80,8 @@ Foreach-Object {
 Set-Content -Path $AssemblyInfoFilePath -Value $updatedContent
 
 $versionString = "$newMajorVersion.$newMinorVersion.$newPatchVersion.$newBuildNumber"
-$releaseName = "V$versionString-$(Get-Date -Format 'MM/dd/yyyy')($ExpirationDate)"
-$normalizedReleaseName = "V$versionString-$(Get-Date -Format 'MM-dd-yyyy')($($ExpirationDate -replace '/','-'))"
+$releaseName = "$ProjectName-V$versionString-$(Get-Date -Format 'MM/dd/yyyy')($ExpirationDate)"
+$normalizedReleaseName = "$ProjectName-V$versionString-$(Get-Date -Format 'MM-dd-yyyy').$($ExpirationDate -replace '/','-')"
 
 "RELEASE_VERSION=$($versionString)" >> $env:GITHUB_OUTPUT
 "RELEASE_NAME=$($releaseName)" >> $env:GITHUB_OUTPUT

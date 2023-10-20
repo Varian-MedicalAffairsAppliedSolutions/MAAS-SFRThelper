@@ -1,4 +1,4 @@
-name: Build ESAPI Script - v17.0
+name: Build ESAPI Script - v18.0
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ jobs:
   build:
     runs-on: windows-2019
     env:
-      GITHUB_WORKSPACE_PACKAGES_PATH: ..\packages\ESAPI.17.0.0\lib\net48\
+      GITHUB_WORKSPACE_PACKAGES_PATH: ..\packages\ESAPI.18.0.0.1\lib\net48\
       PROJECT_NAME: MAAS-SFRThelper
       PROJECT_ROOT: ${{ github.workspace }}/MAAS-SFRThelper
       CSPROJ_FILE_NAME: MAAS-SFRThelper.csproj
@@ -63,7 +63,7 @@ jobs:
         -StorePasswordInClearText
 
     - name: Download internal ESAPI nuget package
-      run: nuget install ESAPI -Version 17.0.0 -OutputDirectory packages
+      run: nuget install ESAPI -Version 18.0.0.1 -OutputDirectory packages
 
     - name: Update hint paths in the csproj file
       run: |
@@ -77,7 +77,7 @@ jobs:
     - name: Zip
       id: zip_release
       run: |
-        $normalizedFilePath = "${{ github.workspace }}/V17.0-${{ steps.update_assembly_info.outputs.RELEASE_FILE_NAME }}.zip" -replace '\\', '/'
+        $normalizedFilePath = "${{ github.workspace }}/V18.0-${{ steps.update_assembly_info.outputs.RELEASE_FILE_NAME }}.zip" -replace '\\', '/'
         
         Get-ChildItem -Path "${{ env.PROJECT_ROOT }}\bin\x64\Release\*" -Recurse |
           Compress-Archive -DestinationPath $normalizedFilePath
@@ -87,13 +87,13 @@ jobs:
     - name: Create Release
       uses: softprops/action-gh-release@v0.1.13
       with:
-        name: ${{env.PROJECT_NAME}}${{ steps.update_assembly_info.outputs.RELEASE_NAME }}-EclipseV17.0
-        tag_name: ${{env.PROJECT_NAME}}${{ steps.update_assembly_info.outputs.RELEASE_NAME }}-EclipseV17.0
+        name: ${{env.PROJECT_NAME}}${{ steps.update_assembly_info.outputs.RELEASE_NAME }}-EclipseV18.0
+        tag_name: ${{env.PROJECT_NAME}}${{ steps.update_assembly_info.outputs.RELEASE_NAME }}-EclipseV18.0
         token: ${{ secrets.GITHUB_TOKEN }}
         draft: false
         prerelease: false
         body: |
           This is an official release of the **`${{ env.PROJECT_NAME }}`** project.
-          Supported Eclipse version: `V17.0`.
+          Supported Eclipse version: `V18.0`.
           The generated dll is valid until `${{ github.event.inputs.dateInput }}`.
         files: ${{ steps.zip_release.outputs.NORMALIZED_FILE_PATH }}

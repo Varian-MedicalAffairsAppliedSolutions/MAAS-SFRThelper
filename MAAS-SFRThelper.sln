@@ -1,0 +1,41 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.4.33103.184
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MAAS-SFRThelper", "MAAS-SFRThelper\MAAS-SFRThelper.csproj", "{2FC15AB5-D196-45CB-AD50-CF6B7C7AB038}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Actions", "Actions", "{3D5E209E-F8D0-4C91-BDFD-E4ECFA2EAC72}"
+	ProjectSection(SolutionItems) = preProject
+		.github\workflows\pipeline_15.6.yaml = .github\workflows\pipeline_15.6.yaml
+		.github\workflows\pipeline_16.1.yaml = .github\workflows\pipeline_16.1.yaml
+		.github\workflows\pipeline_17.0.yaml = .github\workflows\pipeline_17.0.yaml
+		.github\workflows\pipeline_18.0.yaml = .github\workflows\pipeline_18.0.yaml
+		.github\workflows\Update-AssemblyInfo.ps1 = .github\workflows\Update-AssemblyInfo.ps1
+		.github\workflows\Update-EsapiHintPaths.ps1 = .github\workflows\Update-EsapiHintPaths.ps1
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{2FC15AB5-D196-45CB-AD50-CF6B7C7AB038}.Debug|x64.ActiveCfg = Release|x64
+		{2FC15AB5-D196-45CB-AD50-CF6B7C7AB038}.Debug|x64.Build.0 = Release|x64
+		{2FC15AB5-D196-45CB-AD50-CF6B7C7AB038}.Debug|x86.ActiveCfg = Debug|x86
+		{2FC15AB5-D196-45CB-AD50-CF6B7C7AB038}.Debug|x86.Build.0 = Debug|x86
+		{2FC15AB5-D196-45CB-AD50-CF6B7C7AB038}.Release|x64.ActiveCfg = Release|x64
+		{2FC15AB5-D196-45CB-AD50-CF6B7C7AB038}.Release|x64.Build.0 = Release|x64
+		{2FC15AB5-D196-45CB-AD50-CF6B7C7AB038}.Release|x86.ActiveCfg = Release|x64
+		{2FC15AB5-D196-45CB-AD50-CF6B7C7AB038}.Release|x86.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {821451F9-8590-4AEE-8BA8-E8F454B9D72A}
+	EndGlobalSection
+EndGlobal
