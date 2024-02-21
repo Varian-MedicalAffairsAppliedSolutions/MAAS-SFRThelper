@@ -311,7 +311,8 @@ namespace MAAS_SFRThelper.ViewModels
                 return;
             }
 
-            if (target.IsEmpty == true){
+            if (target.IsEmpty == true)
+            {
                 MessageBox.Show("PTV volume is 0. Unable to create spheres.");
                 return;
             }
