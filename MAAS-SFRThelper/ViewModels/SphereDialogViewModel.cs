@@ -13,6 +13,59 @@ namespace MAAS_SFRThelper.ViewModels
 {
     public class SphereDialogViewModel : BindableBase
     {
+        public List <string> Templates { get; set; }
+        private string _selectedTemplate;
+
+        public string SelectedTemplate
+        {
+            get { return _selectedTemplate; }
+            set { SetProperty(ref _selectedTemplate, value);
+                if (SelectedTemplate == "WashU")
+                {
+                    PatternEnabled = false;
+                    ShiftEnabled = false;
+                    ThresholdEnabled = false;
+                    MultiSphereEnabled = false;
+                    Radius = 7.5f; // Units = mm 
+                    SpacingSelected = ValidSpacings.FirstOrDefault(s=>s.Value==30); // Selected spacing is in a list of valid spacings which we default to 30 using linq
+
+                }
+            }
+        }
+
+        private bool _patternEnabled;
+
+        public bool PatternEnabled
+        {
+            get { return _patternEnabled; }
+            set { SetProperty(ref _patternEnabled, value); }
+        }
+
+        private bool _thresholdenabled;
+
+        public bool ThresholdEnabled
+        {
+            get { return _thresholdenabled; }
+            set { SetProperty(ref _thresholdenabled, value); }
+        }
+
+        private bool _shiftEnabled;
+
+        public bool ShiftEnabled
+        {
+            get { return _shiftEnabled; }
+            set { SetProperty(ref _shiftEnabled, value); }
+        }
+
+        private bool _multiSphereEnabled;
+
+        public bool MultiSphereEnabled
+        {
+            get { return _multiSphereEnabled; }
+            set { SetProperty(ref _multiSphereEnabled, value); }
+        }
+
+
         private string output;
         public string Output
         {
@@ -103,7 +156,7 @@ namespace MAAS_SFRThelper.ViewModels
         {
             // ctor
             scriptContext = context;
-
+            Templates = new List<string> { "WashU" };
             // Set UI value defaults
             VThresh = 0;
             IsHex = true; // default to hex
@@ -111,12 +164,15 @@ namespace MAAS_SFRThelper.ViewModels
             XShift = 0;
             YShift = 0;
             Output = "Welcome to the SFRT-Helper";
-
+            PatternEnabled = true;
+            ThresholdEnabled = true;
+            ShiftEnabled = true;
+            MultiSphereEnabled = true;
 
             // Set valid spacings based on CT img z resolution
             ValidSpacings = new List<Spacing>();
             var spacing = context.Image.ZRes;
-            for (int i = 1; i < 30; i++)
+            for (int i = 1; i < 40; i++) // changed 30 to 40 to include 30 for WashU method @ 7/5 - Matt
             {
                 ValidSpacings.Add(new Spacing(spacing * i));
             }
