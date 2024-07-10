@@ -241,7 +241,7 @@ namespace MAAS_SFRThelper.ViewModels
             return retval;
         }
 
-        private List<VVector> BuildGrid(List<double> xcoords, List<double> ycoords, List<double> zcoords)
+        private List<VVector> BuildGrid(List<double> xcoords, List<double> ycoords, List<double> zcoords) // this sets up points around which spheres are built
         {
             var retval = new List<VVector>();
             foreach (var x in xcoords)
@@ -260,7 +260,7 @@ namespace MAAS_SFRThelper.ViewModels
             return retval;
         }
 
-        private List<VVector> BuildHexGrid(double Xstart, double Xsize, double Ystart, double Ysize, double Zstart, double Zsize)
+        private List<VVector> BuildHexGrid(double Xstart, double Xsize, double Ystart, double Ysize, double Zstart, double Zsize) // this will setup coords for points on hex grid
         {
             double A = SpacingSelected.Value * (Math.Sqrt(3) / 2.0);
             var retval = new List<VVector>();
@@ -289,8 +289,8 @@ namespace MAAS_SFRThelper.ViewModels
 
             return retval;
         }
-
-        private bool PreSpheres()
+        // this is a presphere sanity check -- may want to add something like this to make sure number does not exceed 99?
+        private bool PreSpheres()  
         {
             // Check if we are ready to make spheres
             if (!IsHex && !IsRect)
