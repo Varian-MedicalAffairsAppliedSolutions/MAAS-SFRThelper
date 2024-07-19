@@ -8,7 +8,7 @@
 
     <StackPanel Orientation="Vertical" Margin="0,0,0,0" IsEnabled="True">
 
-        <StackPanel Orientation="Horizontal" >
+        <StackPanel Orientation="Horizontal" Visibility="Hidden" >
             <Label Height="26" Width="200" Margin="10,10,10,10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Predefined Template" />
             <ComboBox ItemsSource="{Binding Templates}" SelectedItem="{Binding SelectedTemplate}" HorizontalAlignment="Left" Height="26" Margin="0, 10, 10, 10" VerticalAlignment="Top" Width="123"/>
         </StackPanel>
@@ -37,7 +37,7 @@
             <TextBox IsEnabled="False" x:Name="TargetBorder" Text="{Binding TargetBorder}" HorizontalAlignment="Left" Height="26" Margin="0, 10, 10, 10" VerticalAlignment="Top" Width="123"/-->
             <Label Height="26" Width="107" Margin="3,10,10,10" VerticalAlignment="Top" Content="Vol Threshold (%)" />
             <TextBox x:Name="VThresh" Text="{Binding VThresh}" IsEnabled="{Binding ThresholdEnabled}" Height="26" Width="123"/>
-            <CheckBox IsEnabled="{Binding MultiSphereEnabled}" Margin="20,10,10,10" IsChecked="{Binding CreateIndividual}">Create Individual Spheres</CheckBox>
+            <CheckBox IsEnabled="{Binding SingleSphereEnabled}" Margin="20,10,10,10" IsChecked="{Binding CreateSingle}">Create spheres as single structure</CheckBox>
         </StackPanel>
         <StackPanel Orientation="Horizontal"/>
 

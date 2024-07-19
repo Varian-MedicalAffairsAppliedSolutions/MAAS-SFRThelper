@@ -25,7 +25,7 @@ namespace MAAS_SFRThelper.ViewModels
                     PatternEnabled = false;
                     ShiftEnabled = false;
                     ThresholdEnabled = false;
-                    MultiSphereEnabled = false;
+                    SingleSphereEnabled = false;
                     Radius = 7.5f; // Units = mm 
                     SpacingSelected = ValidSpacings.FirstOrDefault(s=>s.Value==30); // Selected spacing is in a list of valid spacings which we default to 30 using linq
 
@@ -57,12 +57,12 @@ namespace MAAS_SFRThelper.ViewModels
             set { SetProperty(ref _shiftEnabled, value); }
         }
 
-        private bool _multiSphereEnabled;
+        private bool _singleSphereEnabled;
 
-        public bool MultiSphereEnabled
+        public bool SingleSphereEnabled
         {
-            get { return _multiSphereEnabled; }
-            set { SetProperty(ref _multiSphereEnabled, value); }
+            get { return _singleSphereEnabled; }
+            set { SetProperty(ref _singleSphereEnabled, value); }
         }
 
 
@@ -73,11 +73,11 @@ namespace MAAS_SFRThelper.ViewModels
             set { SetProperty(ref output, value); }
         }
 
-        private bool createIndividual;
-        public bool CreateIndividual
+        private bool createSingle;
+        public bool CreateSingle
         {
-            get { return createIndividual; }
-            set { SetProperty(ref createIndividual, value); }
+            get { return createSingle; }
+            set { SetProperty(ref createSingle, value); }
         }
 
         private bool isHex;
@@ -160,14 +160,14 @@ namespace MAAS_SFRThelper.ViewModels
             // Set UI value defaults
             VThresh = 0;
             IsHex = true; // default to hex
-            createIndividual = true; // default to keeping individual structures
+            createSingle = true; // default to keeping individual structures
             XShift = 0;
             YShift = 0;
             Output = "Welcome to the SFRT-Helper";
             PatternEnabled = true;
             ThresholdEnabled = true;
             ShiftEnabled = true;
-            MultiSphereEnabled = true;
+            SingleSphereEnabled = true;
 
             // Set valid spacings based on CT img z resolution
             ValidSpacings = new List<Spacing>();
@@ -192,6 +192,16 @@ namespace MAAS_SFRThelper.ViewModels
                 if (planTargetId == null) continue;
                 if (i.Id == planTargetId) targetSelected = targetStructures.Count() - 1;
             }
+
+            // Mod date 7/14 - Matt and Japan
+            // Make a new target that is (for now) 1.2 cm inside the PTV - lets call it PTV_sfrt - and then set targetSelected to this structure
+            // This in a way is like uniform shrinkage of tumors - you go from one PTV to another post treatment. 
+            // If I remember correctly, in my MATLAB code from a while ago, we first find the centroid of the structure, then go slice by slice, 
+            // and pull the contour points in. So then, each for each point, we find a distance between the point and centroid, then find coordinates 
+            // of the point that is 1.2 cm inwards --- not testing this here for now - will test in sphere_in_a_box
+            // will wait to meet Matt before implementing here.
+
+
         }
 
         private void AddContoursToMain(ref Structure PrimaryStructure, ref Structure SecondaryStructure)
@@ -332,7 +342,7 @@ namespace MAAS_SFRThelper.ViewModels
             return true;
         }
 
-        public void BuildSpheres(bool makeIndividual, bool alignGrid)
+        public void BuildSpheres(bool alignGrid)
         {
 
             if (!PreSpheres())
@@ -408,6 +418,7 @@ namespace MAAS_SFRThelper.ViewModels
             }
 
             // 4. Make spheres
+            // This loop removes any already existing spheres prior to creating new spheres
             int sphere_count = 0;
 
             var prevSpheres = scriptContext.StructureSet.Structures.Where(x => x.Id.Contains("Sphere")).ToList();
@@ -432,57 +443,65 @@ namespace MAAS_SFRThelper.ViewModels
             // Create all individual spheres
             foreach (VVector ctr in grid)
             {
-                if (makeIndividual)
+                Structure currentSphere = null;
+
+                if (!createSingle)
                 {
                     // Create a new structure and build sphere on that
                     var singleId = $"Sphere_{sphere_count}";
-                    var singleSphere = CreateStructure(singleId, false, true);
-                    BuildSphere(singleSphere, ctr, Radius);
-
-                    // Crop to target
-                    singleSphere.SegmentVolume = singleSphere.SegmentVolume.And(target);
-
-                    sphere_count++;
-
-                    singleIds.Add(singleId);
-                    singleVols.Add(singleSphere.Volume);
+                    currentSphere = CreateStructure(singleId, false, true);
                 }
+                else
+                {
+                    currentSphere = structMain;
+
+                }
+                BuildSphere(currentSphere, ctr, Radius);
+
+                // Crop to target
+                currentSphere.SegmentVolume = currentSphere.SegmentVolume.And(target);
+
+                sphere_count++;
+
+                singleIds.Add(currentSphere.Id);
+                singleVols.Add(currentSphere.Volume);
+
             }
 
             var volThresh = singleVols.Max() * (VThresh / 100);
 
 
 
-            foreach (string id_ in singleIds)
-            {
-                // delete small spheres
-                var singleSphere = scriptContext.StructureSet.Structures.Where(x => x.Id == id_).FirstOrDefault();
-                if (singleSphere != null)
-                {
-                    if (singleSphere.Volume <= volThresh || singleSphere.Volume == 0)
-                    {
-                        // Delete
-                        //MessageBox.Show($"Deleted sphere based on volume threshold: {singleSphere.Volume} >= {volThresh}");
-                        scriptContext.StructureSet.RemoveStructure(singleSphere);
-                        continue;
-                    }
-                }
+            //foreach (string id_ in singleIds.Distinct()) // distinct does 
+            //{
+            //    // delete small spheres
+            //    var singleSphere = scriptContext.StructureSet.Structures.Where(x => x.Id == id_).FirstOrDefault();
+            //    if (singleSphere != null)
+            //    {
+            //        if (singleSphere.Volume <= volThresh || singleSphere.Volume == 0)
+            //        {
+            //            // Delete
+            //            //MessageBox.Show($"Deleted sphere based on volume threshold: {singleSphere.Volume} >= {volThresh}");
+            //            scriptContext.StructureSet.RemoveStructure(singleSphere);
+            //            continue;
+            //        }
+            //    }
 
-                // If here sphere is big enough
-                // Set the lattice struct segment = lattice struct segment.
-                // TODO: try other boolean ops to create mainStructure
+            //    // If here sphere is big enough
+            //    // Set the lattice struct segment = lattice struct segment.
+            //    // TODO: try other boolean ops to create mainStructure
 
-                //structMain.SegmentVolume = structMain.SegmentVolume.Or(singleSphere); // OLD method
-                AddContoursToMain(ref structMain, ref singleSphere);
+            //    //structMain.SegmentVolume = structMain.SegmentVolume.Or(singleSphere); // OLD method
+            //    AddContoursToMain(ref structMain, ref singleSphere);
 
-                // If delete individual delete 
-                if (!createIndividual)
-                {
-                    scriptContext.StructureSet.RemoveStructure(singleSphere);
-                }
+            //    // If delete individual delete 
+            //    if (!createSingle)
+            //    {
+            //        scriptContext.StructureSet.RemoveStructure(singleSphere);
+            //    }
 
 
-            }
+            //}
 
             // Delete the autogenerated target if it exists
             if (deleteAutoTarget)
@@ -537,7 +556,7 @@ namespace MAAS_SFRThelper.ViewModels
         public void CreateLattice()
         {
             scriptContext.Patient.BeginModifications();
-            BuildSpheres(true, true);
+            BuildSpheres(true);
         }
     }
 }
