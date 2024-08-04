@@ -272,21 +272,32 @@ namespace MAAS_SFRThelper.ViewModels
 
         private List<VVector> BuildHexGrid(double Xstart, double Xsize, double Ystart, double Ysize, double Zstart, double Zsize) // this will setup coords for points on hex grid
         {
-            double A = SpacingSelected.Value * (Math.Sqrt(3) / 2.0);
+            double A = SpacingSelected.Value * (Math.Sqrt(3) / 2.0); // what is A? why is it this value?
+            // https://www.omnicalculator.com/math/hexagon
+            // the height of a triangle will be h = √3/2 × a
+
             var retval = new List<VVector>();
 
             void CreateLayer(double zCoord, double x0, double y0)
             {
                 // create planar hexagonal sphere packing grid
-                var yeven = Arange(y0, y0 + Ysize, 2.0 * A);
+                var yeven = Arange(y0, y0 + Ysize, 2.0 * A); // Tenzin - make a drop down menu and rather than having a 2.0, put some variable in it
+                // 2 is the scaling factor --- changed to 4 and tested -- Matt - 2 and 4 reduces number of spheres overall (makes sense - verified by measurements?)
+
                 var xeven = Arange(x0, x0 + Xsize, SpacingSelected.Value);
+                // int yRow = 0;
+
                 foreach (var y in yeven)
                 {
+                    // int xSpot = yRow%2 == 0 ? 1 : 0; // start x spot counter at 1 if y is even and start x spot counter at 0 is y is odd
                     foreach (var x in xeven)
                     {
                         retval.Add(new VVector(x, y, zCoord));
-                        retval.Add(new VVector(x + (SpacingSelected.Value / 2.0), y + A, zCoord));
+                        retval.Add(new VVector(x + (SpacingSelected.Value / 2.0), y + A, zCoord ));
+                       // retval.Add(new VVector(x + (SpacingSelected.Value / 2.0), y + A, zCoord + A/4)); // messy sphere change
+                       // xSpot++;
                     }
+                   //  yRow++;
                 }
             }
 

@@ -24,6 +24,7 @@ namespace VMS.TPS
             {
                 // Consider removing requirement of a plan - just need contours not a plan for spheres - Matt
                 if (context.Patient == null || context.PlanSetup == null)
+                // if (context.Patient == null) // 8/4 trying to comment out context.PlanSetup
                 {
                     MessageBox.Show("No active patient/plan selected - exiting",
                                     "MAAS-SFRTHelper",
