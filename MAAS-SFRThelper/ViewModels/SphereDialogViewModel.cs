@@ -244,7 +244,7 @@ namespace MAAS_SFRThelper.ViewModels
             return retval;
         }
 
-        private List<VVector> BuildGrid(List<double> xcoords, List<double> ycoords, List<double> zcoords) // this sets up points around which spheres are built
+        private List<VVector> BuildGrid(List<double> xcoords, List<double> ycoords, List<double> zcoords, Structure ptvRetract) // this sets up points around which spheres are built
         {
             var retval = new List<VVector>();
             foreach (var x in xcoords)
@@ -255,9 +255,16 @@ namespace MAAS_SFRThelper.ViewModels
                     {
                         var pt = new VVector(x, y, z);
 
-                        // We want to elminate partial spheres - so if we put some sort of a check on pt before adding it to retval, which
-                        // seems to be the vector that holds coordinates for center of spheres
-                        retval.Add(pt);
+                        // We want to elminate partial spheres - so if we put a check in here - if the point is in ptvRetract, we add it to retval
+                        // if it is not inside sphere, we don't add this point to retval
+
+                        bool isInsideptvRetract = ptvRetract.IsPointInsideSegment(pt);
+
+                        if (isInsideptvRetract)
+                        { 
+                            retval.Add(pt);
+                        }
+                        
                     }
                 }
             }
@@ -265,7 +272,7 @@ namespace MAAS_SFRThelper.ViewModels
             return retval;
         }
 
-        private List<VVector> BuildHexGrid(double Xstart, double Xsize, double Ystart, double Ysize, double Zstart, double Zsize) // this will setup coords for points on hex grid
+        private List<VVector> BuildHexGrid(double Xstart, double Xsize, double Ystart, double Ysize, double Zstart, double Zsize, Structure ptvRetract) // this will setup coords for points on hex grid
         {
             double A = SpacingSelected.Value * (Math.Sqrt(3) / 2.0); // what is A? why is it this value?
             // https://www.omnicalculator.com/math/hexagon
@@ -275,6 +282,7 @@ namespace MAAS_SFRThelper.ViewModels
 
             void CreateLayer(double zCoord, double x0, double y0)
             {
+                
                 // create planar hexagonal sphere packing grid
                 var yeven = Arange(y0, y0 + Ysize, 2.0 * A); // Tenzin - make a drop down menu and rather than having a 2.0, put some variable in it
                 // 2 is the scaling factor --- changed to 4 and tested -- Matt - 2 and 4 reduces number of spheres overall (makes sense - verified by measurements?)
@@ -287,12 +295,35 @@ namespace MAAS_SFRThelper.ViewModels
                     // int xSpot = yRow%2 == 0 ? 1 : 0; // start x spot counter at 1 if y is even and start x spot counter at 0 is y is odd
                     foreach (var x in xeven)
                     {
-                        retval.Add(new VVector(x, y, zCoord));
-                        retval.Add(new VVector(x + (SpacingSelected.Value / 2.0), y + A, zCoord ));
-                       // retval.Add(new VVector(x + (SpacingSelected.Value / 2.0), y + A, zCoord + A/4)); // messy sphere change
-                       // xSpot++;
+
+                        var pt1 = new VVector(x, y, zCoord);
+                        var pt2 = new VVector(x + (SpacingSelected.Value / 2.0), y + A, zCoord);
+
+                        // We want to elminate partial spheres - so if we put a check in here - if the point is in ptvRetract, we add it to retval
+                        // if it is not inside sphere, we don't add this point to retval
+
+                        bool isInsideptvRetract1 = ptvRetract.IsPointInsideSegment(pt1);
+                        bool isInsideptvRetract2 = ptvRetract.IsPointInsideSegment(pt2);
+
+                        if (isInsideptvRetract1)
+                        {
+                            retval.Add(pt1);
+                        }
+
+                        if (isInsideptvRetract2)
+                        {
+                            retval.Add(pt2);
+                        }
+
+                        // Old code
+                        // retval.Add(new VVector(x, y, zCoord));
+                        // retval.Add(new VVector(x + (SpacingSelected.Value / 2.0), y + A, zCoord ));
+                        // messy sphere change
+                        // retval.Add(new VVector(x + (SpacingSelected.Value / 2.0), y + A, zCoord + A/4)); 
+
+                        // xSpot++;
                     }
-                   //  yRow++;
+                    //  yRow++;
                 }
             }
 
@@ -359,7 +390,25 @@ namespace MAAS_SFRThelper.ViewModels
             {
                 return;
             }
-            
+
+            scriptContext.Patient.BeginModifications();
+            // Make a new structure
+            // Matt email 7/15/24
+            // https://github.com/VarianAPIs/Varian-Code-Samples/blob/master/webinars%20%26%20workshops/06%20Apr%202018%20Webinar/Eclipse%20Scripting%20API/Projects/CreateOptStructures/CreateOptStructures.cs
+
+
+            // Retrieve the structure set from the plan
+            var plan = scriptContext.PlanSetup;
+            var structureSet = plan.StructureSet;
+
+            // Define the sphere radius for the margin
+            double sphereRadius = Radius; // Change this value as needed
+
+            // Make shrunk volume structure
+            Structure ptv = structureSet.Structures.FirstOrDefault(x => x.Id == "PTV_High");
+            Structure ptvRetract = structureSet.AddStructure("PTV", "ptvRetract");
+            ptvRetract.SegmentVolume = ptv.Margin(-1.25 * sphereRadius);
+
             // Total lattice structure with all spheres
             Structure structMain = null;
 
@@ -414,7 +463,7 @@ namespace MAAS_SFRThelper.ViewModels
 
             if (IsHex)
             {
-                grid = BuildHexGrid(bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ);
+                grid = BuildHexGrid(bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract);
                 structMain = CreateStructure("LatticeHex", true, true);
             }
             else if (IsRect)
@@ -423,7 +472,7 @@ namespace MAAS_SFRThelper.ViewModels
                 var ycoords = Arange(bounds.Y + XShift, bounds.Y + bounds.SizeY + YShift, SpacingSelected.Value);
                 var zcoords = Arange(z0, zf, SpacingSelected.Value);
 
-                grid = BuildGrid(xcoords, ycoords, zcoords);
+                grid = BuildGrid(xcoords, ycoords, zcoords, ptvRetract);
                 structMain = CreateStructure("LatticeRect", true, true);
             }
 
@@ -572,16 +621,16 @@ namespace MAAS_SFRThelper.ViewModels
 
 
             // Retrieve the structure set from the plan
-            var plan = scriptContext.PlanSetup;
-            var structureSet = plan.StructureSet;
+            // var plan = scriptContext.PlanSetup;
+            // var structureSet = plan.StructureSet;
 
             // Define the sphere radius for the margin
-            double sphereRadius = Radius; // Change this value as needed
+            // double sphereRadius = Radius; // Change this value as needed
 
             // Make shrunk volume structure
-            Structure ptv = structureSet.Structures.FirstOrDefault(x => x.Id == "PTV_High");
-            Structure ptvRetract = structureSet.AddStructure("PTV", "ptvRetract");
-            ptvRetract.SegmentVolume = ptv.Margin(-1.25*sphereRadius);
+            // Structure ptv = structureSet.Structures.FirstOrDefault(x => x.Id == "PTV_High");
+            // Structure ptvRetract = structureSet.AddStructure("PTV", "ptvRetract");
+            // ptvRetract.SegmentVolume = ptv.Margin(-1.25*sphereRadius);
 
             // Build spheres
             BuildSpheres(true);
