@@ -3,8 +3,10 @@ using Prism.Mvvm;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.Remoting.Contexts;
 using System.Threading;
 using System.Windows;
+using System.Windows.Controls;
 using VMS.TPS.Common.Model.API;
 using VMS.TPS.Common.Model.Types;
 
@@ -154,7 +156,7 @@ namespace MAAS_SFRThelper.ViewModels
 
         public SphereDialogViewModel(ScriptContext context)
         {
-            // ctor
+            // constructor
             scriptContext = context;
             Templates = new List<string> { "WashU" };
             // Set UI value defaults
@@ -192,15 +194,6 @@ namespace MAAS_SFRThelper.ViewModels
                 if (planTargetId == null) continue;
                 if (i.Id == planTargetId) targetSelected = targetStructures.Count() - 1;
             }
-
-            // Mod date 7/14 - Matt and Japan
-            // Make a new target that is (for now) 1.2 cm inside the PTV - lets call it PTV_sfrt - and then set targetSelected to this structure
-            // This in a way is like uniform shrinkage of tumors - you go from one PTV to another post treatment. 
-            // If I remember correctly, in my MATLAB code from a while ago, we first find the centroid of the structure, then go slice by slice, 
-            // and pull the contour points in. So then, each for each point, we find a distance between the point and centroid, then find coordinates 
-            // of the point that is 1.2 cm inwards --- not testing this here for now - will test in sphere_in_a_box
-            // will wait to meet Matt before implementing here.
-
 
         }
 
@@ -262,6 +255,8 @@ namespace MAAS_SFRThelper.ViewModels
                     {
                         var pt = new VVector(x, y, z);
 
+                        // We want to elminate partial spheres - so if we put some sort of a check on pt before adding it to retval, which
+                        // seems to be the vector that holds coordinates for center of spheres
                         retval.Add(pt);
                     }
                 }
@@ -343,7 +338,11 @@ namespace MAAS_SFRThelper.ViewModels
                 return false;
             }
 
-            if (SpacingSelected.Value < Radius * 2)
+            // this checks for sphere spacing - let's make this 1.1 x to be safer otherwise spheres will touch and we don't want that
+            // at some point we should also check whether spheres are larger than a value - there are a bunch of values given in the drop down value
+            // may need to clean them up a little bit and only show values that make sense for the given PTV - JP
+
+            if (SpacingSelected.Value < 1.1*(Radius * 2))
             {
                 var buttons = MessageBoxButton.OKCancel;
                 var result = MessageBox.Show($"WARNING: Sphere center spacing is less than sphere diameter ({Radius * 2}) mm.\n Continue?", "", buttons);
@@ -360,7 +359,7 @@ namespace MAAS_SFRThelper.ViewModels
             {
                 return;
             }
-
+            
             // Total lattice structure with all spheres
             Structure structMain = null;
 
@@ -567,6 +566,24 @@ namespace MAAS_SFRThelper.ViewModels
         public void CreateLattice()
         {
             scriptContext.Patient.BeginModifications();
+            // Make a new structure
+            // Matt email 7/15/24
+            // https://github.com/VarianAPIs/Varian-Code-Samples/blob/master/webinars%20%26%20workshops/06%20Apr%202018%20Webinar/Eclipse%20Scripting%20API/Projects/CreateOptStructures/CreateOptStructures.cs
+
+
+            // Retrieve the structure set from the plan
+            var plan = scriptContext.PlanSetup;
+            var structureSet = plan.StructureSet;
+
+            // Define the sphere radius for the margin
+            double sphereRadius = Radius; // Change this value as needed
+
+            // Make shrunk volume structure
+            Structure ptv = structureSet.Structures.FirstOrDefault(x => x.Id == "PTV_High");
+            Structure ptvRetract = structureSet.AddStructure("PTV", "ptvRetract");
+            ptvRetract.SegmentVolume = ptv.Margin(-1.25*sphereRadius);
+
+            // Build spheres
             BuildSpheres(true);
         }
     }

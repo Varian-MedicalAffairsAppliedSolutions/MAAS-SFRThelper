@@ -36,7 +36,8 @@ namespace MAAS_SFRThelper.Models
 
         public override string ToString()
         {
-            string v = $"{Math.Round(value_, 1)} (Rec) | {Math.Round(hex_spacing, 1)} (Hex)";
+            // string v = $"{Math.Round(value_, 1)} (Rec) | {Math.Round(hex_spacing, 1)} (Hex)"; // change from hex/rec to axial/lat - JP
+            string v = $"{Math.Round(value_, 1)} (Lateral) | {Math.Round(hex_spacing, 1)} (Axial)";
             return v;
         }
     }
