@@ -47,6 +47,10 @@
             <Label Height="26" Width="107" Margin="10,10,10,10" VerticalAlignment="Top" Content="Y Shift (mm)" />
             <TextBox x:Name="Yshift" Text="{Binding YShift}" IsEnabled="{Binding ShiftEnabled}" HorizontalAlignment="Left" Height="26" Margin="0, 10, 10, 10" VerticalAlignment="Top" Width="123"/>
         </StackPanel>
+        <StackPanel Orientation="Horizontal" >
+            <Label Height="26" Width="180" Margin="10,10,10,10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Lateral spacing scaling factor" />
+            <TextBox x:Name="LateralScalingFactor" Text="{Binding LateralScalingFactor}" HorizontalAlignment="Left" Height="26" Margin="0, 10, 10, 10" VerticalAlignment="Top" Width="123"/>
+        </StackPanel>
         <StackPanel Orientation="Horizontal"/>
 
         <StackPanel Orientation="Horizontal" >

@@ -30,12 +30,19 @@ namespace MAAS_SFRThelper.ViewModels
                     SingleSphereEnabled = false;
                     Radius = 7.5f; // Units = mm 
                     SpacingSelected = ValidSpacings.FirstOrDefault(s=>s.Value==30); // Selected spacing is in a list of valid spacings which we default to 30 using linq
-
+                    
                 }
             }
         }
 
         private bool _patternEnabled;
+        private double _LateralScalingFactor;
+
+        public double LateralScalingFactor
+        {
+            get { return _LateralScalingFactor; }
+            set { SetProperty(ref _LateralScalingFactor, value); }
+        }
 
         public bool PatternEnabled
         {
@@ -170,6 +177,7 @@ namespace MAAS_SFRThelper.ViewModels
             ThresholdEnabled = true;
             ShiftEnabled = true;
             SingleSphereEnabled = true;
+            LateralScalingFactor = 1.0;
 
             // Set valid spacings based on CT img z resolution
             ValidSpacings = new List<Spacing>();
@@ -284,10 +292,10 @@ namespace MAAS_SFRThelper.ViewModels
             {
                 
                 // create planar hexagonal sphere packing grid
-                var yeven = Arange(y0, y0 + Ysize, 2.0 * A); // Tenzin - make a drop down menu and rather than having a 2.0, put some variable in it
+                var yeven = Arange(y0, y0 + Ysize, 2.0 * A * LateralScalingFactor); // Tenzin - make a drop down menu and rather than having a 2.0, put some variable in it
                 // 2 is the scaling factor --- changed to 4 and tested -- Matt - 2 and 4 reduces number of spheres overall (makes sense - verified by measurements?)
 
-                var xeven = Arange(x0, x0 + Xsize, SpacingSelected.Value);
+                var xeven = Arange(x0, x0 + Xsize, LateralScalingFactor * SpacingSelected.Value);
                 // int yRow = 0;
 
                 foreach (var y in yeven)
@@ -297,7 +305,7 @@ namespace MAAS_SFRThelper.ViewModels
                     {
 
                         var pt1 = new VVector(x, y, zCoord);
-                        var pt2 = new VVector(x + (SpacingSelected.Value / 2.0), y + A, zCoord);
+                        var pt2 = new VVector(x + (SpacingSelected.Value / 2.0) * LateralScalingFactor, y + A * LateralScalingFactor, zCoord);
 
                         // We want to elminate partial spheres - so if we put a check in here - if the point is in ptvRetract, we add it to retval
                         // if it is not inside sphere, we don't add this point to retval
@@ -404,8 +412,10 @@ namespace MAAS_SFRThelper.ViewModels
             // Define the sphere radius for the margin
             double sphereRadius = Radius; // Change this value as needed
 
-            // Make shrunk volume structure
-            Structure ptv = structureSet.Structures.FirstOrDefault(x => x.Id == "PTV_High");
+            // Make shrunk volume structure --  
+            // Structure ptv = structureSet.Structures.FirstOrDefault(x => x.Id == "PTV_High");
+            var target_named = targetStructures[targetSelected]; // this is used to create PTV retract without having to pass target_name everywhere over and over again
+            Structure ptv = structureSet.Structures.FirstOrDefault(x => x.Id == target_named);
             Structure ptvRetract = structureSet.AddStructure("PTV", "ptvRetract");
             ptvRetract.SegmentVolume = ptv.Margin(-1.25 * sphereRadius);
 

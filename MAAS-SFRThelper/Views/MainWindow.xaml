@@ -13,8 +13,8 @@
                 <RowDefinition Height="Auto"></RowDefinition>
             </Grid.RowDefinitions>
             <TabControl>
-                <TabItem Name="SphereLatticeTab" Header="SphereLattice" />
-                <TabItem Name="RapidRodsTab" Header="RapidRods"/>
+                <TabItem Name="SphereLatticeTab" Header="SphereLattice" Style="{x:Null}"/>
+                <TabItem Name="RapidRodsTab" Header="RapidRods" Style="{x:Null}"/>
             </TabControl>
 
             <TextBlock Grid.Row="1" Name="Footer" Background="PaleVioletRed">
