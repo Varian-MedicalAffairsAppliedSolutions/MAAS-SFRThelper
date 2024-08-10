@@ -13,12 +13,12 @@ namespace MAAS_SFRThelper.Models
             set { SetProperty(ref value_, value); }
         }
 
-        private double hex_spacing;
-        public double Hex_Spacing
-        {
-            get { return hex_spacing; }
-            set { SetProperty(ref hex_spacing, value); }
-        }
+        //private double hex_spacing;
+        //public double Hex_Spacing
+        //{
+        //    get { return hex_spacing; }
+        //    set { SetProperty(ref hex_spacing, value); }
+        //}
 
         private string stringRep;
         public string StringRep
@@ -27,17 +27,17 @@ namespace MAAS_SFRThelper.Models
             set { SetProperty(ref stringRep, value); }
         }
 
-        public Spacing(double rect_spacing)
+        public Spacing(double spacing)
         {
-            value_ = rect_spacing;
-            Hex_Spacing = rect_spacing * Math.Sqrt(3);
+            value_ = spacing;
+            // Hex_Spacing = rect_spacing * Math.Sqrt(3);
             StringRep = ToString();
         }
 
         public override string ToString()
         {
-            // string v = $"{Math.Round(value_, 1)} (Rec) | {Math.Round(hex_spacing, 1)} (Hex)"; // change from hex/rec to axial/lat - JP
-            string v = $"{Math.Round(value_, 1)} (Lateral) | {Math.Round(hex_spacing, 1)} (Axial)";
+            string v = $"{Math.Round(value_, 1)}"; // | {Math.Round(hex_spacing, 1)} (Hex)"; // change from hex/rec to axial/lat - JP
+            // string v = $"{Math.Round(value_, 1)} (Lateral) | {Math.Round(hex_spacing, 1)} (Axial)";
             return v;
         }
     }

@@ -1,6 +1,7 @@
 ﻿using MAAS_SFRThelper.Models;
 using MAAS_SFRThelper.ViewModels;
 using System;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -49,6 +50,12 @@ namespace MAAS_SFRThelper.Views
         {
             //this.Close();
 
+        }
+
+        private void Hyperlink_RequestNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
+        {
+            Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri));
+            e.Handled = true;
         }
 
     }

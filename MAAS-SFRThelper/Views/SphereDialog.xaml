@@ -2,68 +2,79 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:MAAS_SFRThelper.Views" 
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        Height="580" Width="580" Background="White">
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        d:DesignHeight="580" d:DesignWidth="600" Background="White">
 
 
-    <StackPanel Orientation="Vertical" Margin="0,0,0,0" IsEnabled="True">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
 
-        <StackPanel Orientation="Horizontal" Visibility="Hidden" >
-            <Label Height="26" Width="200" Margin="10,10,10,10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Predefined Template" />
-            <ComboBox ItemsSource="{Binding Templates}" SelectedItem="{Binding SelectedTemplate}" HorizontalAlignment="Left" Height="26" Margin="0, 10, 10, 10" VerticalAlignment="Top" Width="123"/>
-        </StackPanel>
+        </Grid.RowDefinitions>
 
-        <StackPanel Orientation="Horizontal" >
-            <Label Height="26" Width="100" Margin="10,10,10,10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Target" />
-            <ComboBox x:Name="TargetList" ItemsSource="{Binding TargetStructures}" SelectedIndex="{Binding TargetSelected}" HorizontalAlignment="Left" Height="26" Margin="0, 10, 10, 10" VerticalAlignment="Top" Width="123"/>
-            <Label Height="26" Width="100"  Margin="10,10,10,10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Radius (mm)" />
-            <TextBox x:Name="Radius" Text="{Binding Radius}" HorizontalAlignment="Left" Height="26" Margin="10, 10, 10, 10" VerticalAlignment="Top" Width="123"/>
-        </StackPanel>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <Label Height="26" Width="100" Margin="10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Target" />
+        <ComboBox Grid.Column ="1" x:Name="TargetList" ItemsSource="{Binding TargetStructures}" SelectedIndex="{Binding TargetSelected}" HorizontalAlignment="Left" Height="26" Margin="10" VerticalAlignment="Top" Width="123"/>
+        <Label Grid.Column ="2" Height="26" Width="58" Margin="10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Pattern" />
         
-        
-
-        <StackPanel Orientation="Horizontal" >
-            <Label Height="26" Width="100" Margin="10,10,10,10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Spacing (mm)" />
-            <!--TextBox x:Name=MinSpacing" Text="{Binding MinSpacing}" HorizontalAlignment="Left" Height="26" Margin="0, 10, 10, 10" VerticalAlignment="Top" Width="123"/-->
-            <ComboBox x:Name="SpacingCombo" ItemsSource="{Binding ValidSpacings}" SelectedItem="{Binding SpacingSelected}" HorizontalAlignment="Left" Height="26" Margin="0, 10, 10, 10" VerticalAlignment="Top" Width="123"></ComboBox>
-            <Label Height="26" Width="58" Margin="10,10,10,10" VerticalAlignment="Top" Content="Pattern" />
-            <RadioButton IsEnabled="{Binding PatternEnabled}" IsChecked="{Binding IsHex}" GroupName="Pattern" Margin="5,15">Hexagonal</RadioButton>
-            <RadioButton IsEnabled="{Binding PatternEnabled}" IsChecked="{Binding IsRect}" GroupName="Pattern" Margin="5, 15">Rectangular</RadioButton>
-
-        </StackPanel>
-
-        <StackPanel Orientation="Horizontal" >
-            <!--Label Height="26" Width="100" Margin="10,10,10,10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Border (mm)" />
-            <TextBox IsEnabled="False" x:Name="TargetBorder" Text="{Binding TargetBorder}" HorizontalAlignment="Left" Height="26" Margin="0, 10, 10, 10" VerticalAlignment="Top" Width="123"/-->
-            <Label Height="26" Width="107" Margin="3,10,10,10" VerticalAlignment="Top" Content="Vol Threshold (%)" />
-            <TextBox x:Name="VThresh" Text="{Binding VThresh}" IsEnabled="{Binding ThresholdEnabled}" Height="26" Width="123"/>
-            <CheckBox IsEnabled="{Binding SingleSphereEnabled}" Margin="20,10,10,10" IsChecked="{Binding CreateSingle}">Create spheres as single structure</CheckBox>
-        </StackPanel>
-        <StackPanel Orientation="Horizontal"/>
-
-        <StackPanel Orientation="Horizontal" >
-            <Label Height="26" Width="100" Margin="10,10,10,10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="X Shift (mm)" />
-            <TextBox x:Name="XShift" Text="{Binding XShift}" IsEnabled="{Binding ShiftEnabled}" HorizontalAlignment="Left" Height="26" Margin="0, 10, 10, 10" VerticalAlignment="Top" Width="123"/>
-            <Label Height="26" Width="107" Margin="10,10,10,10" VerticalAlignment="Top" Content="Y Shift (mm)" />
-            <TextBox x:Name="Yshift" Text="{Binding YShift}" IsEnabled="{Binding ShiftEnabled}" HorizontalAlignment="Left" Height="26" Margin="0, 10, 10, 10" VerticalAlignment="Top" Width="123"/>
-        </StackPanel>
-        <StackPanel Orientation="Horizontal" >
-            <Label Height="26" Width="180" Margin="10,10,10,10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Lateral spacing scaling factor" />
-            <TextBox x:Name="LateralScalingFactor" Text="{Binding LateralScalingFactor}" HorizontalAlignment="Left" Height="26" Margin="0, 10, 10, 10" VerticalAlignment="Top" Width="123"/>
-        </StackPanel>
-        <StackPanel Orientation="Horizontal"/>
-
-        <StackPanel Orientation="Horizontal" >
-            <Button Height="26" Width="130" Margin="10,10,10,10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Create" Click="CreateLattice"/>
-        </StackPanel>
-        
-
-        <StackPanel>
-            <TextBlock Margin="10" Text="{Binding Output}">
+        <StackPanel Grid.Column="3" Margin="10">
+            <RadioButton Grid.Column ="3" IsEnabled="{Binding PatternEnabled}" IsChecked="{Binding IsHex}" GroupName="Pattern" Margin="2">
+                <Hyperlink NavigateUri="https://legacy.nimbios.org/~gross/bioed/webmodules/spherepacking.htm"  RequestNavigate="Hyperlink_RequestNavigate"  >
+                    Hexagonal Closest 
+                </Hyperlink>
                 
-            </TextBlock>
+            </RadioButton>
+            <RadioButton Grid.Column ="3" IsEnabled="{Binding PatternEnabled}" IsChecked="{Binding IsRect}" GroupName="Pattern" Margin="2">
+                <Hyperlink NavigateUri="https://chem.libretexts.org/Bookshelves/Physical_and_Theoretical_Chemistry_Textbook_Maps/Supplemental_Modules_(Physical_and_Theoretical_Chemistry)/Physical_Properties_of_Matter/States_of_Matter/Properties_of_Solids/Crystal_Lattice/Closest_Pack_Structures" RequestNavigate="Hyperlink_RequestNavigate" >
+                    Simple Cubic
+                </Hyperlink>
+                
+            </RadioButton>
         </StackPanel>
 
 
-    </StackPanel>
+        <Label  Grid.Row ="1" Height="26" Width="100"  Margin="10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Radius (mm)" />
+        <TextBox Grid.Row ="1"  Grid.Column ="1" x:Name="Radius" Text="{Binding Radius}" HorizontalAlignment="Left" Height="26" Margin="10" VerticalAlignment="Top" Width="123"/>
+        <Label Grid.Row ="1"  Grid.Column ="2" Height="26" Width="100" Margin="10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Spacing (mm)"  />
+                <!--TextBox x:Name=MinSpacing" Text="{Binding MinSpacing}" HorizontalAlignment="Left" Height="26" Margin="0, 10, 10, 10" VerticalAlignment="Top" Width="123"/-->
+        <ComboBox Grid.Row ="1"  Grid.Column ="3" x:Name="SpacingCombo" ItemsSource="{Binding ValidSpacings}" SelectedItem="{Binding SpacingSelected}" HorizontalAlignment="Left" Height="26" Margin="10" VerticalAlignment="Top" Width="123" ></ComboBox>
+
+                <!--Label Height="26" Width="100" Margin="10,10,10,10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Border (mm)" />
+            <TextBox IsEnabled="False" x:Name="TargetBorder" Text="{Binding TargetBorder}" HorizontalAlignment="Left" Height="26" Margin="0, 10, 10, 10" VerticalAlignment="Top" Width="123"/-->
+        <!--<TextBox Grid.Row ="2" Grid.Column="1" x:Name="VThresh" Text="{Binding VThresh}" IsEnabled="{Binding ThresholdEnabled}" Height="26" Width="123"/>-->
+        <StackPanel Grid.Row="2" Grid.ColumnSpan="2">
+            <Slider Grid.Row ="2" Value="{Binding VThresh}" Minimum="0" Maximum="100"  IsEnabled="{Binding ThresholdEnabled}" ToolTip="{Binding VThresh}"/>
+            <Label  Grid.Row ="2" Grid.Column="1" VerticalAlignment="Top" HorizontalAlignment="Center" Content="{Binding PartialSphereText}" />
+        </StackPanel>
+
+        <CheckBox Grid.Row ="2" Grid.Column="2" Grid.ColumnSpan="2" IsEnabled="{Binding SingleSphereEnabled}" Margin="10" IsChecked="{Binding CreateSingle}" Style="{x:Null}">Create spheres as single structure</CheckBox>
+        <Label Grid.Row ="3" Height="26" Margin="10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Lattice X Shift (mm)" />
+        <TextBox Grid.Row ="3" Grid.Column="1" x:Name="XShift" Text="{Binding XShift}" IsEnabled="{Binding ShiftEnabled}" HorizontalAlignment="Left" Height="26" Margin="10" VerticalAlignment="Top" Width="123"/>
+        <Label Grid.Row ="3" Grid.Column="2" Height="26" Margin="10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Lattice Y Shift (mm)" />
+        <TextBox Grid.Row ="3" Grid.Column="3" x:Name="Yshift" Text="{Binding YShift}" IsEnabled="{Binding ShiftEnabled}" HorizontalAlignment="Left" Height="26" Margin="10" VerticalAlignment="Top" Width="123"/>
+
+
+        <Label Grid.Row ="4" Height="26" Width="180" Margin="10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Lateral spacing factor" />
+        <TextBox Grid.Row ="4" Grid.Column="1" x:Name="LateralScalingFactor" Text="{Binding LateralScalingFactor}" HorizontalAlignment="Left" Height="26" Margin="10" VerticalAlignment="Top" Width="123"/>
+
+
+        <Button Grid.Row ="4" Grid.Column="2" Grid.ColumnSpan="2" Height="26"  Margin="10" HorizontalAlignment="Stretch" VerticalAlignment="Top" Content="Create" Click="CreateLattice"/>
+
+        <TextBlock Grid.Row ="5" Grid.ColumnSpan="4" Margin="10" Text="{Binding Output}">
+
+                </TextBlock>
+        </Grid>
 </UserControl>
