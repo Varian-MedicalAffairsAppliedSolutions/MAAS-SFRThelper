@@ -38,12 +38,10 @@ namespace MAAS_SFRThelper.Views
         }
 
 
-        private void CreateLattice(object sender, RoutedEventArgs e)
-        {
-            vm.CreateLattice();
-        }
-
-
+      //  private void CreateLattice(object sender, RoutedEventArgs e)
+      //  {
+      //      vm.CreateLattice();
+      //  }
 
 
         private void Cancel(object sender, RoutedEventArgs e)

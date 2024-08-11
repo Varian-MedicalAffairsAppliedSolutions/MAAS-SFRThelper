@@ -1,4 +1,5 @@
 ﻿using MAAS_SFRThelper.Models;
+using Prism.Commands;
 using Prism.Mvvm;
 using System;
 using System.Collections.Generic;
@@ -96,12 +97,12 @@ namespace MAAS_SFRThelper.ViewModels
             get { return isHex; }
             set { 
                 SetProperty(ref isHex, value);
-                // MessageBox.Show("IsHex" + IsHex);
-                if (IsHex)
-                {
-                    IsRect = false;
-                    UpdateValidSpacings();
-                }
+                //// MessageBox.Show("IsHex" + IsHex);
+                //if (IsHex)
+                //{
+                //    IsRect = false;
+                //    UpdateValidSpacings();
+                //}
             }
         }
 
@@ -113,11 +114,10 @@ namespace MAAS_SFRThelper.ViewModels
             set { 
                 SetProperty(ref isRect, value);
                 // MessageBox.Show("IsRect" + IsRect);
-                if (IsRect){
-                    IsHex = false;
-                    UpdateValidSpacings();
-                }
-                
+                //if (IsRect){
+                //    IsHex = false;
+                //    UpdateValidSpacings();
+                //}                
             }
         }
 
@@ -139,7 +139,9 @@ namespace MAAS_SFRThelper.ViewModels
         public float Radius
         {
             get { return radius; }
-            set { SetProperty(ref radius, value); }
+            set { SetProperty(ref radius, value);
+                CreateLatticeCommand.RaiseCanExecuteChanged();
+            }
         }
 
         private List<string> targetStructures;
@@ -186,7 +188,9 @@ namespace MAAS_SFRThelper.ViewModels
         public Spacing SpacingSelected
         {
             get { return spacingSelected; }
-            set { SetProperty(ref spacingSelected, value); }
+            set { SetProperty(ref spacingSelected, value);
+                CreateLatticeCommand.RaiseCanExecuteChanged();
+            }
         }
 
         private readonly ScriptContext scriptContext;
@@ -197,6 +201,24 @@ namespace MAAS_SFRThelper.ViewModels
         {
             get { return _partialSphereText; }
             set { SetProperty(ref _partialSphereText, value); }
+        }
+
+        public DelegateCommand CreateLatticeCommand { get; set; }
+
+        private string _latticeValidationText;
+
+        public string LatticeValidationText
+        {
+            get { return _latticeValidationText; }
+            set { SetProperty(ref _latticeValidationText, value); }
+        }
+
+        private bool _LVVis;
+
+        public bool LVVis
+        {
+            get { return _LVVis; }
+            set { SetProperty(ref _LVVis, value); }
         }
 
 
@@ -219,17 +241,18 @@ namespace MAAS_SFRThelper.ViewModels
             ShiftEnabled = true;
             SingleSphereEnabled = true;
             LateralScalingFactor = 1.0;
+            CreateLatticeCommand = new DelegateCommand(CreateLattice, CanCreateLattice);
 
             // Set valid spacings based on CT img z resolution
             // ValidSpacings = new List<Spacing>();
-           
-            /* for (int i = 1; i < 40; i++) // changed 30 to 40 to include 30 for WashU method @ 7/5 - Matt
+            var spacing = scriptContext.Image.ZRes;
+            for (int i = 1; i < 40; i++) // changed 30 to 40 to include 30 for WashU method @ 7/5 - Matt
             {
                 ValidSpacings.Add(new Spacing(spacing * i));
             }
-            */
+            
             // Default to first value
-            // SpacingSelected = ValidSpacings.FirstOrDefault();
+            SpacingSelected = ValidSpacings.FirstOrDefault();
 
             // Target structures
             targetStructures = new List<string>();
@@ -244,8 +267,29 @@ namespace MAAS_SFRThelper.ViewModels
                 if (i.Id == planTargetId) targetSelected = targetStructures.Count() - 1;
             }
 
+
         }
 
+        private bool CanCreateLattice()
+        {
+            if (radius == 0)
+            {
+                LatticeValidationText = "Please set radius.";
+                LVVis = true;
+            }
+            else if (radius > spacingSelected.Value / 2)
+            {
+                LatticeValidationText = "Radius must be less than half of the spacing value.";
+                LVVis = true;
+            }
+            else { 
+                LVVis = false;
+            }
+            return radius > 0 && spacingSelected != null && radius <= spacingSelected.Value / 2;
+            
+        }
+
+        /*
         private void UpdateValidSpacings()
         {
             ValidSpacings.Clear();
@@ -254,7 +298,8 @@ namespace MAAS_SFRThelper.ViewModels
                 {
                 if (IsHex)
                 {
-                    ValidSpacings.Add(new Spacing(spacing * Math.Sqrt(3) * i));
+                   // ValidSpacings.Add(new Spacing(spacing * Math.Sqrt(3) * i)); // this actually does not make sense because Zres determines Zcoords, and these should not have a sqrt 3
+                   ValidSpacings.Add(new Spacing(spacing * i));
                 }
                 if (IsRect)
                 {
@@ -267,6 +312,7 @@ namespace MAAS_SFRThelper.ViewModels
              // Default to first value
              SpacingSelected = ValidSpacings.FirstOrDefault();
         }
+        */
 
         private void AddContoursToMain(ref Structure PrimaryStructure, ref Structure SecondaryStructure)
         {
@@ -490,7 +536,7 @@ namespace MAAS_SFRThelper.ViewModels
             {
                 ptvRetract = structureSet.AddStructure("CONTROL", "ptvRetract");
             }
-            double margin = vThresh == 100 ? -1.1 * sphereRadius : -sphereRadius * vThresh / 100.0;
+            double margin = vThresh == 100 ? -1.01 * sphereRadius : -sphereRadius * vThresh / 100.0;
             ptvRetract.SegmentVolume = ptv.Margin(margin);
 
             // Total lattice structure with all spheres
@@ -593,6 +639,7 @@ namespace MAAS_SFRThelper.ViewModels
                     // Create a new structure and build sphere on that
                     var singleId = $"Sphere_{sphere_count}";
                     currentSphere = CreateStructure(singleId, false, true);
+
                 }
                 else
                 {
@@ -603,7 +650,12 @@ namespace MAAS_SFRThelper.ViewModels
 
                 // Crop to target
                 currentSphere.SegmentVolume = currentSphere.SegmentVolume.And(target);
+                
+                if (!createSingle) {
 
+                    structMain.SegmentVolume = structMain.Or(currentSphere.SegmentVolume);
+
+                }
                 sphere_count++;
 
                 singleIds.Add(currentSphere.Id);
@@ -611,7 +663,7 @@ namespace MAAS_SFRThelper.ViewModels
 
             }
 
-            var volThresh = singleVols.Max() * (VThresh / 100);
+            // var volThresh = singleVols.Max() * (VThresh / 100);
 
 
 
@@ -650,6 +702,7 @@ namespace MAAS_SFRThelper.ViewModels
             if (deleteAutoTarget)
             {
                 scriptContext.StructureSet.RemoveStructure(target);
+                scriptContext.StructureSet.RemoveStructure(ptvRetract);
             }
 
             // And the main structure with target

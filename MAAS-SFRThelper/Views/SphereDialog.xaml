@@ -4,8 +4,14 @@
         xmlns:local="clr-namespace:MAAS_SFRThelper.Views" 
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:converters="clr-namespace:MAAS_SFRThelper.Converters"
         mc:Ignorable="d"
         d:DesignHeight="580" d:DesignWidth="600" Background="White">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <converters:boolVisibilityConverter x:Key="localVisibilityConverter">  </converters:boolVisibilityConverter>
+        </ResourceDictionary>
+    </UserControl.Resources>
 
 
     <Grid>
@@ -27,7 +33,7 @@
         </Grid.ColumnDefinitions>
 
         <Label Height="26" Width="100" Margin="10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Target" />
-        <ComboBox Grid.Column ="1" x:Name="TargetList" ItemsSource="{Binding TargetStructures}" SelectedIndex="{Binding TargetSelected}" HorizontalAlignment="Left" Height="26" Margin="10" VerticalAlignment="Top" Width="123"/>
+        <ComboBox Grid.Column ="1" x:Name="TargetList" ItemsSource="{Binding TargetStructures}" SelectedIndex="{Binding TargetSelected}" HorizontalAlignment="Left" Height="26" Margin="10" VerticalAlignment="Top" Width="123" Style="{x:Null}"/>
         <Label Grid.Column ="2" Height="26" Width="58" Margin="10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Pattern" />
         
         <StackPanel Grid.Column="3" Margin="10">
@@ -37,7 +43,7 @@
                 </Hyperlink>
                 
             </RadioButton>
-            <RadioButton Grid.Column ="3" IsEnabled="{Binding PatternEnabled}" IsChecked="{Binding IsRect}" GroupName="Pattern" Margin="2">
+            <RadioButton Grid.Column ="3" IsEnabled="{Binding PatternEnabled}" IsChecked="{Binding IsRect}" GroupName="Pattern" Margin="2" >
                 <Hyperlink NavigateUri="https://chem.libretexts.org/Bookshelves/Physical_and_Theoretical_Chemistry_Textbook_Maps/Supplemental_Modules_(Physical_and_Theoretical_Chemistry)/Physical_Properties_of_Matter/States_of_Matter/Properties_of_Solids/Crystal_Lattice/Closest_Pack_Structures" RequestNavigate="Hyperlink_RequestNavigate" >
                     Simple Cubic
                 </Hyperlink>
@@ -47,8 +53,8 @@
 
 
         <Label  Grid.Row ="1" Height="26" Width="100"  Margin="10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Radius (mm)" />
-        <TextBox Grid.Row ="1"  Grid.Column ="1" x:Name="Radius" Text="{Binding Radius}" HorizontalAlignment="Left" Height="26" Margin="10" VerticalAlignment="Top" Width="123"/>
-        <Label Grid.Row ="1"  Grid.Column ="2" Height="26" Width="100" Margin="10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Spacing (mm)"  />
+        <TextBox Grid.Row ="1"  Grid.Column ="1" x:Name="Radius" Text="{Binding Radius}" HorizontalAlignment="Left" Height="26" Margin="10" VerticalAlignment="Top" Width="123" Style="{x:Null}"/>
+        <Label Grid.Row ="1"  Grid.Column ="2" Height="26" Width="100" Margin="10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Spacing (mm)" />
                 <!--TextBox x:Name=MinSpacing" Text="{Binding MinSpacing}" HorizontalAlignment="Left" Height="26" Margin="0, 10, 10, 10" VerticalAlignment="Top" Width="123"/-->
         <ComboBox Grid.Row ="1"  Grid.Column ="3" x:Name="SpacingCombo" ItemsSource="{Binding ValidSpacings}" SelectedItem="{Binding SpacingSelected}" HorizontalAlignment="Left" Height="26" Margin="10" VerticalAlignment="Top" Width="123" ></ComboBox>
 
@@ -56,23 +62,25 @@
             <TextBox IsEnabled="False" x:Name="TargetBorder" Text="{Binding TargetBorder}" HorizontalAlignment="Left" Height="26" Margin="0, 10, 10, 10" VerticalAlignment="Top" Width="123"/-->
         <!--<TextBox Grid.Row ="2" Grid.Column="1" x:Name="VThresh" Text="{Binding VThresh}" IsEnabled="{Binding ThresholdEnabled}" Height="26" Width="123"/>-->
         <StackPanel Grid.Row="2" Grid.ColumnSpan="2">
-            <Slider Grid.Row ="2" Value="{Binding VThresh}" Minimum="0" Maximum="100"  IsEnabled="{Binding ThresholdEnabled}" ToolTip="{Binding VThresh}"/>
+            <Slider Grid.Row ="2" Value="{Binding VThresh}" Minimum="0" Maximum="100"  IsEnabled="{Binding ThresholdEnabled}" ToolTip="{Binding VThresh}" Style="{x:Null}"/>
             <Label  Grid.Row ="2" Grid.Column="1" VerticalAlignment="Top" HorizontalAlignment="Center" Content="{Binding PartialSphereText}" />
         </StackPanel>
 
-        <CheckBox Grid.Row ="2" Grid.Column="2" Grid.ColumnSpan="2" IsEnabled="{Binding SingleSphereEnabled}" Margin="10" IsChecked="{Binding CreateSingle}" Style="{x:Null}">Create spheres as single structure</CheckBox>
+        <CheckBox Grid.Row ="2" Grid.Column="2" Grid.ColumnSpan="2" IsEnabled="{Binding SingleSphereEnabled}" Margin="10" IsChecked="{Binding CreateSingle}" Style="{x:Null}">Create spheres as single structure only</CheckBox>
         <Label Grid.Row ="3" Height="26" Margin="10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Lattice X Shift (mm)" />
-        <TextBox Grid.Row ="3" Grid.Column="1" x:Name="XShift" Text="{Binding XShift}" IsEnabled="{Binding ShiftEnabled}" HorizontalAlignment="Left" Height="26" Margin="10" VerticalAlignment="Top" Width="123"/>
+        <TextBox Grid.Row ="3" Grid.Column="1" x:Name="XShift" Text="{Binding XShift}" IsEnabled="{Binding ShiftEnabled}" HorizontalAlignment="Left" Height="26" Margin="10" VerticalAlignment="Top" Width="123" Style="{x:Null}"/>
         <Label Grid.Row ="3" Grid.Column="2" Height="26" Margin="10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Lattice Y Shift (mm)" />
-        <TextBox Grid.Row ="3" Grid.Column="3" x:Name="Yshift" Text="{Binding YShift}" IsEnabled="{Binding ShiftEnabled}" HorizontalAlignment="Left" Height="26" Margin="10" VerticalAlignment="Top" Width="123"/>
+        <TextBox Grid.Row ="3" Grid.Column="3" x:Name="Yshift" Text="{Binding YShift}" IsEnabled="{Binding ShiftEnabled}" HorizontalAlignment="Left" Height="26" Margin="10" VerticalAlignment="Top" Width="123" Style="{x:Null}"/>
 
 
         <Label Grid.Row ="4" Height="26" Width="180" Margin="10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Lateral spacing factor" />
-        <TextBox Grid.Row ="4" Grid.Column="1" x:Name="LateralScalingFactor" Text="{Binding LateralScalingFactor}" HorizontalAlignment="Left" Height="26" Margin="10" VerticalAlignment="Top" Width="123"/>
+        <TextBox Grid.Row ="4" Grid.Column="1" x:Name="LateralScalingFactor" Text="{Binding LateralScalingFactor}" HorizontalAlignment="Left" Height="26" Margin="10" VerticalAlignment="Top" Width="123" Style="{x:Null}"/>
 
-
-        <Button Grid.Row ="4" Grid.Column="2" Grid.ColumnSpan="2" Height="26"  Margin="10" HorizontalAlignment="Stretch" VerticalAlignment="Top" Content="Create" Click="CreateLattice"/>
-
+        <StackPanel Grid.Row ="4" Grid.Column="2" Grid.ColumnSpan="2" >
+            <Button  Height="26"  Margin="10" HorizontalAlignment="Stretch" VerticalAlignment="Top" Content="Create" Command="{Binding CreateLatticeCommand}" Style="{x:Null}" />
+            <TextBlock Foreground="red" Text="{Binding LatticeValidationText}" Visibility="{Binding LVVis, Converter={StaticResource localVisibilityConverter}}" />
+        </StackPanel>
+       
         <TextBlock Grid.Row ="5" Grid.ColumnSpan="4" Margin="10" Text="{Binding Output}">
 
                 </TextBlock>
