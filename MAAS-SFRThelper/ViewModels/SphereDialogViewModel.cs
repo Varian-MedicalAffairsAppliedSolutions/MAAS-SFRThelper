@@ -11,6 +11,7 @@ using System.Windows;
 using System.Windows.Controls;
 using VMS.TPS.Common.Model.API;
 using VMS.TPS.Common.Model.Types;
+using Voronoi;
 
 
 namespace MAAS_SFRThelper.ViewModels
@@ -118,6 +119,23 @@ namespace MAAS_SFRThelper.ViewModels
                 //    IsHex = false;
                 //    UpdateValidSpacings();
                 //}                
+            }
+        }
+
+
+        private bool isCVT3D;
+        public bool IsCVT3D
+        {
+            get { return isCVT3D; }
+            set
+            {
+                SetProperty(ref isCVT3D, value);
+                //// MessageBox.Show("IsHex" + IsHex);
+                //if (IsHex)
+                //{
+                //    IsRect = false;
+                //    UpdateValidSpacings();
+                //}
             }
         }
 
@@ -604,6 +622,13 @@ namespace MAAS_SFRThelper.ViewModels
 
                 grid = BuildGrid(xcoords, ycoords, zcoords, ptvRetract);
                 structMain = CreateStructure("LatticeRect", false, true);
+            } 
+            else if (IsCVT3D)
+            {
+                var cvt = new CVT3D(target, CVTSettings.DefaultSettings());
+                var cvtGenerators = cvt.CalculateGenerators();
+                grid = cvtGenerators.Select(x => new VVector(x[0], x[1], x[2])).ToList();
+                structMain = CreateStructure("CVT3D", false, true);
             }
 
             // 4. Make spheres
