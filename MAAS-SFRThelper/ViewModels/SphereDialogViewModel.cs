@@ -625,9 +625,9 @@ namespace MAAS_SFRThelper.ViewModels
             } 
             else if (IsCVT3D)
             {
-                var cvt = new CVT3D(target, CVTSettings.DefaultSettings());
+                var cvt = new CVT3D(target.MeshGeometry, CVTSettings.DefaultSettings());
                 var cvtGenerators = cvt.CalculateGenerators();
-                grid = cvtGenerators.Select(x => new VVector(x[0], x[1], x[2])).ToList();
+                grid = cvtGenerators.Select(p => new VVector(p.X, p.Y, p.Z)).ToList();
                 structMain = CreateStructure("CVT3D", false, true);
             }
 
