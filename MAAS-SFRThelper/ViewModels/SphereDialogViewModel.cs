@@ -475,7 +475,7 @@ namespace MAAS_SFRThelper.ViewModels
         private bool PreSpheres()  
         {
             // Check if we are ready to make spheres
-            if (!IsHex && !IsRect)
+            if (!IsHex && !IsRect && !IsCVT3D)
             {
                 var msg = "No pattern selected. Returning.";
                 Output += "\n" + msg;
