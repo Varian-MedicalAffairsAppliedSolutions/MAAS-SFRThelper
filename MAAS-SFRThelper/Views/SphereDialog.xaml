@@ -51,7 +51,7 @@
             </RadioButton>
 
             <RadioButton Grid.Column ="3" IsEnabled="{Binding PatternEnabled}" IsChecked="{Binding IsCVT3D}" GroupName="Pattern" Margin="2" >
-                <Hyperlink NavigateUri="https://chem.libretexts.org/Bookshelves/Physical_and_Theoretical_Chemistry_Textbook_Maps/Supplemental_Modules_(Physical_and_Theoretical_Chemistry)/Physical_Properties_of_Matter/States_of_Matter/Properties_of_Solids/Crystal_Lattice/Closest_Pack_Structures" RequestNavigate="Hyperlink_RequestNavigate" >
+                <Hyperlink NavigateUri="https://www.ovito.org/docs/current/reference/pipelines/modifiers/voronoi_analysis.html" RequestNavigate="Hyperlink_RequestNavigate" >
                     CVT3D
                 </Hyperlink>
 

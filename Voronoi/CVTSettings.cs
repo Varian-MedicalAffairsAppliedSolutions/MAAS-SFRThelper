@@ -17,9 +17,15 @@ namespace Voronoi
             InitializeDefaults();
         }
 
-        private void InitializeDefaults()
+        public CVTSettings(int n_generators)
         {
-            NumberOfGenerators = 32;
+              InitializeDefaults(n_generators); 
+        }
+
+        private void InitializeDefaults(int n_generators = 32)
+        {
+            
+            NumberOfGenerators = n_generators;
             NumberOfSamplingPoints = 3000;
             SelectedSamplingMethod = RandomEngine.HALTONSEQUENCE;
             MaxNumberOfIterations = 1000;

@@ -625,7 +625,11 @@ namespace MAAS_SFRThelper.ViewModels
             } 
             else if (IsCVT3D)
             {
-                var cvt = new CVT3D(target.MeshGeometry, CVTSettings.DefaultSettings());
+                // Extra dialog box for calculating number of points for seed placement CVT
+                Output += "\nCalculating number of spheres, this could take several minutes ...";
+                MessageBox.Show("Calculating number of spheres needed.");
+                grid = BuildHexGrid(bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract);               
+                var cvt = new CVT3D(target.MeshGeometry, new CVTSettings(grid.Count));
                 var cvtGenerators = cvt.CalculateGenerators();
                 grid = cvtGenerators.Select(p => new VVector(p.X, p.Y, p.Z)).ToList();
                 structMain = CreateStructure("CVT3D", false, true);
@@ -732,7 +736,7 @@ namespace MAAS_SFRThelper.ViewModels
 
             // And the main structure with target
             Output += "\nCreated spheres";
-            MessageBox.Show("Created spheres close tool to view. Rerun with different x and y shift values to change location of spheres.");
+            MessageBox.Show("Created spheres close tool to view. \nFor different sphere locations rerun with different x and y shift values.");
 
         }
 
