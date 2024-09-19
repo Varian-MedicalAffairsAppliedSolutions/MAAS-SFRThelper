@@ -140,9 +140,9 @@
     <None Include="VarianLUSLA.pdf" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Voronoi\Voronoi.csproj">
-      <Project>{ca47a04c-e412-4cd5-b718-05433f75ce05}</Project>
-      <Name>Voronoi</Name>
+    <ProjectReference Include="..\Voronoi3d\Voronoi3d.csproj">
+      <Project>{84e535fb-2233-4e7a-ae69-f97b944a84f6}</Project>
+      <Name>Voronoi3d</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

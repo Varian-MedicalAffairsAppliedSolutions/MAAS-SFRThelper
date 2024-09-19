@@ -1,8 +1,7 @@
-﻿using System.ComponentModel;
-using Voronoi.RandomEngines;
-using Voronoi.StoppingCriteria;
+﻿using Voronoi3d.RandomEngines;
+using Voronoi3d.StoppingCriteria;
 
-namespace Voronoi
+namespace Voronoi3d
 {
     public class CVTSettings
     {

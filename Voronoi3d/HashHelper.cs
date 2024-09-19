@@ -1,4 +1,4 @@
-﻿namespace Voronoi
+﻿namespace Voronoi3d
 {
 
     public static class HashHelper

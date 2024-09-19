@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Windows.Media.Media3D;
 
-namespace Voronoi.RandomEngines
+namespace Voronoi3d.RandomEngines
 {
     public interface IRandom3D
     {

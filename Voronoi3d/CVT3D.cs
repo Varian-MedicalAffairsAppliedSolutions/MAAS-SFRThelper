@@ -1,12 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Windows.Media.Media3D;
-using Voronoi.RandomEngines;
-using Voronoi.StoppingCriteria;
+using Voronoi3d.RandomEngines;
+using Voronoi3d.StoppingCriteria;
 
-namespace Voronoi
+namespace Voronoi3d
 {
     public class CVT3D
     {

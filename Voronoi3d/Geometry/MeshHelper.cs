@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
 
-namespace Voronoi.Geometry
+namespace Voronoi3d.Geometry
 {
     public static class MeshHelper
     {

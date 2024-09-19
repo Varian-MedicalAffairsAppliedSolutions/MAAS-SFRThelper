@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 
-namespace Voronoi.StoppingCriteria
+namespace Voronoi3d.StoppingCriteria
 {
     public class CounterDecorator : IStoppingCriterion
     {
