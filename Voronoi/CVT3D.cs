@@ -47,7 +47,8 @@ namespace Voronoi
 
             public override int GetHashCode()
             {
-                return HashCode.Combine(X, Y, Z);
+                //return HashCode.Combine(X, Y, Z);
+                return HashHelper.CombineHashCodes(X, Y, Z);
             }
         }
 
