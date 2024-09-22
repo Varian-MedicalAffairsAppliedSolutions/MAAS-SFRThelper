@@ -28,7 +28,7 @@ namespace Voronoi
             NumberOfGenerators = n_generators;
             NumberOfSamplingPoints = 3000;
             SelectedSamplingMethod = RandomEngine.HALTONSEQUENCE;
-            MaxNumberOfIterations = 1000;
+            MaxNumberOfIterations = 1500;
             StoppingCriterion = new CounterDecorator(new NoDiffAfterThreeIterationsStoppingCriterion());
         }
 

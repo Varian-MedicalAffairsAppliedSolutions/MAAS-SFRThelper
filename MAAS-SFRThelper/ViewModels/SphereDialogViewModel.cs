@@ -626,10 +626,13 @@ namespace MAAS_SFRThelper.ViewModels
             else if (IsCVT3D)
             {
                 // Extra dialog box for calculating number of points for seed placement CVT
-                Output += "\nCalculating number of spheres, this could take several minutes ...";
                 MessageBox.Show("Calculating number of spheres needed.");
-                grid = BuildHexGrid(bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract);               
-                var cvt = new CVT3D(target.MeshGeometry, new CVTSettings(grid.Count));
+                Output += "\nEvaluating number of spheres, this could take several minutes ...";
+                grid = BuildHexGrid(bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract);
+                MessageBox.Show("Total seeds is", grid.Count.ToString());               
+                Output += "\nEvaluating sphere locations using 3D CVT, this could take several minutes ...";
+                // var cvt = new CVT3D(target.MeshGeometry, new CVTSettings(grid.Count));
+                var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(grid.Count));
                 var cvtGenerators = cvt.CalculateGenerators();
                 grid = cvtGenerators.Select(p => new VVector(p.X, p.Y, p.Z)).ToList();
                 structMain = CreateStructure("CVT3D", false, true);
