@@ -4,12 +4,12 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{CA47A04C-E412-4CD5-B718-05433F75CE05}</ProjectGuid>
+    <ProjectGuid>{84E535FB-2233-4E7A-AE69-F97B944A84F6}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>Voronoi</RootNamespace>
-    <AssemblyName>Voronoi</AssemblyName>
-    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+    <RootNamespace>Voronoi3d</RootNamespace>
+    <AssemblyName>Voronoi3d</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
   </PropertyGroup>
@@ -31,7 +31,6 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Microsoft.Bcl.HashCode, Version=1.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL" />
     <Reference Include="PresentationCore" />
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -47,6 +46,7 @@
     <Compile Include="CVT3D.cs" />
     <Compile Include="CVTSettings.cs" />
     <Compile Include="Geometry\MeshHelper.cs" />
+    <Compile Include="HashHelper.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RandomEngines\HaltonSequence3D.cs" />
     <Compile Include="RandomEngines\IRandom3D.cs" />
@@ -56,11 +56,5 @@
     <Compile Include="StoppingCriteria\IStoppingCriterion.cs" />
     <Compile Include="StoppingCriteria\NoDiffAfterThreeIterationsStoppingCriterion.cs" />
   </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Bcl.HashCode">
-      <Version>1.1.1</Version>
-    </PackageReference>
-  </ItemGroup>
-  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

@@ -1,9 +1,9 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Media.Media3D;
-using Voronoi.Geometry;
+using Voronoi3d.Geometry;
 
-namespace Voronoi.RandomEngines
+namespace Voronoi3d.RandomEngines
 {
     public class HaltonSequence3D : IRandom3D
     {

@@ -11,7 +11,7 @@ using System.Windows;
 using System.Windows.Controls;
 using VMS.TPS.Common.Model.API;
 using VMS.TPS.Common.Model.Types;
-using Voronoi;
+using Voronoi3d;
 
 
 namespace MAAS_SFRThelper.ViewModels

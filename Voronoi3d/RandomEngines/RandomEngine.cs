@@ -1,4 +1,4 @@
-﻿namespace Voronoi.RandomEngines
+﻿namespace Voronoi3d.RandomEngines
 {
     public enum RandomEngine
     {

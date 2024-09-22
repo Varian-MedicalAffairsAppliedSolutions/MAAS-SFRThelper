@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace Voronoi.StoppingCriteria
+namespace Voronoi3d.StoppingCriteria
 {
     public class NoDiffAfterThreeIterationsStoppingCriterion : IStoppingCriterion
     {
