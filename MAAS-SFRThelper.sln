@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.4.33103.184
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.35229.62
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MAAS-SFRThelper", "MAAS-SFRThelper\MAAS-SFRThelper.csproj", "{2FC15AB5-D196-45CB-AD50-CF6B7C7AB038}"
 EndProject
@@ -15,22 +15,42 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Actions", "Actions", "{3D5E
 		.github\workflows\Update-EsapiHintPaths.ps1 = .github\workflows\Update-EsapiHintPaths.ps1
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Voronoi3d", "Voronoi3d\Voronoi3d.csproj", "{84E535FB-2233-4E7A-AE69-F97B944A84F6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
 		Debug|x64 = Debug|x64
 		Debug|x86 = Debug|x86
+		Release|Any CPU = Release|Any CPU
 		Release|x64 = Release|x64
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{2FC15AB5-D196-45CB-AD50-CF6B7C7AB038}.Debug|x64.ActiveCfg = Release|x64
-		{2FC15AB5-D196-45CB-AD50-CF6B7C7AB038}.Debug|x64.Build.0 = Release|x64
+		{2FC15AB5-D196-45CB-AD50-CF6B7C7AB038}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{2FC15AB5-D196-45CB-AD50-CF6B7C7AB038}.Debug|Any CPU.Build.0 = Debug|x64
+		{2FC15AB5-D196-45CB-AD50-CF6B7C7AB038}.Debug|x64.ActiveCfg = Debug|x64
+		{2FC15AB5-D196-45CB-AD50-CF6B7C7AB038}.Debug|x64.Build.0 = Debug|x64
 		{2FC15AB5-D196-45CB-AD50-CF6B7C7AB038}.Debug|x86.ActiveCfg = Debug|x86
 		{2FC15AB5-D196-45CB-AD50-CF6B7C7AB038}.Debug|x86.Build.0 = Debug|x86
+		{2FC15AB5-D196-45CB-AD50-CF6B7C7AB038}.Release|Any CPU.ActiveCfg = Release|x64
+		{2FC15AB5-D196-45CB-AD50-CF6B7C7AB038}.Release|Any CPU.Build.0 = Release|x64
 		{2FC15AB5-D196-45CB-AD50-CF6B7C7AB038}.Release|x64.ActiveCfg = Release|x64
 		{2FC15AB5-D196-45CB-AD50-CF6B7C7AB038}.Release|x64.Build.0 = Release|x64
 		{2FC15AB5-D196-45CB-AD50-CF6B7C7AB038}.Release|x86.ActiveCfg = Release|x64
 		{2FC15AB5-D196-45CB-AD50-CF6B7C7AB038}.Release|x86.Build.0 = Release|x64
+		{84E535FB-2233-4E7A-AE69-F97B944A84F6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{84E535FB-2233-4E7A-AE69-F97B944A84F6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{84E535FB-2233-4E7A-AE69-F97B944A84F6}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{84E535FB-2233-4E7A-AE69-F97B944A84F6}.Debug|x64.Build.0 = Debug|Any CPU
+		{84E535FB-2233-4E7A-AE69-F97B944A84F6}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{84E535FB-2233-4E7A-AE69-F97B944A84F6}.Debug|x86.Build.0 = Debug|Any CPU
+		{84E535FB-2233-4E7A-AE69-F97B944A84F6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{84E535FB-2233-4E7A-AE69-F97B944A84F6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{84E535FB-2233-4E7A-AE69-F97B944A84F6}.Release|x64.ActiveCfg = Release|Any CPU
+		{84E535FB-2233-4E7A-AE69-F97B944A84F6}.Release|x64.Build.0 = Release|Any CPU
+		{84E535FB-2233-4E7A-AE69-F97B944A84F6}.Release|x86.ActiveCfg = Release|Any CPU
+		{84E535FB-2233-4E7A-AE69-F97B944A84F6}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

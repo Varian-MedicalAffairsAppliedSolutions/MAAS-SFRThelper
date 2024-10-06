@@ -1,0 +1,117 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ClassDiagram MajorVersion="1" MinorVersion="1">
+  <Class Name="MAAS_SFRThelper.Models.BaseObject">
+    <Position X="1.5" Y="0.5" Width="2.25" />
+    <TypeIdentifier>
+      <HashCode>AAAEAAAAAAAAYoQAAAAAAAACgAAAAAAAAABgAAAAYAA=</HashCode>
+      <FileName>Models\BaseObject.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" />
+  </Class>
+  <Class Name="MAAS_SFRThelper.Models.Circle">
+    <Position X="4" Y="0.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAABAAAAAgAAAABAgAAAQI=</HashCode>
+      <FileName>Models\Circle.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="MAAS_SFRThelper.Models.Polygon">
+    <Position X="5.75" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAACAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Models\Polygon.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="MAAS_SFRThelper.Models.Spacing">
+    <Position X="5.75" Y="2.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAgAAAAAEAAAAAAAAAAAAACAAAAAjAAAAAAA=</HashCode>
+      <FileName>Models\Spacing.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="MAAS_SFRThelper.Views.Converters.BoolToBlueConverter" BaseTypeListCollapsed="true">
+    <Position X="8.75" Y="2" Width="2" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAIAAAAAAAAgAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Views\Converters\BoolToBlueConverter.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" Collapsed="true" />
+  </Class>
+  <Class Name="MAAS_SFRThelper.Views.Converters.BoolToStrikeConverter" BaseTypeListCollapsed="true">
+    <Position X="8.75" Y="0.5" Width="2" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAIAAAAAAAAgAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Views\Converters\BoolToStrikeConverter.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" Collapsed="true" />
+  </Class>
+  <Class Name="MAAS_SFRThelper.Views.Converters.RadiusToDiameterConverter" BaseTypeListCollapsed="true">
+    <Position X="8.75" Y="3.5" Width="2.25" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAIAAAAAAAAgAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Views\Converters\RadiusToDiameterConverter.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" Collapsed="true" />
+  </Class>
+  <Class Name="MAAS_SFRThelper.Views.GridDialog">
+    <Position X="11.25" Y="0.5" Width="2" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAQAAgAAAAAAAAQgAAAAAAAAAAAAAAACAAAAA=</HashCode>
+      <FileName>Views\GridDialog.xaml.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" />
+  </Class>
+  <Class Name="MAAS_SFRThelper.Views.MainWindow">
+    <Position X="13.5" Y="0.5" Width="2.25" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Views\MainWindow.xaml.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" />
+  </Class>
+  <Class Name="MAAS_SFRThelper.Views.SphereDialog">
+    <Position X="13.5" Y="2.25" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAQgAgAAAAAEAEAAAAAAAAAAAAAAAAACAAAAA=</HashCode>
+      <FileName>Views\SphereDialog.xaml.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" />
+  </Class>
+  <Class Name="MAAS_SFRThelper.Views.TextBoxOutputter">
+    <Position X="11.25" Y="3.25" Width="1.75" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAACAAAAAAAAgAAAAAAAAAAAAAEAAAA=</HashCode>
+      <FileName>Views\TextBoxOutputter.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="MAAS_SFRThelper.ViewModels.CoordinateConverter">
+    <Position X="17.25" Y="0.5" Width="1.75" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAUAAAAAAAAAAAAABAAAKAAAAAAA=</HashCode>
+      <FileName>ViewModels\CoordinateConverter.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="MAAS_SFRThelper.ViewModels.GridDialogViewModel">
+    <Position X="19.25" Y="0.5" Width="2" />
+    <TypeIdentifier>
+      <HashCode>ABgOCgAIbgpgQqTAYHKAQhggwAAIAALAgAAAIIAgBAI=</HashCode>
+      <FileName>ViewModels\GridDialogViewModel.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" />
+  </Class>
+  <Class Name="MAAS_SFRThelper.ViewModels.MainViewModel">
+    <Position X="16.5" Y="3" Width="2.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAIAAAACAAAACAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>ViewModels\MainViewModel.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="MAAS_SFRThelper.ViewModels.SphereDialogViewModel">
+    <Position X="21.5" Y="0.5" Width="2.25" />
+    <TypeIdentifier>
+      <HashCode>EBl6BDhEelIgQCAEEBAIAAAISAAAgQIAAAAGAQAAAgA=</HashCode>
+      <FileName>ViewModels\SphereDialogViewModel.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Font Name="Segoe UI" Size="9" />
+</ClassDiagram>

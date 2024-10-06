@@ -93,6 +93,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Converters\boolVisibilityConverter.cs" />
     <Compile Include="Models\BaseObject.cs" />
     <Compile Include="Models\Circle.cs" />
     <Compile Include="Models\Polygon.cs" />
@@ -134,8 +135,15 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
+    <None Include="ClassDiagram1.cd" />
     <None Include="packages.config" />
     <None Include="VarianLUSLA.pdf" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Voronoi3d\Voronoi3d.csproj">
+      <Project>{84e535fb-2233-4e7a-ae69-f97b944a84f6}</Project>
+      <Name>Voronoi3d</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

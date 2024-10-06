@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:MAAS_SFRThelper.Views"
         mc:Ignorable="d"
-        Title="MAAS-SFRThelper" Height="635" Width="580">
+        Title="MAAS-SFRThelper" Height="635" Width="635">
     <DockPanel LastChildFill="False">
         <Grid DockPanel.Dock="Top">
             <Grid.RowDefinitions>
@@ -13,8 +13,8 @@
                 <RowDefinition Height="Auto"></RowDefinition>
             </Grid.RowDefinitions>
             <TabControl>
-                <TabItem Name="SphereLatticeTab" Header="SphereLattice" />
-                <TabItem Name="RapidRodsTab" Header="RapidRods"/>
+                <TabItem Name="SphereLatticeTab" Header="SphereLattice" Style="{x:Null}"/>
+                <TabItem Name="RapidRodsTab" Header="RapidRods" Style="{x:Null}"/>
             </TabControl>
 
             <TextBlock Grid.Row="1" Name="Footer" Background="PaleVioletRed">
