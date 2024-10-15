@@ -11,6 +11,8 @@ Features
   * Simple Cubic Packed (SCP)
     * square/rectangular pattern
   * Centroidal Voronoi Tessellation in 3D (CVT3D)
+* Indvidual sphere structure generation supported
+  * No separate sphere structures checked by default (avoids 99+ structures, current ESAPI non-research mode limitation)
 * Selectable sphere radius
 * Selectable sphere spacing
   * spacing only strictly enforced for HCP and SCP
