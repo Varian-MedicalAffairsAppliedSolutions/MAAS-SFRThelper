@@ -43,8 +43,8 @@ Features planned
 * Automatic Dose Optimization tab
   * Preloads and starts optimizer with objectives on spheres, nulls+voids structures and manual NTO
 
-Special Recognition for contributions
-[Pierre Lansonneur](https://www.linkedin.com/in/pierre-lansonneur-87141111b/) [ for original Centroidal Voronoi Tessellation in 3D research and prototyping
+Special Recognition for contributions<br>
+[Pierre Lansonneur](https://www.linkedin.com/in/pierre-lansonneur-87141111b/) [ for original Centroidal Voronoi Tessellation in 3D research and prototyping<br>
 [Ilias Sachpazidis](https://www.sachpazidis.com/) [isachpaz](https://github.com/isachpaz) for CVT3D C# implementation adapted from [previous 2D implementation](https://www.sachpazidis.com/cvt-space-partitioning/) and open source example [CVTGenerator](https://github.com/isachpaz/CVTGenerator)  
 
 ## RapidRods
