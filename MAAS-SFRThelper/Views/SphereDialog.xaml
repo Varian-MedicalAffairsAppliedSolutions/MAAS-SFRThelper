@@ -74,7 +74,10 @@
             <Label  Grid.Row ="2" Grid.Column="1" VerticalAlignment="Top" HorizontalAlignment="Center" Content="{Binding PartialSphereText}" />
         </StackPanel>
 
-        <CheckBox Grid.Row ="2" Grid.Column="2" Grid.ColumnSpan="2" IsEnabled="{Binding SingleSphereEnabled}" Margin="10" IsChecked="{Binding CreateSingle}" Style="{x:Null}">Create spheres as single structure only</CheckBox>
+        <StackPanel Grid.Row="2" Grid.Column="2" Grid.ColumnSpan="2">
+            <CheckBox IsEnabled="{Binding SingleSphereEnabled}" Margin="5" IsChecked="{Binding CreateSingle}" Style="{x:Null}">Create spheres as single structure only</CheckBox>
+            <CheckBox IsEnabled="{Binding NullVoidsEnabled}" Margin="5" IsChecked="{Binding CreateNullsVoids}" Style="{x:Null}">Create void structures</CheckBox>
+        </StackPanel>
         <Label Grid.Row ="3" Height="26" Margin="10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Lattice X Shift (mm)" />
         <TextBox Grid.Row ="3" Grid.Column="1" x:Name="XShift" Text="{Binding XShift}" IsEnabled="{Binding ShiftEnabled}" HorizontalAlignment="Left" Height="26" Margin="10" VerticalAlignment="Top" Width="123" Style="{x:Null}"/>
         <Label Grid.Row ="3" Grid.Column="2" Height="26" Margin="10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Lattice Y Shift (mm)" />

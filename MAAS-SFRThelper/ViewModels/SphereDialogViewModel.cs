@@ -12,7 +12,8 @@ using System.Windows.Controls;
 using VMS.TPS.Common.Model.API;
 using VMS.TPS.Common.Model.Types;
 using Voronoi3d;
-
+using System.Numerics;
+using System.Diagnostics.Eventing.Reader;
 
 namespace MAAS_SFRThelper.ViewModels
 {
@@ -92,12 +93,35 @@ namespace MAAS_SFRThelper.ViewModels
             set { SetProperty(ref createSingle, value); }
         }
 
+        private bool nullVoidsEnabled;
+        public bool NullVoidsEnabled
+        {
+            get { return nullVoidsEnabled; }
+            set { SetProperty(ref nullVoidsEnabled, value); }
+        }
+
+        private bool createNullsVoids;
+        public bool CreateNullsVoids
+        {
+            get { return createNullsVoids; }
+            set { SetProperty(ref createNullsVoids, value); }
+        }
+
         private bool isHex;
         public bool IsHex
         {
             get { return isHex; }
             set { 
                 SetProperty(ref isHex, value);
+               /* if (isHex)
+                {
+                    createNullsVoids = false;
+                    nullVoidsEnabled = false;
+                }
+                else
+                {
+                    nullVoidsEnabled = true;
+                }*/
                 //// MessageBox.Show("IsHex" + IsHex);
                 //if (IsHex)
                 //{
@@ -130,6 +154,15 @@ namespace MAAS_SFRThelper.ViewModels
             set
             {
                 SetProperty(ref isCVT3D, value);
+                /*if (IsCVT3D)
+                {
+                    createNullsVoids = false;
+                    nullVoidsEnabled = false;
+                }
+                else
+                {
+                    nullVoidsEnabled = true;
+                }*/
                 //// MessageBox.Show("IsHex" + IsHex);
                 //if (IsHex)
                 //{
@@ -251,6 +284,7 @@ namespace MAAS_SFRThelper.ViewModels
             IsHex = true; // default to hex
             IsRect = false;
             createSingle = true; // default to keeping individual structures
+            nullVoidsEnabled = true; // default to not creating nulls and voids - if Voronio or hex are selected that need to go to false
             XShift = 0;
             YShift = 0;
             Output = "Welcome to the SFRT-Helper";
@@ -628,13 +662,64 @@ namespace MAAS_SFRThelper.ViewModels
                 // Extra dialog box for calculating number of points for seed placement CVT
                 MessageBox.Show("Calculating number of spheres needed.");
                 Output += "\nEvaluating number of spheres, this could take several minutes ...";
-                grid = BuildHexGrid(bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract);
-                MessageBox.Show("Total seeds is", grid.Count.ToString());               
+                var gridhex = BuildHexGrid(bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract);
+                MessageBox.Show("Total seeds in gridhex", gridhex.Count.ToString());               
                 Output += "\nEvaluating sphere locations using 3D CVT, this could take several minutes ...";
-                // var cvt = new CVT3D(target.MeshGeometry, new CVTSettings(grid.Count));
-                var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(grid.Count));
+                var cvt = new CVT3D(target.MeshGeometry, new CVTSettings(gridhex.Count));
+                // var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(gridhex.Count));
                 var cvtGenerators = cvt.CalculateGenerators();
-                grid = cvtGenerators.Select(p => new VVector(p.X, p.Y, p.Z)).ToList();
+
+                // Check to make sure each point is at least SelectedSpacing distance away from every other point. If not 
+                // remove that point from the list. We could search for another point if one gets rejected to preserve
+                // total number of points but for that we'd have to change Voronio3D. Alternatively, we could add another option
+                // in Voronoi3D to be able to use cubic or hex grids. But that would also require modification of Voronoi3D which we 
+                // will look into later. For now we just do a simple check to make sure included point is at least a minimum distance away from
+                // every other point.
+
+                var retval = new List<VVector>();
+                int idx = -1;
+                double d = 0;
+                foreach (var i in cvtGenerators)
+                {
+                    idx++;
+                    var cvtpt = new VVector(i.X, i.Y, i.Z);
+                    {
+                        if (idx > 0)
+                        {
+                            int num_points = retval.Count;
+                            double[] dists = Enumerable.Repeat(1.0, num_points).ToArray();
+                            for (int j = 0; j < num_points; j++)
+                            {
+                                double dist = Math.Sqrt(
+                                    Math.Pow(cvtpt[0] - retval[j][0], 2) +
+                                    Math.Pow(cvtpt[1] - retval[j][1], 2) +
+                                    Math.Pow(cvtpt[2] - retval[j][2], 2)
+                                );
+
+                                dists[j] = dist;
+
+                            }
+
+                            if (num_points > 0)
+                            {
+                                d = dists.Min();
+                            }
+
+                        }
+                        else
+                        {
+                            d = SpacingSelected.Value;
+                        }
+
+                        if (SpacingSelected.Value <= d)
+                        {
+                            retval.Add(cvtpt);
+                        }
+
+                    }
+                }
+                grid = retval; // cvtGenerators.Select(p => new VVector(p.X, p.Y, p.Z)).ToList();
+                MessageBox.Show("Total seeds in gridCVT", grid.Count.ToString());
                 structMain = CreateStructure("CVT3D", false, true);
             }
 
@@ -694,6 +779,16 @@ namespace MAAS_SFRThelper.ViewModels
                 singleVols.Add(currentSphere.Volume);
 
             }
+
+           
+            // Nulls and voids using complement
+            if (createNullsVoids)
+            {
+                Output += "\nCreating nulls and voids ... ";
+                var voidStructure = scriptContext.StructureSet.AddStructure("CONTROL", "Voids");
+                voidStructure.SegmentVolume = target.Margin(-1* spacingSelected.Value/2).Sub(structMain.Margin((spacingSelected.Value - 2*radius)/2));
+            }
+
 
             // var volThresh = singleVols.Max() * (VThresh / 100);
 
