@@ -665,8 +665,8 @@ namespace MAAS_SFRThelper.ViewModels
                 var gridhex = BuildHexGrid(bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract);
                 MessageBox.Show("Total seeds in gridhex", gridhex.Count.ToString());               
                 Output += "\nEvaluating sphere locations using 3D CVT, this could take several minutes ...";
-                var cvt = new CVT3D(target.MeshGeometry, new CVTSettings(gridhex.Count));
-                // var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(gridhex.Count));
+                // var cvt = new CVT3D(target.MeshGeometry, new CVTSettings(gridhex.Count));
+                var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(gridhex.Count));
                 var cvtGenerators = cvt.CalculateGenerators();
 
                 // Check to make sure each point is at least SelectedSpacing distance away from every other point. If not 
