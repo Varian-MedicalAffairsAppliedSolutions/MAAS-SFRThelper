@@ -683,40 +683,40 @@ namespace MAAS_SFRThelper.ViewModels
                 {
                     idx++;
                     var cvtpt = new VVector(i.X, i.Y, i.Z);
+                    
+                    if (idx > 0)
                     {
-                        if (idx > 0)
+                        int num_points = retval.Count;
+                        double[] dists = Enumerable.Repeat(1.0, num_points).ToArray();
+                        for (int j = 0; j < num_points; j++)
                         {
-                            int num_points = retval.Count;
-                            double[] dists = Enumerable.Repeat(1.0, num_points).ToArray();
-                            for (int j = 0; j < num_points; j++)
-                            {
-                                double dist = Math.Sqrt(
-                                    Math.Pow(cvtpt[0] - retval[j][0], 2) +
-                                    Math.Pow(cvtpt[1] - retval[j][1], 2) +
-                                    Math.Pow(cvtpt[2] - retval[j][2], 2)
-                                );
+                            double dist = Math.Sqrt(
+                                Math.Pow(cvtpt[0] - retval[j][0], 2) +
+                                Math.Pow(cvtpt[1] - retval[j][1], 2) +
+                                Math.Pow(cvtpt[2] - retval[j][2], 2)
+                            );
 
-                                dists[j] = dist;
-
-                            }
-
-                            if (num_points > 0)
-                            {
-                                d = dists.Min();
-                            }
+                            dists[j] = dist;
 
                         }
-                        else
-                        {
-                            d = SpacingSelected.Value;
-                        }
 
-                        if (SpacingSelected.Value <= d)
+                        if (num_points > 0)
                         {
-                            retval.Add(cvtpt);
+                            d = dists.Min();
                         }
 
                     }
+                    else
+                    {
+                        d = SpacingSelected.Value;
+                    }
+
+                    if (SpacingSelected.Value <= d)
+                    {
+                        retval.Add(cvtpt);
+                    }
+
+                    
                 }
                 grid = retval; // cvtGenerators.Select(p => new VVector(p.X, p.Y, p.Z)).ToList();
                 MessageBox.Show("Total seeds in gridCVT", grid.Count.ToString());
