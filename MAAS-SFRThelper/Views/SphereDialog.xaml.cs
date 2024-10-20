@@ -17,10 +17,10 @@ namespace MAAS_SFRThelper.Views
         private readonly SphereDialogViewModel vm;
         public TextBoxOutputter outputter;
 
-        public SphereDialog(ScriptContext context)
+        public SphereDialog(EsapiWorker ew)
         {
             InitializeComponent();
-            vm = new SphereDialogViewModel(context);
+            vm = new SphereDialogViewModel(ew);
             DataContext = vm;
         }
 

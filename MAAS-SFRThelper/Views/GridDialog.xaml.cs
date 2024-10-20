@@ -15,10 +15,10 @@ namespace MAAS_SFRThelper.Views
     {
         public GridDialogViewModel vm;
 
-        public GridDialog(ScriptContext context)
+        public GridDialog(EsapiWorker ew)
         {
             InitializeComponent();
-            vm = new GridDialogViewModel(context);
+            vm = new GridDialogViewModel(ew);
             this.DataContext = vm;
         }
 

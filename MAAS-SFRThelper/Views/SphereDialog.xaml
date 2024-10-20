@@ -21,6 +21,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
 
         </Grid.RowDefinitions>
@@ -91,8 +92,9 @@
             <Button  Height="26"  Margin="10" HorizontalAlignment="Stretch" VerticalAlignment="Top" Content="Create" Command="{Binding CreateLatticeCommand}" Style="{x:Null}" />
             <TextBlock Foreground="red" Text="{Binding LatticeValidationText}" Visibility="{Binding LVVis, Converter={StaticResource localVisibilityConverter}}" />
         </StackPanel>
-       
-        <TextBlock Grid.Row ="5" Grid.ColumnSpan="4" Margin="10" Text="{Binding Output}">
+        <ProgressBar Grid.Row="5" Margin="10" Maximum="100" Minimum="0" Value="{Binding ProgressValue}" 
+                     Grid.ColumnSpan="4" Height="20"/>
+        <TextBlock Grid.Row ="6" Grid.ColumnSpan="4" Margin="10" Text="{Binding Output}">
 
                 </TextBlock>
         </Grid>

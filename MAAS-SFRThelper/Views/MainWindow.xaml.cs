@@ -11,13 +11,13 @@ namespace MAAS_SFRThelper.Views
     /// </summary>
     public partial class MainWindow : Window
     {
-        public MainWindow(ScriptContext context)
+        public MainWindow(EsapiWorker esapiWorker)
         {
             InitializeComponent();
 
-            SphereLatticeTab.Content = new SphereDialog(context);
-            RapidRodsTab.Content = new GridDialog(context);
-            DataContext = new MainViewModel();
+            SphereLatticeTab.Content = new SphereDialog(esapiWorker);
+            RapidRodsTab.Content = new GridDialog(esapiWorker);
+            DataContext = new MainViewModel(esapiWorker);
         }
 
         private void Hyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)

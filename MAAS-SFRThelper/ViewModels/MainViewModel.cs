@@ -19,7 +19,7 @@ namespace MAAS_SFRThelper.ViewModels
             e.Handled = true;
         }
 
-        public MainViewModel()
+        public MainViewModel(EsapiWorker esapi)
         {
             //var isDebug = MAAS_SFRThelper.Properties.Settings.Default.Debug;
             ////MessageBox.Show($"Display Terms {isDebug}");
