@@ -765,6 +765,21 @@ namespace MAAS_SFRThelper.ViewModels
                     structMain = CreateStructure(sc.StructureSet, "CVT3D", false, true);
                 }
 
+                // Set a message box to add display the total sphere volume and give users choice of 
+                // going forward or cancelling run
+                MessageBoxResult result = MessageBox.Show("Approx sphere volume fraction", (((4/3)*Math.PI*0.1*0.1*0.1*sphereRadius*sphereRadius*sphereRadius*grid.Count)/(target.Volume)).ToString(),
+                MessageBoxButton.OKCancel,MessageBoxImage.Question);
+
+                // Check the user's response
+                if (result == MessageBoxResult.Cancel)
+                {
+                    // User chose to cancel; close the application
+                    // Environment.Exit(0);
+                    Output += "\n Sphere creation has been cancelled. Please close the window!";
+
+                    return;
+                }
+               
                 // 4. Make spheres
                 // This loop removes any already existing spheres prior to creating new spheres
                 int sphere_count = 0;
@@ -782,7 +797,6 @@ namespace MAAS_SFRThelper.ViewModels
                 // Hold on to single sphere ids
                 var singleIds = new List<string>();
                 var singleVols = new List<double>();
-
 
                 // Starting message
                 Output += "\nCreating spheres, this could take several minutes ...";
@@ -828,12 +842,22 @@ namespace MAAS_SFRThelper.ViewModels
                 // Nulls and voids using complement
                 if (createNullsVoids)
                 {
+                    var voidFactor = (spacingSelected.Value - 2.0 * radius) / 2.0;
                     Output += "\nCreating nulls and voids ... ";
-                    var voidStructure = sc.StructureSet.AddStructure("CONTROL", "Voids");
-                    voidStructure.SegmentVolume = target.Margin(-1 * spacingSelected.Value / 2).Sub(structMain.Margin((spacingSelected.Value - 2 * radius) / 2));
+                    var voidStructureL1 = sc.StructureSet.AddStructure("CONTROL", "VoidL1");
+                    voidStructureL1.SegmentVolume = target.Margin(-1 * spacingSelected.Value / 2).Sub(structMain.Margin(0.8*voidFactor));
+
+                    var voidStructureL2 = sc.StructureSet.AddStructure("CONTROL", "VoidL2");
+                    voidStructureL2.Color = System.Windows.Media.Color.FromRgb(160, 32, 240);
+                    voidStructureL2.SegmentVolume = target.Margin(-1 * spacingSelected.Value / 2).Sub(structMain.Margin(voidFactor));
+
+                    var voidStructureL3 = sc.StructureSet.AddStructure("CONTROL", "VoidL3");
+                    voidStructureL3.Color = System.Windows.Media.Color.FromRgb(0, 255, 255);
+                    voidStructureL3.SegmentVolume = target.Margin(-1 * spacingSelected.Value / 2).Sub(structMain.Margin(1.2 * voidFactor));
+
                     ProgressValue += 5.0;
                 }
-
+                Output += "\nCreated spheres. Please close the tool to view";
 
                 // var volThresh = singleVols.Max() * (VThresh / 100);
 
@@ -878,7 +902,7 @@ namespace MAAS_SFRThelper.ViewModels
                 }
             });
             // And the main structure with target
-            Output += "\nCreated spheres. Please close the tool to view";
+            // Output += "\nCreated spheres. Please close the tool to view";
             //MessageBox.Show("Created spheres close tool to view. \nFor different sphere locations rerun with different x and y shift values.");
 
         }
