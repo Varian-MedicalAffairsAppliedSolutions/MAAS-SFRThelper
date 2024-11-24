@@ -27,40 +27,40 @@ namespace MAAS_SFRThelper.ViewModels
         public double SpacingX
         {
             get { return spacingX; }
-            set { spacingX = value; Create2Dgrid(); OnPropertyChanged(); }
+            set { spacingX = value; Create2Dgrid(zRes); OnPropertyChanged(); }
         }
 
         double spacingY;
         public double SpacingY
         {
             get { return spacingY; }
-            set { spacingY = value; Create2Dgrid(); OnPropertyChanged(); }
+            set { spacingY = value; Create2Dgrid(zRes); OnPropertyChanged(); }
         }
 
         double offsetX;
         public double OffsetX
         {
             get { return offsetX; }
-            set { offsetX = value; Create2Dgrid(); OnPropertyChanged(); }
+            set { offsetX = value; Create2Dgrid(zRes); OnPropertyChanged(); }
         }
         double offsetY;
         public double OffsetY
         {
             get { return offsetY; }
-            set { offsetY = value; Create2Dgrid(); OnPropertyChanged(); }
+            set { offsetY = value; Create2Dgrid(zRes); OnPropertyChanged(); }
         }
 
         double tiltX;
         public double TiltX
         {
             get { return tiltX; }
-            set { tiltX = value; Create2Dgrid(); OnPropertyChanged(); }
+            set { tiltX = value; Create2Dgrid(zRes); OnPropertyChanged(); }
         }
         double tiltY;
         public double TiltY
         {
             get { return tiltY; }
-            set { tiltY = value; Create2Dgrid(); OnPropertyChanged(); }
+            set { tiltY = value; Create2Dgrid(zRes); OnPropertyChanged(); }
         }
 
         int zStart;
@@ -81,7 +81,7 @@ namespace MAAS_SFRThelper.ViewModels
         public int ZShown
         {
             get { return zShown; }
-            set { zShown = value; UpdateContours(zShown); Create2Dgrid(); OnPropertyChanged(); }
+            set { zShown = value; UpdateContours(zShown); Create2Dgrid(zRes); OnPropertyChanged(); }
         }
 
         ObservableCollection<BaseObject> drawingObjects;
@@ -91,6 +91,7 @@ namespace MAAS_SFRThelper.ViewModels
             set { drawingObjects = value; OnPropertyChanged(); }
         }
 
+        private EsapiWorker _esapiWorker;
         double canvasHeight;
         public double CanvasHeight
         {
@@ -123,7 +124,10 @@ namespace MAAS_SFRThelper.ViewModels
             set
             {
                 targetSelected = value;
-                UpdateFullState();
+                _esapiWorker.Run(sc =>
+                {
+                    UpdateFullState(sc);
+                });
                 OnPropertyChanged();
             }
         }
@@ -133,19 +137,20 @@ namespace MAAS_SFRThelper.ViewModels
         double bbXe;
         double bbYe;
 
-        readonly double centerX;
-        readonly double centerY;
-
+        double centerX;
+        double centerY;
+        private double zRes;
         private CoordinateConverter xConv;
         private CoordinateConverter yConv;
 
-        public ScriptContext context;
+        //public ScriptContext context;
 
         public Structure target;
 
-        public GridDialogViewModel(ScriptContext currentContext)
+        public GridDialogViewModel(EsapiWorker esapiWorker)
         {
-            context = currentContext;
+            _esapiWorker = esapiWorker;
+            //context = currentContext;
 
             //ui 'consts'
             canvasHeight = 300;
@@ -166,32 +171,35 @@ namespace MAAS_SFRThelper.ViewModels
             bbYe = 200;
 
             //plan isocenter
-            var firstBeam = context.PlanSetup.Beams.First();
-            centerX = firstBeam.IsocenterPosition.x;
-            centerY = firstBeam.IsocenterPosition.y;
-
-            //target structures
-            targetStructures = new List<string>();
-            targetSelected = -1;
-            //plan target
-            string planTargetId = null;
-            //only for 15.x or later
-            //List<ProtocolPhasePrescription> p = new List<ProtocolPhasePrescription>();
-            //List<ProtocolPhaseMeasure> m = new List<ProtocolPhaseMeasure>();
-            //context.PlanSetup.GetProtocolPrescriptionsAndMeasures(ref p, ref m);
-
-            //if (p.Count() > 0) planTargetId = p.First().StructureId;
-            //..plan target selection ends
-
-            foreach (var i in context.StructureSet.Structures)
+            _esapiWorker.Run(sc =>
             {
-                if (i.DicomType != "PTV") continue;
-                targetStructures.Add(i.Id);
-                if (planTargetId == null) continue;
-                if (i.Id == planTargetId) targetSelected = targetStructures.Count() - 1;
-            }
+                var firstBeam = sc.PlanSetup.Beams.First();
+                centerX = firstBeam.IsocenterPosition.x;
+                centerY = firstBeam.IsocenterPosition.y;
+                zRes = sc.Image.ZRes;
+                //target structures
+                targetStructures = new List<string>();
+                targetSelected = -1;
+                //plan target
+                string planTargetId = null;
+                //only for 15.x or later
+                //List<ProtocolPhasePrescription> p = new List<ProtocolPhasePrescription>();
+                //List<ProtocolPhaseMeasure> m = new List<ProtocolPhaseMeasure>();
+                //context.PlanSetup.GetProtocolPrescriptionsAndMeasures(ref p, ref m);
 
-            UpdateFullState();
+                //if (p.Count() > 0) planTargetId = p.First().StructureId;
+                //..plan target selection ends
+
+                foreach (var i in sc.StructureSet.Structures)
+                {
+                    if (i.DicomType != "PTV") continue;
+                    targetStructures.Add(i.Id);
+                    if (planTargetId == null) continue;
+                    if (i.Id == planTargetId) targetSelected = targetStructures.Count() - 1;
+                }
+
+                UpdateFullState(sc);
+            });
         }
 
         private Circle GetOrCreateForInGrid(int xG, int yG, ObservableCollection<BaseObject> newDrawingObjects)
@@ -215,12 +223,12 @@ namespace MAAS_SFRThelper.ViewModels
                 YGrid = yG,
                 TiltX = tiltX,
                 TiltY = tiltY,
-                ZCoordStarX = xConv.LengthToCanvas((double)(2.0 * zShown - zStart - zEnd) * 0.5 * context.Image.ZRes),
-                ZCoordStarY = yConv.LengthToCanvas((double)(2.0 * zShown - zStart - zEnd) * 0.5 * context.Image.ZRes)
+                ZCoordStarX = xConv.LengthToCanvas((double)(2.0 * zShown - zStart - zEnd) * 0.5 * zRes),
+                ZCoordStarY = yConv.LengthToCanvas((double)(2.0 * zShown - zStart - zEnd) * 0.5 * zRes)
             };
         }
 
-        private void Create2Dgrid()
+        private void Create2Dgrid(double Zres)
         {
 
             ObservableCollection<BaseObject> newDrawingObjects = new ObservableCollection<BaseObject>(drawingObjects); //new ObservableCollection<BaseObject>();
@@ -240,8 +248,8 @@ namespace MAAS_SFRThelper.ViewModels
                     curCircle.Y = yConv.PointToCanvas(centerY + offsetY + (double)(y) * (spacingY) - radius);
                     curCircle.TiltX = TiltX;
                     curCircle.TiltY = tiltY;
-                    curCircle.ZCoordStarX = xConv.LengthToCanvas((double)(2 * zShown - zStart - zEnd) * 0.5 * context.Image.ZRes);
-                    curCircle.ZCoordStarY = yConv.LengthToCanvas((double)(2 * zShown - zStart - zEnd) * 0.5 * context.Image.ZRes);
+                    curCircle.ZCoordStarX = xConv.LengthToCanvas((double)(2 * zShown - zStart - zEnd) * 0.5 * Zres);
+                    curCircle.ZCoordStarY = yConv.LengthToCanvas((double)(2 * zShown - zStart - zEnd) * 0.5 * Zres);
 
                     drawingObjects.Add(curCircle);
                 }
@@ -279,7 +287,7 @@ namespace MAAS_SFRThelper.ViewModels
             yConv = new CoordinateConverter(bbYs - heightMargin * canvasHeight, bbYe + heightMargin * canvasHeight, canvasHeight);
         }
 
-        private void SelectTarget()
+        private void SelectTarget(ScriptContext sc)
         {
             if (targetSelected == -1)
             {
@@ -290,7 +298,7 @@ namespace MAAS_SFRThelper.ViewModels
 
             string targetName = targetStructures.ElementAt(TargetSelected);
 
-            var structures = context.StructureSet.Structures;
+            var structures = sc.StructureSet.Structures;
             foreach (var s in structures)
             {
                 if (s.Id == targetName)
@@ -334,9 +342,9 @@ namespace MAAS_SFRThelper.ViewModels
             }
         }
 
-        private void ScanTarget()
+        private void ScanTarget(ScriptContext sc)
         {
-            int zCount = context.Image.ZSize;
+            int zCount = sc.Image.ZSize;
             int zStartTemp = zCount;
             int zEndTemp = 0;
 
@@ -383,16 +391,17 @@ namespace MAAS_SFRThelper.ViewModels
             ZShown = zMid;
             //updateContours(zMid);
 
-            Create2Dgrid();
+            Create2Dgrid(sc.Image.ZRes);
         }
 
-        private void UpdateFullState()
+        private void UpdateFullState(ScriptContext sc)
         {
-            SelectTarget();
+            SelectTarget(sc);
             if (target != null)
             {
-                ScanTarget();
-                Create2Dgrid();
+                ScanTarget(sc);
+                //Create2Dgrid is already called within ScanTarget
+                //Create2Dgrid(sc);
             }
 
         }
@@ -416,15 +425,15 @@ namespace MAAS_SFRThelper.ViewModels
         }
 
         // CR This seems to be the method called to create the grid structure
-        void CreateGridStructure(ref Structure gridStructure)
+        void CreateGridStructure(double zOrigin, ref Structure gridStructure)
         {
             if (target == null) return;
 
-            double zCenter = (zEnd + zStart) / 2.0 * context.Image.ZRes + context.Image.Origin.z;
+            double zCenter = (zEnd + zStart) / 2.0 * zRes + zOrigin;
 
             for (int z = zStart; z < zEnd; ++z)
             {
-                double zCoord = z * context.Image.ZRes + context.Image.Origin.z;
+                double zCoord = z * zRes + zOrigin;
                 double tiltXOffset = (zCoord - zCenter) * Math.Tan(tiltX / 180.0 * Math.PI);
                 double tiltYOffset = (zCoord - zCenter) * Math.Tan(tiltY / 180.0 * Math.PI);
                 const int contourSegmentCount = 32;
@@ -445,34 +454,34 @@ namespace MAAS_SFRThelper.ViewModels
             gridStructure.SegmentVolume = gridStructure.And(target);
         }
 
+        //commented as not being called from 10.19.24 MCS
+        //void CRTest(ref Structure gridStructure, float R)
+        //{
+        //    if (target == null) return;
 
-        void CRTest(ref Structure gridStructure, float R)
-        {
-            if (target == null) return;
+        //    double zCenter = (double)(zEnd + zStart) / 2.0 * context.Image.ZRes + context.Image.Origin.z;
+        //    for (int z = zStart; z < zEnd; ++z)
+        //    {
+        //        double zCoord = (double)(z) * context.Image.ZRes + context.Image.Origin.z;
 
-            double zCenter = (double)(zEnd + zStart) / 2.0 * context.Image.ZRes + context.Image.Origin.z;
-            for (int z = zStart; z < zEnd; ++z)
-            {
-                double zCoord = (double)(z) * context.Image.ZRes + context.Image.Origin.z;
+        //        // For each slice find in plane radius
+        //        var z_diff = Math.Abs(zCoord - zCenter);
+        //        if (z_diff > R) // If we are out of range of the sphere continue
+        //        {
+        //            continue;
+        //        }
 
-                // For each slice find in plane radius
-                var z_diff = Math.Abs(zCoord - zCenter);
-                if (z_diff > R) // If we are out of range of the sphere continue
-                {
-                    continue;
-                }
+        //        // Otherwise do the thing (make spheres)
+        //        var r_z = Math.Pow(R, 2) - Math.Pow(z_diff, 2);
 
-                // Otherwise do the thing (make spheres)
-                var r_z = Math.Pow(R, 2) - Math.Pow(z_diff, 2);
+        //        // Just make one sphere at target center for now
+        //        var contour = CreateContour(gridStructure.CenterPoint, 2, 64);
+        //        gridStructure.AddContourOnImagePlane(contour, z);
 
-                // Just make one sphere at target center for now
-                var contour = CreateContour(gridStructure.CenterPoint, 2, 64);
-                gridStructure.AddContourOnImagePlane(contour, z);
+        //    }
 
-            }
-
-            gridStructure.SegmentVolume = gridStructure.SegmentVolume.And(target);
-        }
+        //    gridStructure.SegmentVolume = gridStructure.SegmentVolume.And(target);
+        //}
 
         public void CreateGrid()
         {
@@ -485,19 +494,26 @@ namespace MAAS_SFRThelper.ViewModels
 
 
             //Start prepare the patient
-            context.Patient.BeginModifications();
-            var grid = context.StructureSet.AddStructure("PTV", "Grid");
-            CreateGridStructure(ref grid);
+            _esapiWorker.Run(sc =>
+            {
+                sc.Patient.BeginModifications();
+                var grid = sc.StructureSet.AddStructure("PTV", "Grid");
+                CreateGridStructure(sc.Image.Origin.z, ref grid);
+            });
         }
 
         public void CreateGridAndInverse()
         {
             //Start prepare the patient
-            context.Patient.BeginModifications();
-            var grid = context.StructureSet.AddStructure("PTV", "Grid");
-            CreateGridStructure(ref grid);
-            var inverse = context.StructureSet.AddStructure("PTV", "GridInv");
-            inverse.SegmentVolume = target.Sub(grid);
+            _esapiWorker.Run(sc =>
+            {
+                sc.Patient.BeginModifications();
+                var grid = sc.StructureSet.AddStructure("PTV", "Grid");
+                CreateGridStructure(sc.Image.Origin.z, ref grid);
+                var inverse = sc.StructureSet.AddStructure("PTV", "GridInv");
+                inverse.SegmentVolume = target.Sub(grid);
+
+            });
         }
 
         #region INotifyPropertyChanged

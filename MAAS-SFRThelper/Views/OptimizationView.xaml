@@ -1,0 +1,35 @@
+﻿<UserControl x:Class="MAAS_SFRThelper.Views.OptimizationView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:MAAS_SFRThelper.Views"
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="800">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <StackPanel>
+            <TextBlock Text="Beam Geometry Definitions" FontWeight="Bold" HorizontalAlignment="Center" Margin="10" />
+            <CheckBox Content="Automatic Beam Determination" />
+            
+        </StackPanel>
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions >
+                <RowDefinition Height="*" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <TextBlock Text="Prescriptions" FontWeight="Bold" HorizontalAlignment="Center" Margin="10"/>
+            <TextBlock Text="Optimization Objectives" FontWeight="Bold" HorizontalAlignment="Center" Margin="10" Grid.Row="1"/>
+            
+        </Grid>
+        <StackPanel Grid.Column="2">
+
+            <TextBlock Text="Calculation Overrides" FontWeight="Bold" HorizontalAlignment="Center" Margin="10" />
+        </StackPanel>
+
+    </Grid>
+</UserControl>

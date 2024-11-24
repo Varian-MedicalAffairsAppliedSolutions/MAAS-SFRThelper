@@ -14,18 +14,24 @@ using VMS.TPS.Common.Model.Types;
 using Voronoi3d;
 using System.Numerics;
 using System.Diagnostics.Eventing.Reader;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using MAAS_SFRThelper.Services;
 
 namespace MAAS_SFRThelper.ViewModels
 {
     public class SphereDialogViewModel : BindableBase
     {
-        public List <string> Templates { get; set; }
+        #region UI Properties
+        public List<string> Templates { get; set; }
         private string _selectedTemplate;
 
         public string SelectedTemplate
         {
             get { return _selectedTemplate; }
-            set { SetProperty(ref _selectedTemplate, value);
+            set
+            {
+                SetProperty(ref _selectedTemplate, value);
                 if (SelectedTemplate == "WashU")
                 {
                     PatternEnabled = false;
@@ -33,21 +39,13 @@ namespace MAAS_SFRThelper.ViewModels
                     ThresholdEnabled = false;
                     SingleSphereEnabled = false;
                     Radius = 7.5f; // Units = mm 
-                    SpacingSelected = ValidSpacings.FirstOrDefault(s=>s.Value==30); // Selected spacing is in a list of valid spacings which we default to 30 using linq
-                    
+                    SpacingSelected = ValidSpacings.FirstOrDefault(s => s.Value == 30); // Selected spacing is in a list of valid spacings which we default to 30 using linq
+
                 }
             }
         }
 
         private bool _patternEnabled;
-        private double _LateralScalingFactor;
-
-        public double LateralScalingFactor
-        {
-            get { return _LateralScalingFactor; }
-            set { SetProperty(ref _LateralScalingFactor, value); }
-        }
-
         public bool PatternEnabled
         {
             get { return _patternEnabled; }
@@ -111,17 +109,18 @@ namespace MAAS_SFRThelper.ViewModels
         public bool IsHex
         {
             get { return isHex; }
-            set { 
+            set
+            {
                 SetProperty(ref isHex, value);
-               /* if (isHex)
-                {
-                    createNullsVoids = false;
-                    nullVoidsEnabled = false;
-                }
-                else
-                {
-                    nullVoidsEnabled = true;
-                }*/
+                /* if (isHex)
+                 {
+                     createNullsVoids = false;
+                     nullVoidsEnabled = false;
+                 }
+                 else
+                 {
+                     nullVoidsEnabled = true;
+                 }*/
                 //// MessageBox.Show("IsHex" + IsHex);
                 //if (IsHex)
                 //{
@@ -136,7 +135,8 @@ namespace MAAS_SFRThelper.ViewModels
         public bool IsRect
         {
             get { return isRect; }
-            set { 
+            set
+            {
                 SetProperty(ref isRect, value);
                 // MessageBox.Show("IsRect" + IsRect);
                 //if (IsRect){
@@ -146,7 +146,6 @@ namespace MAAS_SFRThelper.ViewModels
             }
         }
 
-
         private bool isCVT3D;
         public bool IsCVT3D
         {
@@ -154,15 +153,17 @@ namespace MAAS_SFRThelper.ViewModels
             set
             {
                 SetProperty(ref isCVT3D, value);
-                /*if (IsCVT3D)
+                if (IsCVT3D)
                 {
-                    createNullsVoids = false;
-                    nullVoidsEnabled = false;
+                    LSFVisibility = false; 
+                    // createNullsVoids = false;
+                    // nullVoidsEnabled = false;
                 }
                 else
                 {
-                    nullVoidsEnabled = true;
-                }*/
+                    LSFVisibility = true;
+                    // nullVoidsEnabled = true;
+                }
                 //// MessageBox.Show("IsHex" + IsHex);
                 //if (IsHex)
                 //{
@@ -170,6 +171,41 @@ namespace MAAS_SFRThelper.ViewModels
                 //    UpdateValidSpacings();
                 //}
             }
+        }
+        private bool _LSFVisibility;
+        public bool LSFVisibility
+        {
+            get { return _LSFVisibility; }
+            set { SetProperty(ref _LSFVisibility, value); }
+        }
+
+        //private Visibility _lsfVisibility; // = Visibility.Hidden;
+        //public Visibility LSFVisibility
+        //{
+        //    get => _lsfVisibility;
+        //    set
+        //    {
+        //        if (IsCVT3D)
+        //        {
+        //            _lsfVisibility = Visibility.Collapsed;
+
+        //        }
+        //        else
+        //        {
+        //            _lsfVisibility = Visibility.Visible;
+        //            // OnPropertyChanged(nameof(LSFVisibility)); // Notify the UI
+
+        //        }
+
+        //    }
+
+        //}
+
+        private double _LateralScalingFactor;
+        public double LateralScalingFactor
+        {
+            get { return _LateralScalingFactor; }
+            set { SetProperty(ref _LateralScalingFactor, value); }
         }
 
         private double xShift;
@@ -190,7 +226,9 @@ namespace MAAS_SFRThelper.ViewModels
         public float Radius
         {
             get { return radius; }
-            set { SetProperty(ref radius, value);
+            set
+            {
+                SetProperty(ref radius, value);
                 CreateLatticeCommand.RaiseCanExecuteChanged();
             }
         }
@@ -220,11 +258,11 @@ namespace MAAS_SFRThelper.ViewModels
                 {
                     PartialSphereText = "Full Spheres Only";
                 }
-                else 
+                else
                 {
                     PartialSphereText = $"Allow Partial Spheres ({vThresh}%)";
                 }
-            
+
             }
         }
 
@@ -239,12 +277,15 @@ namespace MAAS_SFRThelper.ViewModels
         public Spacing SpacingSelected
         {
             get { return spacingSelected; }
-            set { SetProperty(ref spacingSelected, value);
+            set
+            {
+                SetProperty(ref spacingSelected, value);
                 CreateLatticeCommand.RaiseCanExecuteChanged();
             }
         }
 
-        private readonly ScriptContext scriptContext;
+
+
 
         private string _partialSphereText;
 
@@ -254,7 +295,7 @@ namespace MAAS_SFRThelper.ViewModels
             set { SetProperty(ref _partialSphereText, value); }
         }
 
-        public DelegateCommand CreateLatticeCommand { get; set; }
+
 
         private string _latticeValidationText;
 
@@ -271,12 +312,33 @@ namespace MAAS_SFRThelper.ViewModels
             get { return _LVVis; }
             set { SetProperty(ref _LVVis, value); }
         }
+        private double _progressValue;
 
+        public double ProgressValue
+        {
+            get { return _progressValue; }
+            set { SetProperty(ref _progressValue, value); }
+        }
 
-        public SphereDialogViewModel(ScriptContext context)
+        #endregion
+        #region internals
+        private readonly EsapiWorker _esapiWorker;
+        //private ScriptContext scriptContext;
+        public DelegateCommand CreateLatticeCommand { get; set; }
+
+        #endregion
+
+        public SphereDialogViewModel(EsapiWorker esapiWorker)
         {
             // constructor
-            scriptContext = context;
+            _esapiWorker = esapiWorker;
+            double spacing = 0.0;
+            _esapiWorker.RunWithWait(sc =>
+            {
+                //scriptContext = sc;
+                spacing = sc.Image.ZRes;
+            });
+
             Templates = new List<string> { "WashU" };
             // Set UI value defaults
             VThresh = 100;
@@ -294,32 +356,41 @@ namespace MAAS_SFRThelper.ViewModels
             SingleSphereEnabled = true;
             LateralScalingFactor = 1.0;
             CreateLatticeCommand = new DelegateCommand(CreateLattice, CanCreateLattice);
+            LSFVisibility = true;
 
             // Set valid spacings based on CT img z resolution
             // ValidSpacings = new List<Spacing>();
-            var spacing = scriptContext.Image.ZRes;
             for (int i = 1; i < 40; i++) // changed 30 to 40 to include 30 for WashU method @ 7/5 - Matt
             {
                 ValidSpacings.Add(new Spacing(spacing * i));
             }
-            
+
             // Default to first value
             SpacingSelected = ValidSpacings.FirstOrDefault();
 
             // Target structures
             targetStructures = new List<string>();
             targetSelected = -1;
-            string planTargetId = null;
+            //string planTargetId = null;
 
-            foreach (var i in context.StructureSet.Structures)
+            SetStructures();
+
+        }
+
+        private void SetStructures()
+        {
+            _esapiWorker.Run(sc =>
             {
-                if (i.DicomType != "PTV") continue;
-                targetStructures.Add(i.Id);
-                if (planTargetId == null) continue;
-                if (i.Id == planTargetId) targetSelected = targetStructures.Count() - 1;
-            }
-
-
+                //consider removing plantargetid as its not used in the following loop. (stays null)
+                string planTargetId = null;
+                foreach (var i in sc.StructureSet.Structures)
+                {
+                    if (i.DicomType != "PTV") continue;
+                    targetStructures.Add(i.Id);
+                    if (planTargetId == null) continue;
+                    if (i.Id == planTargetId) targetSelected = targetStructures.Count() - 1;
+                }
+            });
         }
 
         private bool CanCreateLattice()
@@ -334,11 +405,12 @@ namespace MAAS_SFRThelper.ViewModels
                 LatticeValidationText = "Radius must be less than half of the spacing value.";
                 LVVis = true;
             }
-            else { 
+            else
+            {
                 LVVis = false;
             }
             return radius > 0 && spacingSelected != null && radius <= spacingSelected.Value / 2;
-            
+
         }
 
         /*
@@ -366,11 +438,11 @@ namespace MAAS_SFRThelper.ViewModels
         }
         */
 
-        private void AddContoursToMain(ref Structure PrimaryStructure, ref Structure SecondaryStructure)
+        private void AddContoursToMain(int zSize, ref Structure PrimaryStructure, ref Structure SecondaryStructure)
         {
             // Loop through each image plane
             // { foreach (var segment in contours) { lowResSSource.AddContourOnImagePlane(segment, j); } }
-            for (int z = 0; z < scriptContext.Image.ZSize; ++z)
+            for (int z = 0; z < zSize; ++z)
             {
                 var contours = SecondaryStructure.GetContoursOnImagePlane(z);
                 foreach (var seg in contours)
@@ -380,11 +452,11 @@ namespace MAAS_SFRThelper.ViewModels
             }
         }
 
-        private void BuildSphere(Structure parentStruct, VVector center, float r)
+        private void BuildSphere(Structure parentStruct, VVector center, float r, VMS.TPS.Common.Model.API.Image image)
         {
-            for (int z = 0; z < scriptContext.Image.ZSize; ++z)
+            for (int z = 0; z < image.ZSize; ++z)
             {
-                double zCoord = z * (scriptContext.Image.ZRes) + scriptContext.Image.Origin.z;
+                double zCoord = z * (image.ZRes) + image.Origin.z;
 
                 // For each slice find in plane radius
                 var z_diff = Math.Abs(zCoord - center.z);
@@ -413,9 +485,10 @@ namespace MAAS_SFRThelper.ViewModels
             return retval;
         }
 
-        private List<VVector> BuildGrid(List<double> xcoords, List<double> ycoords, List<double> zcoords, Structure ptvRetract) // this sets up points around which spheres are built
+        private List<VVector> BuildGrid(double progressMax,List<double> xcoords, List<double> ycoords, List<double> zcoords, Structure ptvRetract) // this sets up points around which spheres are built
         {
             var retval = new List<VVector>();
+            //double progressMax = 50.0;
             foreach (var x in xcoords)
             {
                 foreach (var y in ycoords)
@@ -430,10 +503,10 @@ namespace MAAS_SFRThelper.ViewModels
                         bool isInsideptvRetract = ptvRetract.IsPointInsideSegment(pt);
 
                         if (isInsideptvRetract)
-                        { 
+                        {
                             retval.Add(pt);
                         }
-                        
+                        ProgressValue += progressMax / ((double)xcoords.Count() * (double)ycoords.Count() * (double)zcoords.Count());
                     }
                 }
             }
@@ -441,17 +514,16 @@ namespace MAAS_SFRThelper.ViewModels
             return retval;
         }
 
-        private List<VVector> BuildHexGrid(double Xstart, double Xsize, double Ystart, double Ysize, double Zstart, double Zsize, Structure ptvRetract) // this will setup coords for points on hex grid
+        private List<VVector> BuildHexGrid(double progressMax, double Xstart, double Xsize, double Ystart, double Ysize, double Zstart, double Zsize, Structure ptvRetract) // this will setup coords for points on hex grid
         {
             double A = SpacingSelected.Value * (Math.Sqrt(3) / 2.0); // what is A? why is it this value?
             // https://www.omnicalculator.com/math/hexagon
             // the height of a triangle will be h = √3/2 × a
 
             var retval = new List<VVector>();
-
             void CreateLayer(double zCoord, double x0, double y0)
             {
-                
+
                 // create planar hexagonal sphere packing grid
                 var yeven = Arange(y0, y0 + Ysize, 2.0 * A * LateralScalingFactor); // Tenzin - make a drop down menu and rather than having a 2.0, put some variable in it
                 // 2 is the scaling factor --- changed to 4 and tested -- Matt - 2 and 4 reduces number of spheres overall (makes sense - verified by measurements?)
@@ -491,22 +563,23 @@ namespace MAAS_SFRThelper.ViewModels
                         // retval.Add(new VVector(x + (SpacingSelected.Value / 2.0), y + A, zCoord + A/4)); 
 
                         // xSpot++;
+                        //ProgressValue += progressMax / ((double)yeven.Count() * (double)xeven.Count());
                     }
                     //  yRow++;
                 }
             }
-
-            foreach (var z in Arange(Zstart, Zstart + Zsize, 2.0 * A))
+            var zRange = Arange(Zstart, Zstart + Zsize, 2.0 * A);
+            foreach (var z in zRange)
             {
                 CreateLayer(z, Xstart, Ystart);
                 CreateLayer(z + A, Xstart + (SpacingSelected.Value / 2.0), Ystart + (A / 2.0));
-
+                ProgressValue += progressMax / (double)zRange.Count();
             }
 
             return retval;
         }
         // this is a presphere sanity check -- may want to add something like this to make sure number does not exceed 99?
-        private bool PreSpheres()  
+        private bool PreSpheres()
         {
             // Check if we are ready to make spheres
             if (!IsHex && !IsRect && !IsCVT3D)
@@ -542,7 +615,7 @@ namespace MAAS_SFRThelper.ViewModels
             // at some point we should also check whether spheres are larger than a value - there are a bunch of values given in the drop down value
             // may need to clean them up a little bit and only show values that make sense for the given PTV - JP
 
-            if (SpacingSelected.Value < 1.1*(Radius * 2))
+            if (SpacingSelected.Value < 1.1 * (Radius * 2))
             {
                 var buttons = MessageBoxButton.OKCancel;
                 var result = MessageBox.Show($"WARNING: Sphere center spacing is less than sphere diameter ({Radius * 2}) mm.\n Continue?", "", buttons);
@@ -559,15 +632,16 @@ namespace MAAS_SFRThelper.ViewModels
             {
                 return;
             }
-
-            scriptContext.Patient.BeginModifications();
+            //begin modifications call is already in the DelegateCommand action method.
+            //scriptContext.Patient.BeginModifications();
             // Make a new structure
             // Matt email 7/15/24
             // https://github.com/VarianAPIs/Varian-Code-Samples/blob/master/webinars%20%26%20workshops/06%20Apr%202018%20Webinar/Eclipse%20Scripting%20API/Projects/CreateOptStructures/CreateOptStructures.cs
 
-
+            _esapiWorker.Run(sc =>
+            {
             // Retrieve the structure set from the plan
-            var plan = scriptContext.PlanSetup;
+            var plan = sc.PlanSetup;
             var structureSet = plan.StructureSet;
 
             // Define the sphere radius for the margin
@@ -595,14 +669,14 @@ namespace MAAS_SFRThelper.ViewModels
             Structure structMain = null;
 
             var target_name = targetStructures[targetSelected];
-            var target_initial = scriptContext.StructureSet.Structures.Where(x => x.Id == target_name).First();
+            var target_initial = sc.StructureSet.Structures.Where(x => x.Id == target_name).First();
             Structure target = null;
             bool deleteAutoTarget = false;
 
             if (!target_initial.IsHighResolution)
             {
-                target = scriptContext.StructureSet.AddStructure("PTV", "AutoTarget");
-                AddContoursToMain(ref target, ref target_initial);
+                target = sc.StructureSet.AddStructure("PTV", "AutoTarget");
+                AddContoursToMain(sc.Image.ZSize, ref target, ref target_initial);
                 target.ConvertToHighResolution();
                 deleteAutoTarget = true;
                 // MessageBox.Show("Created HiRes target.");
@@ -631,10 +705,10 @@ namespace MAAS_SFRThelper.ViewModels
                 // x, y, z --> dropdown all equal
                 // z0 --> rounded to nearest grid slice
                 var zSlices = new List<double>();
-                var plane_idx = (bounds.Z - scriptContext.Image.Origin.z) / scriptContext.Image.ZRes;
+                var plane_idx = (bounds.Z - sc.Image.Origin.z) / sc.Image.ZRes;
                 int plane_int = (int)Math.Round(plane_idx);
 
-                z0 = scriptContext.Image.Origin.z + (plane_int * scriptContext.Image.ZRes);
+                z0 = sc.Image.Origin.z + (plane_int * sc.Image.ZRes);
                 //MessageBox.Show($"Original z | Snapped z = {bounds.Z} | {Math.Round(z0, 2)}");
                 Output += $"\nOriginal z | Snapped z = {Math.Round(bounds.Z, 2)} | {Math.Round(z0, 2)}";
                 Thread.Sleep(100);
@@ -645,8 +719,8 @@ namespace MAAS_SFRThelper.ViewModels
 
             if (IsHex)
             {
-                grid = BuildHexGrid(bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract);
-                structMain = CreateStructure("LatticeHex", false, true);
+                grid = BuildHexGrid(25.0, bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract);
+                structMain = CreateStructure(sc.StructureSet, "LatticeHex", false, true);
             }
             else if (IsRect)
             {
@@ -654,21 +728,21 @@ namespace MAAS_SFRThelper.ViewModels
                 var ycoords = Arange(bounds.Y + XShift, bounds.Y + bounds.SizeY + YShift, SpacingSelected.Value);
                 var zcoords = Arange(z0, zf, SpacingSelected.Value);
 
-                grid = BuildGrid(xcoords, ycoords, zcoords, ptvRetract);
-                structMain = CreateStructure("LatticeRect", false, true);
-            } 
+                grid = BuildGrid(25.0,xcoords, ycoords, zcoords, ptvRetract);
+                structMain = CreateStructure(sc.StructureSet, "LatticeRect", false, true);
+            }
             else if (IsCVT3D)
             {
                 // Extra dialog box for calculating number of points for seed placement CVT
-                MessageBox.Show("Calculating number of spheres needed.");
-                Output += "\nEvaluating number of spheres, this could take several minutes ...";
-                var gridhex = BuildHexGrid(bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract);
-                MessageBox.Show("Total seeds in gridhex", gridhex.Count.ToString());               
+                // MessageBox.Show("Calculating number of spheres needed.");
+                // Output += "\nEvaluating number of spheres, this could take several minutes ...";
+                var gridhex = BuildHexGrid(10.0, bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract);
+                // MessageBox.Show("Total seeds in gridhex", gridhex.Count.ToString());
                 Output += "\nEvaluating sphere locations using 3D CVT, this could take several minutes ...";
                 // var cvt = new CVT3D(target.MeshGeometry, new CVTSettings(gridhex.Count));
                 var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(gridhex.Count));
                 var cvtGenerators = cvt.CalculateGenerators();
-
+                ProgressValue += 15.0;
                 // Check to make sure each point is at least SelectedSpacing distance away from every other point. If not 
                 // remove that point from the list. We could search for another point if one gets rejected to preserve
                 // total number of points but for that we'd have to change Voronio3D. Alternatively, we could add another option
@@ -679,11 +753,12 @@ namespace MAAS_SFRThelper.ViewModels
                 var retval = new List<VVector>();
                 int idx = -1;
                 double d = 0;
+                //check to make sure cvt spheres don't overlap
                 foreach (var i in cvtGenerators)
                 {
                     idx++;
                     var cvtpt = new VVector(i.X, i.Y, i.Z);
-                    
+
                     if (idx > 0)
                     {
                         int num_points = retval.Count;
@@ -716,125 +791,165 @@ namespace MAAS_SFRThelper.ViewModels
                         retval.Add(cvtpt);
                     }
 
-                    
+
                 }
                 grid = retval; // cvtGenerators.Select(p => new VVector(p.X, p.Y, p.Z)).ToList();
-                MessageBox.Show("Total seeds in gridCVT", grid.Count.ToString());
-                structMain = CreateStructure("CVT3D", false, true);
-            }
-
-            // 4. Make spheres
-            // This loop removes any already existing spheres prior to creating new spheres
-            int sphere_count = 0;
-
-            var prevSpheres = scriptContext.StructureSet.Structures.Where(x => x.Id.Contains("Sphere")).ToList();
-            int deleted_spheres = 0;
-            foreach (var sp in prevSpheres)
-            {
-                scriptContext.StructureSet.RemoveStructure(sp);
-                deleted_spheres++;
-            }
-            if (deleted_spheres > 0) { MessageBox.Show($"{deleted_spheres} pre-existing spheres deleted "); }
+                Output += $"Total seeds in gridCVT: {grid.Count.ToString()}";
+                    structMain = CreateStructure(sc.StructureSet, "CVT3D", false, true);
+                }
+                Output += $"\nPTV volume: {target.Volume.ToString()}";
+                Output += $"\nApproximate sphere volume: {((0.987053856 * 4 / 3) * Math.PI * 0.1 * 0.1 * 0.1 * sphereRadius * sphereRadius * sphereRadius * grid.Count).ToString()}";
+                Output += $"\nRatio (total sphere Volume/PTV volume): {(((0.987053856 * 4 / 3) * Math.PI * 0.1 * 0.1 * 0.1 * sphereRadius * sphereRadius * sphereRadius * grid.Count) / (target.Volume)).ToString()}";
 
 
-            // Hold on to single sphere ids
-            var singleIds = new List<string>();
-            var singleVols = new List<double>();
+                // Set a message box to add display the total sphere volume and give users choice of 
+                // going forward or cancelling run
+                MessageBoxResult result = MessageBox.Show("Approx sphere volume fraction", (((0.987053856*4 /3)*Math.PI*0.1*0.1*0.1*sphereRadius*sphereRadius*sphereRadius*grid.Count)/(target.Volume)).ToString(),
+                MessageBoxButton.OKCancel,MessageBoxImage.Question);
 
-
-            // Starting message
-            Output += "\nCreating spheres, this could take several minutes ...";
-            MessageBox.Show("About to create spheres.");
-
-            // Create all individual spheres
-            foreach (VVector ctr in grid)
-            {
-                Structure currentSphere = null;
-
-                if (!createSingle)
+                // Check the user's response
+                if (result == MessageBoxResult.Cancel)
                 {
-                    // Create a new structure and build sphere on that
-                    var singleId = $"Sphere_{sphere_count}";
-                    currentSphere = CreateStructure(singleId, false, true);
+                    // User chose to cancel; close the application
+                    // Environment.Exit(0);
+                    Output += "\n Sphere creation has been cancelled. Please close the window!";
 
+                    return;
                 }
-                else
+               
+                // 4. Make spheres
+                // This loop removes any already existing spheres prior to creating new spheres
+                int sphere_count = 0;
+
+                var prevSpheres = sc.StructureSet.Structures.Where(x => x.Id.Contains("Sphere")).ToList();
+                int deleted_spheres = 0;
+                foreach (var sp in prevSpheres)
                 {
-                    currentSphere = structMain;
-
+                    sc.StructureSet.RemoveStructure(sp);
+                    deleted_spheres++;
                 }
-                BuildSphere(currentSphere, ctr, Radius);
+                if (deleted_spheres > 0) { MessageBox.Show($"{deleted_spheres} pre-existing spheres deleted "); }
 
-                // Crop to target
-                currentSphere.SegmentVolume = currentSphere.SegmentVolume.And(target);
-                
-                if (!createSingle) {
 
-                    structMain.SegmentVolume = structMain.Or(currentSphere.SegmentVolume);
+                // Hold on to single sphere ids
+                var singleIds = new List<string>();
+                var singleVols = new List<double>();
 
+                // Starting message
+                Output += "\nCreating spheres, this could take several minutes ...";
+                //MessageBox.Show("About to create spheres.");
+
+                // Create all individual spheres
+                double progressUpdate = createNullsVoids ? 70.0 : 80.0;
+                foreach (VVector ctr in grid)
+                {
+                    Structure currentSphere = null;
+
+                    if (!createSingle)
+                    {
+                        // Create a new structure and build sphere on that
+                        var singleId = $"Sphere_{sphere_count}";
+                        currentSphere = CreateStructure(sc.StructureSet, singleId, false, true);
+
+                    }
+                    else
+                    {
+                        currentSphere = structMain;
+
+                    }
+                    BuildSphere(currentSphere, ctr, Radius, sc.Image);
+
+                    // Crop to target
+                    currentSphere.SegmentVolume = currentSphere.SegmentVolume.And(target);
+
+                    if (!createSingle)
+                    {
+
+                        structMain.SegmentVolume = structMain.Or(currentSphere.SegmentVolume);
+
+                    }
+                    sphere_count++;
+
+                    singleIds.Add(currentSphere.Id);
+                    singleVols.Add(currentSphere.Volume);
+                    ProgressValue += progressUpdate / (double)grid.Count();
                 }
-                sphere_count++;
-
-                singleIds.Add(currentSphere.Id);
-                singleVols.Add(currentSphere.Volume);
-
-            }
-
-           
-            // Nulls and voids using complement
-            if (createNullsVoids)
-            {
-                Output += "\nCreating nulls and voids ... ";
-                var voidStructure = scriptContext.StructureSet.AddStructure("CONTROL", "Voids");
-                voidStructure.SegmentVolume = target.Margin(-1* spacingSelected.Value/2).Sub(structMain.Margin((spacingSelected.Value - 2*radius)/2));
-            }
 
 
-            // var volThresh = singleVols.Max() * (VThresh / 100);
+                // Nulls and voids using complement
+                if (createNullsVoids)
+                {
+                    var voidFactor = (spacingSelected.Value - 2.0 * radius) / 2.0;
+                    Output += "\nCreating nulls and voids ... ";
+                    Output += $"\nVoidFactor = {voidFactor}";
+
+                    var voidStructureL1 = sc.StructureSet.AddStructure("CONTROL", "VoidL1");
+                    voidStructureL1.SegmentVolume = structMain.LargeMargin(0.8 * voidFactor).And(target.LargeMargin(-1 * sphereRadius / 2));
+                    voidStructureL1.SegmentVolume = target.LargeMargin(-1 * sphereRadius / 2).Sub(voidStructureL1.SegmentVolume);
+                    Output += "\nL1 has been created";
+
+                    var voidStructureL2 = sc.StructureSet.AddStructure("CONTROL", "VoidL2");
+                    voidStructureL2.Color = System.Windows.Media.Color.FromRgb(160, 32, 240);
+                    voidStructureL2.SegmentVolume = target.LargeMargin(-1.75 * sphereRadius).And(structMain.LargeMargin(voidFactor));
+                    // Output += $"\nVoid Stucture L2 AND volume = {voidStructureL2.Volume}";
+                    voidStructureL2.SegmentVolume = target.LargeMargin(-1.75 * sphereRadius).Sub(voidStructureL2.SegmentVolume);
+                    Output += "\nL2 has been created";
+
+                    var voidStructureL3 = sc.StructureSet.AddStructure("CONTROL", "VoidL3");
+                    voidStructureL3.Color = System.Windows.Media.Color.FromRgb(0, 255, 255);
+                    voidStructureL3.SegmentVolume = voidStructureL2.LargeMargin(-sphereRadius / 4);
+                    Output += "\nL3 has been created";
+                    // voidStructureL3.SegmentVolume = target.Margin(-1 * spacingSelected.Value / 2).Sub(structMain.Margin(1.2 * voidFactor));
+
+                    ProgressValue += 5.0;
+                }
+                Output += "\nCreated spheres. Please close the tool to view";
+
+                // var volThresh = singleVols.Max() * (VThresh / 100);
 
 
 
-            //foreach (string id_ in singleIds.Distinct()) // distinct does 
-            //{
-            //    // delete small spheres
-            //    var singleSphere = scriptContext.StructureSet.Structures.Where(x => x.Id == id_).FirstOrDefault();
-            //    if (singleSphere != null)
-            //    {
-            //        if (singleSphere.Volume <= volThresh || singleSphere.Volume == 0)
-            //        {
-            //            // Delete
-            //            //MessageBox.Show($"Deleted sphere based on volume threshold: {singleSphere.Volume} >= {volThresh}");
-            //            scriptContext.StructureSet.RemoveStructure(singleSphere);
-            //            continue;
-            //        }
-            //    }
+                //foreach (string id_ in singleIds.Distinct()) // distinct does 
+                //{
+                //    // delete small spheres
+                //    var singleSphere = scriptContext.StructureSet.Structures.Where(x => x.Id == id_).FirstOrDefault();
+                //    if (singleSphere != null)
+                //    {
+                //        if (singleSphere.Volume <= volThresh || singleSphere.Volume == 0)
+                //        {
+                //            // Delete
+                //            //MessageBox.Show($"Deleted sphere based on volume threshold: {singleSphere.Volume} >= {volThresh}");
+                //            scriptContext.StructureSet.RemoveStructure(singleSphere);
+                //            continue;
+                //        }
+                //    }
 
-            //    // If here sphere is big enough
-            //    // Set the lattice struct segment = lattice struct segment.
-            //    // TODO: try other boolean ops to create mainStructure
+                //    // If here sphere is big enough
+                //    // Set the lattice struct segment = lattice struct segment.
+                //    // TODO: try other boolean ops to create mainStructure
 
-            //    //structMain.SegmentVolume = structMain.SegmentVolume.Or(singleSphere); // OLD method
-            //    AddContoursToMain(ref structMain, ref singleSphere);
+                //    //structMain.SegmentVolume = structMain.SegmentVolume.Or(singleSphere); // OLD method
+                //    AddContoursToMain(ref structMain, ref singleSphere);
 
-            //    // If delete individual delete 
-            //    if (!createSingle)
-            //    {
-            //        scriptContext.StructureSet.RemoveStructure(singleSphere);
-            //    }
+                //    // If delete individual delete 
+                //    if (!createSingle)
+                //    {
+                //        scriptContext.StructureSet.RemoveStructure(singleSphere);
+                //    }
 
 
-            //}
+                //}
 
-            // Delete the autogenerated target if it exists
-            if (deleteAutoTarget)
-            {
-                scriptContext.StructureSet.RemoveStructure(target);
-                scriptContext.StructureSet.RemoveStructure(ptvRetract);
-            }
-
+                // Delete the autogenerated target if it exists
+                if (deleteAutoTarget)
+                {
+                    sc.StructureSet.RemoveStructure(target);
+                    sc.StructureSet.RemoveStructure(ptvRetract);
+                }
+            });
             // And the main structure with target
-            Output += "\nCreated spheres";
-            MessageBox.Show("Created spheres close tool to view. \nFor different sphere locations rerun with different x and y shift values.");
+            // Output += "\nCreated spheres. Please close the tool to view";
+            //MessageBox.Show("Created spheres close tool to view. \nFor different sphere locations rerun with different x and y shift values.");
 
         }
 
@@ -855,17 +970,17 @@ namespace MAAS_SFRThelper.ViewModels
             return contour;
         }
 
-        private Structure CreateStructure(string structName, bool showMessage, bool makeHiRes)
+        private Structure CreateStructure(StructureSet ss, string structName, bool showMessage, bool makeHiRes)
         {
             string msg = $"New structure ({structName}) created.";
-            var prevStruct = scriptContext.StructureSet.Structures.FirstOrDefault(x => x.Id == structName);
+            var prevStruct = ss.Structures.FirstOrDefault(x => x.Id == structName);
             if (prevStruct != null)
             {
-                scriptContext.StructureSet.RemoveStructure(prevStruct);
+                ss.RemoveStructure(prevStruct);
                 msg += " Old structure overwritten.";
             }
 
-            var structure = scriptContext.StructureSet.AddStructure("PTV", structName);
+            var structure = ss.AddStructure("PTV", structName);
             if (makeHiRes)
             {
                 structure.ConvertToHighResolution();
@@ -878,7 +993,7 @@ namespace MAAS_SFRThelper.ViewModels
 
         public void CreateLattice()
         {
-            scriptContext.Patient.BeginModifications();
+            _esapiWorker.RunWithWait(sc => { sc.Patient.BeginModifications(); });
             // Make a new structure
             // Matt email 7/15/24
             // https://github.com/VarianAPIs/Varian-Code-Samples/blob/master/webinars%20%26%20workshops/06%20Apr%202018%20Webinar/Eclipse%20Scripting%20API/Projects/CreateOptStructures/CreateOptStructures.cs

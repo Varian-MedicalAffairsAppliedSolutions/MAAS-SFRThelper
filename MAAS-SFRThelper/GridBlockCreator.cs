@@ -1,10 +1,19 @@
+using MAAS_SFRThelper.Services;
+using MAAS_SFRThelper.ViewModels;
 using MAAS_SFRThelper.Views;
 using System;
+using System.Collections.Generic;
+using System.Configuration;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Runtime.Remoting.Contexts;
+using System.Threading;
 using System.Windows;
+using System.Windows.Threading;
+using System.Xml.Linq;
 using VMS.TPS.Common.Model.API;
 
 namespace VMS.TPS
@@ -22,6 +31,8 @@ namespace VMS.TPS
         {
             try
             {
+                AppConfig.GetAppConfig(Assembly.GetExecutingAssembly().Location);
+
                 // Consider removing requirement of a plan - just need contours not a plan for spheres - Matt
                 if (context.Patient == null || context.PlanSetup == null)
                 // if (context.Patient == null) // 8/4 trying to comment out context.PlanSetup
@@ -50,11 +61,30 @@ namespace VMS.TPS
                                                      "MAAS-SFRTHelper",
                                                      MessageBoxButton.YesNo,
                                                      MessageBoxImage.Question) == MessageBoxResult.Yes;
-
+                                                     // MessageBox.Show(ConfigurationManager.AppSettings["ValidForClinicalUse"]);
                     if (userAgree)
                     {
-                        var mainWindow = new MainWindow(context);
-                        mainWindow.ShowDialog();
+                        // The ESAPI worker needs to be created in the main thread
+                        var esapiWorker = new EsapiWorker(context);
+
+                    // This new queue of tasks will prevent the script
+                    // for exiting until the new window is closed
+                    DispatcherFrame frame = new DispatcherFrame();
+
+                    RunOnNewStaThread(() =>
+                    {
+                        // This method won't return until the window is closed
+                        InitializeAndStartMainWindow(esapiWorker);
+
+                        // End the queue so that the script can exit
+                        frame.Continue = false;
+                    });
+
+                    // Start the new queue, waiting until the window is closed
+                    Dispatcher.PushFrame(frame);
+                   
+                        //var mainWindow = new MainWindow(context);
+                        //mainWindow.ShowDialog();
                     }
                 }
                 else
@@ -70,5 +100,23 @@ namespace VMS.TPS
                 MessageBox.Show(ex.Message, "MAAS-SFRTHelper", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
+        private void InitializeAndStartMainWindow(EsapiWorker esapiWorker)
+        {
+            //var viewModel = new MainViewModel(esapiWorker);
+            var mainWindow = new MainWindow(esapiWorker);
+            mainWindow.ShowDialog();
+        }
+
+        private void RunOnNewStaThread(Action a)
+        {
+            Thread thread = new Thread(() => a());
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.IsBackground = true;
+            thread.Start();
+        }
     }
+
+
 }
+

@@ -98,15 +98,26 @@
     <Compile Include="Models\Circle.cs" />
     <Compile Include="Models\Polygon.cs" />
     <Compile Include="Models\Spacing.cs" />
+    <Compile Include="Services\AppConfigHelper.cs" />
+    <Compile Include="Services\EsapiWorker.cs" />
+    <Compile Include="Services\StructureExtension.cs" />
     <Compile Include="ViewModels\CoordinateConverter.cs" />
+    <Compile Include="ViewModels\EvaluationViewModel.cs" />
     <Compile Include="ViewModels\MainViewModel.cs" />
     <Compile Include="Properties\AssemblyExpirationDate.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="ViewModels\OptimizationViewModel.cs" />
     <Compile Include="ViewModels\SphereDialogViewModel.cs" />
     <Compile Include="GridBlockCreator.cs" />
     <Compile Include="Views\Converters\BoolToBlueConverter.cs" />
     <Compile Include="Views\Converters\BoolToStrikeConverter.cs" />
     <Compile Include="Views\Converters\RadiusToDiameterConverter.cs" />
+    <Compile Include="Views\EvaluationView.xaml.cs">
+      <DependentUpon>EvaluationView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\OptimizationView.xaml.cs">
+      <DependentUpon>OptimizationView.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Views\SphereDialog.xaml.cs">
       <DependentUpon>SphereDialog.xaml</DependentUpon>
     </Compile>
@@ -120,6 +131,14 @@
     <Compile Include="Views\TextBoxOutputter.cs" />
   </ItemGroup>
   <ItemGroup>
+    <Page Include="Views\EvaluationView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\OptimizationView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="Views\SphereDialog.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>

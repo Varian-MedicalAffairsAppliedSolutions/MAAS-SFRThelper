@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:MAAS_SFRThelper.Views"
         mc:Ignorable="d"
-        Title="MAAS-SFRThelper" Height="635" Width="635">
+        Title="{Binding WindowTitle}" Height="635" Width="635">
     <DockPanel LastChildFill="False">
         <Grid DockPanel.Dock="Top">
             <Grid.RowDefinitions>
@@ -15,6 +15,13 @@
             <TabControl>
                 <TabItem Name="SphereLatticeTab" Header="SphereLattice" Style="{x:Null}"/>
                 <TabItem Name="RapidRodsTab" Header="RapidRods" Style="{x:Null}"/>
+                <TabItem Header="Optimization" Style="{x:Null}" Visibility="Hidden" >
+                    <local:OptimizationView DataContext="{Binding OptimizationViewModel}" />
+                    
+                </TabItem>
+                <TabItem Header="Evaluation" Style="{x:Null}"  Visibility="Hidden" >
+                    <local:EvaluationView DataContext="{Binding EvaluationViewModel}"/>
+                </TabItem>
             </TabControl>
 
             <TextBlock Grid.Row="1" Name="Footer" Background="PaleVioletRed">
