@@ -14,6 +14,9 @@ using VMS.TPS.Common.Model.Types;
 using Voronoi3d;
 using System.Numerics;
 using System.Diagnostics.Eventing.Reader;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using MAAS_SFRThelper.Services;
 
 namespace MAAS_SFRThelper.ViewModels
 {
@@ -43,14 +46,6 @@ namespace MAAS_SFRThelper.ViewModels
         }
 
         private bool _patternEnabled;
-        private double _LateralScalingFactor;
-
-        public double LateralScalingFactor
-        {
-            get { return _LateralScalingFactor; }
-            set { SetProperty(ref _LateralScalingFactor, value); }
-        }
-
         public bool PatternEnabled
         {
             get { return _patternEnabled; }
@@ -151,7 +146,6 @@ namespace MAAS_SFRThelper.ViewModels
             }
         }
 
-
         private bool isCVT3D;
         public bool IsCVT3D
         {
@@ -159,15 +153,17 @@ namespace MAAS_SFRThelper.ViewModels
             set
             {
                 SetProperty(ref isCVT3D, value);
-                /*if (IsCVT3D)
+                if (IsCVT3D)
                 {
-                    createNullsVoids = false;
-                    nullVoidsEnabled = false;
+                    LSFVisibility = false; 
+                    // createNullsVoids = false;
+                    // nullVoidsEnabled = false;
                 }
                 else
                 {
-                    nullVoidsEnabled = true;
-                }*/
+                    LSFVisibility = true;
+                    // nullVoidsEnabled = true;
+                }
                 //// MessageBox.Show("IsHex" + IsHex);
                 //if (IsHex)
                 //{
@@ -175,6 +171,41 @@ namespace MAAS_SFRThelper.ViewModels
                 //    UpdateValidSpacings();
                 //}
             }
+        }
+        private bool _LSFVisibility;
+        public bool LSFVisibility
+        {
+            get { return _LSFVisibility; }
+            set { SetProperty(ref _LSFVisibility, value); }
+        }
+
+        //private Visibility _lsfVisibility; // = Visibility.Hidden;
+        //public Visibility LSFVisibility
+        //{
+        //    get => _lsfVisibility;
+        //    set
+        //    {
+        //        if (IsCVT3D)
+        //        {
+        //            _lsfVisibility = Visibility.Collapsed;
+
+        //        }
+        //        else
+        //        {
+        //            _lsfVisibility = Visibility.Visible;
+        //            // OnPropertyChanged(nameof(LSFVisibility)); // Notify the UI
+
+        //        }
+
+        //    }
+
+        //}
+
+        private double _LateralScalingFactor;
+        public double LateralScalingFactor
+        {
+            get { return _LateralScalingFactor; }
+            set { SetProperty(ref _LateralScalingFactor, value); }
         }
 
         private double xShift;
@@ -294,6 +325,7 @@ namespace MAAS_SFRThelper.ViewModels
         private readonly EsapiWorker _esapiWorker;
         //private ScriptContext scriptContext;
         public DelegateCommand CreateLatticeCommand { get; set; }
+
         #endregion
 
         public SphereDialogViewModel(EsapiWorker esapiWorker)
@@ -324,6 +356,7 @@ namespace MAAS_SFRThelper.ViewModels
             SingleSphereEnabled = true;
             LateralScalingFactor = 1.0;
             CreateLatticeCommand = new DelegateCommand(CreateLattice, CanCreateLattice);
+            LSFVisibility = true;
 
             // Set valid spacings based on CT img z resolution
             // ValidSpacings = new List<Spacing>();
@@ -701,10 +734,10 @@ namespace MAAS_SFRThelper.ViewModels
             else if (IsCVT3D)
             {
                 // Extra dialog box for calculating number of points for seed placement CVT
-                MessageBox.Show("Calculating number of spheres needed.");
-                Output += "\nEvaluating number of spheres, this could take several minutes ...";
+                // MessageBox.Show("Calculating number of spheres needed.");
+                // Output += "\nEvaluating number of spheres, this could take several minutes ...";
                 var gridhex = BuildHexGrid(10.0, bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract);
-                MessageBox.Show("Total seeds in gridhex", gridhex.Count.ToString());
+                // MessageBox.Show("Total seeds in gridhex", gridhex.Count.ToString());
                 Output += "\nEvaluating sphere locations using 3D CVT, this could take several minutes ...";
                 // var cvt = new CVT3D(target.MeshGeometry, new CVTSettings(gridhex.Count));
                 var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(gridhex.Count));
@@ -764,10 +797,14 @@ namespace MAAS_SFRThelper.ViewModels
                 Output += $"Total seeds in gridCVT: {grid.Count.ToString()}";
                     structMain = CreateStructure(sc.StructureSet, "CVT3D", false, true);
                 }
+                Output += $"\nPTV volume: {target.Volume.ToString()}";
+                Output += $"\nApproximate sphere volume: {((0.987053856 * 4 / 3) * Math.PI * 0.1 * 0.1 * 0.1 * sphereRadius * sphereRadius * sphereRadius * grid.Count).ToString()}";
+                Output += $"\nRatio (total sphere Volume/PTV volume): {(((0.987053856 * 4 / 3) * Math.PI * 0.1 * 0.1 * 0.1 * sphereRadius * sphereRadius * sphereRadius * grid.Count) / (target.Volume)).ToString()}";
+
 
                 // Set a message box to add display the total sphere volume and give users choice of 
                 // going forward or cancelling run
-                MessageBoxResult result = MessageBox.Show("Approx sphere volume fraction", (((4/3)*Math.PI*0.1*0.1*0.1*sphereRadius*sphereRadius*sphereRadius*grid.Count)/(target.Volume)).ToString(),
+                MessageBoxResult result = MessageBox.Show("Approx sphere volume fraction", (((0.987053856*4 /3)*Math.PI*0.1*0.1*0.1*sphereRadius*sphereRadius*sphereRadius*grid.Count)/(target.Volume)).ToString(),
                 MessageBoxButton.OKCancel,MessageBoxImage.Question);
 
                 // Check the user's response
@@ -844,16 +881,25 @@ namespace MAAS_SFRThelper.ViewModels
                 {
                     var voidFactor = (spacingSelected.Value - 2.0 * radius) / 2.0;
                     Output += "\nCreating nulls and voids ... ";
+                    Output += $"\nVoidFactor = {voidFactor}";
+
                     var voidStructureL1 = sc.StructureSet.AddStructure("CONTROL", "VoidL1");
-                    voidStructureL1.SegmentVolume = target.Margin(-1 * spacingSelected.Value / 2).Sub(structMain.Margin(0.8*voidFactor));
+                    voidStructureL1.SegmentVolume = structMain.LargeMargin(0.8 * voidFactor).And(target.LargeMargin(-1 * sphereRadius / 2));
+                    voidStructureL1.SegmentVolume = target.LargeMargin(-1 * sphereRadius / 2).Sub(voidStructureL1.SegmentVolume);
+                    Output += "\nL1 has been created";
 
                     var voidStructureL2 = sc.StructureSet.AddStructure("CONTROL", "VoidL2");
                     voidStructureL2.Color = System.Windows.Media.Color.FromRgb(160, 32, 240);
-                    voidStructureL2.SegmentVolume = target.Margin(-1 * spacingSelected.Value / 2).Sub(structMain.Margin(voidFactor));
+                    voidStructureL2.SegmentVolume = target.LargeMargin(-1.75 * sphereRadius).And(structMain.LargeMargin(voidFactor));
+                    // Output += $"\nVoid Stucture L2 AND volume = {voidStructureL2.Volume}";
+                    voidStructureL2.SegmentVolume = target.LargeMargin(-1.75 * sphereRadius).Sub(voidStructureL2.SegmentVolume);
+                    Output += "\nL2 has been created";
 
                     var voidStructureL3 = sc.StructureSet.AddStructure("CONTROL", "VoidL3");
                     voidStructureL3.Color = System.Windows.Media.Color.FromRgb(0, 255, 255);
-                    voidStructureL3.SegmentVolume = target.Margin(-1 * spacingSelected.Value / 2).Sub(structMain.Margin(1.2 * voidFactor));
+                    voidStructureL3.SegmentVolume = voidStructureL2.LargeMargin(-sphereRadius / 4);
+                    Output += "\nL3 has been created";
+                    // voidStructureL3.SegmentVolume = target.Margin(-1 * spacingSelected.Value / 2).Sub(structMain.Margin(1.2 * voidFactor));
 
                     ProgressValue += 5.0;
                 }

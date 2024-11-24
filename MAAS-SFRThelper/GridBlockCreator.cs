@@ -1,7 +1,11 @@
+using MAAS_SFRThelper.Services;
 using MAAS_SFRThelper.ViewModels;
 using MAAS_SFRThelper.Views;
 using System;
+using System.Collections.Generic;
+using System.Configuration;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -9,6 +13,7 @@ using System.Runtime.Remoting.Contexts;
 using System.Threading;
 using System.Windows;
 using System.Windows.Threading;
+using System.Xml.Linq;
 using VMS.TPS.Common.Model.API;
 
 namespace VMS.TPS
@@ -26,6 +31,8 @@ namespace VMS.TPS
         {
             try
             {
+                AppConfig.GetAppConfig(Assembly.GetExecutingAssembly().Location);
+
                 // Consider removing requirement of a plan - just need contours not a plan for spheres - Matt
                 if (context.Patient == null || context.PlanSetup == null)
                 // if (context.Patient == null) // 8/4 trying to comment out context.PlanSetup
@@ -54,6 +61,7 @@ namespace VMS.TPS
                                                      "MAAS-SFRTHelper",
                                                      MessageBoxButton.YesNo,
                                                      MessageBoxImage.Question) == MessageBoxResult.Yes;
+                                                     // MessageBox.Show(ConfigurationManager.AppSettings["ValidForClinicalUse"]);
                     if (userAgree)
                     {
                         // The ESAPI worker needs to be created in the main thread
@@ -108,4 +116,7 @@ namespace VMS.TPS
             thread.Start();
         }
     }
+
+
 }
+

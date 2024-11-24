@@ -85,8 +85,8 @@
         <TextBox Grid.Row ="3" Grid.Column="3" x:Name="Yshift" Text="{Binding YShift}" IsEnabled="{Binding ShiftEnabled}" HorizontalAlignment="Left" Height="26" Margin="10" VerticalAlignment="Top" Width="123" Style="{x:Null}"/>
 
 
-        <Label Grid.Row ="4" Height="26" Width="180" Margin="10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Lateral spacing factor" />
-        <TextBox Grid.Row ="4" Grid.Column="1" x:Name="LateralScalingFactor" Text="{Binding LateralScalingFactor}" HorizontalAlignment="Left" Height="26" Margin="10" VerticalAlignment="Top" Width="123" Style="{x:Null}"/>
+        <Label Grid.Row ="4" Height="26" Width="180" Margin="10" HorizontalAlignment="Left" VerticalAlignment="Top" Content="Lateral spacing factor" Visibility="{Binding LSFVisibility, Converter={StaticResource localVisibilityConverter}}" />
+        <TextBox Grid.Row ="4" Grid.Column="1" x:Name="LateralScalingFactor" Text="{Binding LateralScalingFactor}" HorizontalAlignment="Left" Height="26" Margin="11,10,0,0" VerticalAlignment="Top" Width="123" Style="{x:Null}" Visibility="{Binding LSFVisibility, Converter={StaticResource localVisibilityConverter}}" />
 
         <StackPanel Grid.Row ="4" Grid.Column="2" Grid.ColumnSpan="2" >
             <Button  Height="26"  Margin="10" HorizontalAlignment="Stretch" VerticalAlignment="Top" Content="Create" Command="{Binding CreateLatticeCommand}" Style="{x:Null}" />
