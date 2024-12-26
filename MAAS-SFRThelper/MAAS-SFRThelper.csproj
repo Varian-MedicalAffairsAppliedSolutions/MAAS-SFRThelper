@@ -97,6 +97,7 @@
     <Compile Include="Models\BaseObject.cs" />
     <Compile Include="Models\Circle.cs" />
     <Compile Include="Models\Polygon.cs" />
+    <Compile Include="Models\seedPointModel.cs" />
     <Compile Include="Models\Spacing.cs" />
     <Compile Include="Services\AppConfigHelper.cs" />
     <Compile Include="Services\EsapiWorker.cs" />

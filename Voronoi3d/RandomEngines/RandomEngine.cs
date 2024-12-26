@@ -2,7 +2,9 @@
 {
     public enum RandomEngine
     {
-        UNIFORMDISTRIBUTION = 0,
+         
+        HEXGRID = 0,
         HALTONSEQUENCE = 1,
+        UNIFORMDISTRIBUTION = 2,
     }
 }
