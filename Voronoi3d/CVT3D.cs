@@ -54,7 +54,6 @@ namespace Voronoi3d
 
         public CVT3D(MeshGeometry3D mesh, CVTSettings settings = default)
         {
-         //    Prism.Commands.DelegateCommand DummyCommand = new Prism.Commands.DelegateCommand(null);
             _mesh = mesh;
             _settings = settings;
             StoppingCriterion = _settings?.StoppingCriterion;
@@ -64,7 +63,7 @@ namespace Voronoi3d
         public IReadOnlyCollection<Point3D> CalculateGenerators()
         {
             var numberOfPoints = _settings.NumberOfGenerators;
-            var maxIterations = _settings.MaxNumberOfIterations; 
+            var maxIterations = _settings.MaxNumberOfIterations;
             List<CVT3D.Point3D> points = GenerateRandomPoints(numberOfPoints, _mesh);
             List<CVT3D.Point3D> generators = LloydRelaxation(points, maxIterations, _mesh);
             return generators;

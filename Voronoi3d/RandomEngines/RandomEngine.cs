@@ -1,10 +1,9 @@
-﻿namespace Voronoi3d.RandomEngines
+﻿
+namespace Voronoi3d.RandomEngines
 {
     public enum RandomEngine
     {
-         
-        HEXGRID = 0,
+        UNIFORMDISTRIBUTION = 0,
         HALTONSEQUENCE = 1,
-        UNIFORMDISTRIBUTION = 2,
     }
 }

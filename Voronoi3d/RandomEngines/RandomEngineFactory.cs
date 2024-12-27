@@ -1,4 +1,5 @@
-﻿using System;
+﻿
+using System;
 
 namespace Voronoi3d.RandomEngines
 {
@@ -8,8 +9,6 @@ namespace Voronoi3d.RandomEngines
         {
             switch (randomEngine)
             {
-                case RandomEngine.HEXGRID:
-                    return new HexGrid3D();
                 case RandomEngine.HALTONSEQUENCE:
                     return new HaltonSequence3D();
                 case RandomEngine.UNIFORMDISTRIBUTION:
