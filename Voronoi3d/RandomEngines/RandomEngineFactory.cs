@@ -11,6 +11,8 @@ namespace Voronoi3d.RandomEngines
             {
                 case RandomEngine.HALTONSEQUENCE:
                     return new HaltonSequence3D();
+                case RandomEngine.HEXGRID:
+                    return new HexGrid3D();
                 case RandomEngine.UNIFORMDISTRIBUTION: 
                     throw new NotImplementedException("RandomEngine.UNIFORMDISTRIBUTION not implemented, yet.");
                 default:

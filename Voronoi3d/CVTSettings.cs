@@ -26,7 +26,7 @@ namespace Voronoi3d
 
             NumberOfGenerators = n_generators;
             NumberOfSamplingPoints = 3000;
-            SelectedSamplingMethod = RandomEngine.HALTONSEQUENCE;
+            SelectedSamplingMethod = RandomEngine.HEXGRID;
             MaxNumberOfIterations = 1500;
             StoppingCriterion = new CounterDecorator(new NoDiffAfterThreeIterationsStoppingCriterion());
         }
