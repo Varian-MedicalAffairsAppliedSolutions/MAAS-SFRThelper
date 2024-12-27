@@ -16,6 +16,8 @@ namespace Voronoi3d
         public double SizeY { get; private set; }
         public double StartZ { get; private set; }
         public double SizeZ { get; private set; }
+        public double Spacing { get; private set; }
+        public double SphereRadius { get; private set; }
 
         public CVTSettings()
         {
@@ -37,12 +39,12 @@ namespace Voronoi3d
         //    StoppingCriterion = new CounterDecorator(new NoDiffAfterThreeIterationsStoppingCriterion());
         //}
 
-        public CVTSettings(int n_generators, double Xstart, double Xsize, double Ystart, double Ysize, double Zstart, double Zsize)
+        public CVTSettings(int n_generators, double Xstart, double Xsize, double Ystart, double Ysize, double Zstart, double Zsize, double spacing, double rad)
         {
-            InitializeDefaults(n_generators, Xstart, Xsize, Ystart, Ysize, Zstart, Zsize);
+            InitializeDefaults(n_generators, Xstart, Xsize, Ystart, Ysize, Zstart, Zsize, spacing, rad);
         }
 
-        private void InitializeDefaults(int n_generators = 32, double Xstart = 0, double Xsize = 1, double Ystart = 0, double Ysize = 1, double Zstart = 0, double Zsize = 1)
+        private void InitializeDefaults(int n_generators = 32, double Xstart = 0, double Xsize = 1, double Ystart = 0, double Ysize = 1, double Zstart = 0, double Zsize = 1, double spacing = 20, double rad = 7)
         {
 
             NumberOfGenerators = n_generators;
@@ -56,6 +58,8 @@ namespace Voronoi3d
             SizeY = Ysize;
             StartZ = Zstart;
             SizeZ = Zsize;  
+            Spacing = spacing;
+            SphereRadius = rad;
         }
 
         public static CVTSettings DefaultSettings()

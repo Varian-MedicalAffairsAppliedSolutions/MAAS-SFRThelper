@@ -845,7 +845,7 @@ namespace MAAS_SFRThelper.ViewModels
                     Output += "\nEvaluating sphere locations using 3D CVT, this could take several minutes ...";
                     // var cvt = new CVT3D(target.MeshGeometry, new CVTSettings(gridhex.Count));
                     //var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(gridhex.Count(g => g.SeedType == SeedTypeEnum.Sphere)));
-                    var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(gridhex.Count(g => g.SeedType == SeedTypeEnum.Sphere), bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ));
+                    var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(gridhex.Count(g => g.SeedType == SeedTypeEnum.Sphere), bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, SpacingSelected.Value, Radius));
 
                     //var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(gridhex.Count(g => g.SeedType == SeedTypeEnum.Sphere), gridhexSph, gridhexVoid));
                     var cvtGenerators = cvt.CalculateGenerators();
