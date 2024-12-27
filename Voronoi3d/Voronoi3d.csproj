@@ -50,16 +50,12 @@
     <Compile Include="HashHelper.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RandomEngines\HaltonSequence3D.cs" />
-    <Compile Include="RandomEngines\HexGrid3D.cs" />
     <Compile Include="RandomEngines\IRandom3D.cs" />
     <Compile Include="RandomEngines\RandomEngine.cs" />
     <Compile Include="RandomEngines\RandomEngineFactory.cs" />
     <Compile Include="StoppingCriteria\CounterDecorator.cs" />
     <Compile Include="StoppingCriteria\IStoppingCriterion.cs" />
     <Compile Include="StoppingCriteria\NoDiffAfterThreeIterationsStoppingCriterion.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
