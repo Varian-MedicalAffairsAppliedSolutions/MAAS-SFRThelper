@@ -11,7 +11,7 @@ namespace Voronoi3d.RandomEngines
             {
                 case RandomEngine.HALTONSEQUENCE:
                     return new HaltonSequence3D();
-                case RandomEngine.UNIFORMDISTRIBUTION:
+                case RandomEngine.UNIFORMDISTRIBUTION: 
                     throw new NotImplementedException("RandomEngine.UNIFORMDISTRIBUTION not implemented, yet.");
                 default:
                     throw new ArgumentException("You should never received this exception (RandomEngineFactory)");
