@@ -1,4 +1,6 @@
-﻿using Voronoi3d.RandomEngines;
+﻿using System.Collections.Generic;
+using System.Windows.Media.Media3D;
+using Voronoi3d.RandomEngines;
 using Voronoi3d.StoppingCriteria;
 
 namespace Voronoi3d
@@ -10,6 +12,8 @@ namespace Voronoi3d
         public RandomEngine SelectedSamplingMethod { get; protected set; }
         public int MaxNumberOfIterations { get; protected set; }
         public IStoppingCriterion StoppingCriterion { get; protected set; }
+        public List<Point3D> SphereLocations { get; private set; }
+        public List<Point3D> VoidLocations { get; private set; }
         public double StartX { get; private set; }
         public double SizeX { get; private set; }
         public double StartY { get; private set; }
@@ -24,27 +28,44 @@ namespace Voronoi3d
             InitializeDefaults();
         }
 
-        //public CVTSettings(int n_generators)
-        //{
-        //    InitializeDefaults(n_generators);
-        //}
-
-        //private void InitializeDefaults(int n_generators = 32)
-        //{
-
-        //    NumberOfGenerators = n_generators;
-        //    NumberOfSamplingPoints = 3000;
-        //    SelectedSamplingMethod = RandomEngine.HEXGRID;
-        //    MaxNumberOfIterations = 1500;
-        //    StoppingCriterion = new CounterDecorator(new NoDiffAfterThreeIterationsStoppingCriterion());
-        //}
-
-        public CVTSettings(int n_generators, double Xstart, double Xsize, double Ystart, double Ysize, double Zstart, double Zsize, double spacing, double rad)
+        public CVTSettings(int n_generators)
         {
-            InitializeDefaults(n_generators, Xstart, Xsize, Ystart, Ysize, Zstart, Zsize, spacing, rad);
+            InitializeDefaults(n_generators);
         }
 
-        private void InitializeDefaults(int n_generators = 32, double Xstart = 0, double Xsize = 1, double Ystart = 0, double Ysize = 1, double Zstart = 0, double Zsize = 1, double spacing = 20, double rad = 7)
+        private void InitializeDefaults(int n_generators = 32)
+        {
+
+            NumberOfGenerators = n_generators;
+            NumberOfSamplingPoints = 3000;
+            SelectedSamplingMethod = RandomEngine.HEXGRID;
+            MaxNumberOfIterations = 1500;
+            StoppingCriterion = new CounterDecorator(new NoDiffAfterThreeIterationsStoppingCriterion());
+        }
+
+        public CVTSettings(List<Point3D> gridhexSph, List<Point3D> gridhexVoid, int n_generators)
+        {
+            InitializeDefaults(gridhexSph, gridhexVoid, n_generators);
+        }
+
+        private void InitializeDefaults(List<Point3D> gridhexSph, List<Point3D> gridhexVoid, int n_generators = 32)
+        {
+
+            NumberOfGenerators = n_generators;
+            NumberOfSamplingPoints = 3000;
+            SelectedSamplingMethod = RandomEngine.HEXGRID;
+            MaxNumberOfIterations = 1500;
+            StoppingCriterion = new CounterDecorator(new NoDiffAfterThreeIterationsStoppingCriterion());
+            SphereLocations = gridhexSph;
+            VoidLocations = gridhexVoid;
+        }
+
+        public CVTSettings(double Xstart, double Xsize, double Ystart, double Ysize, double Zstart, double Zsize, double spacing, double rad, int n_generators)
+        {
+            InitializeDefaults(Xstart, Xsize, Ystart, Ysize, Zstart, Zsize, spacing, rad, n_generators);
+        }
+
+        private void InitializeDefaults(double Xstart, double Xsize, double Ystart, double Ysize, double Zstart, double Zsize, double spacing, double rad, int n_generators = 32)
         {
 
             NumberOfGenerators = n_generators;
@@ -57,7 +78,7 @@ namespace Voronoi3d
             StartY = Ystart;
             SizeY = Ysize;
             StartZ = Zstart;
-            SizeZ = Zsize;  
+            SizeZ = Zsize;
             Spacing = spacing;
             SphereRadius = rad;
         }

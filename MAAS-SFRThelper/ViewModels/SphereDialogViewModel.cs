@@ -826,28 +826,28 @@ namespace MAAS_SFRThelper.ViewModels
                     var gridhex = BuildHexGrid(10.0, bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract, ptvRetractVoid);
 
                     // make list of the points in gridhex_sph, gridhex_void
-                    //List<Point3D> gridhexSph = null;
-                    //List<Point3D> gridhexVoid = null;
+                    List<Point3D> gridhexSph = new List<Point3D>();
+                    List<Point3D> gridhexVoid = new List<Point3D>();
 
-                    //foreach (VVector pos in gridhex.Where(r => r.SeedType == SeedTypeEnum.Sphere).Select(r => r.Position))
-                    //{
-                    //    gridhexSph.Add(new Point3D (pos.x, pos.y, pos.z));
+                    foreach (VVector pos in gridhex.Where(r => r.SeedType == SeedTypeEnum.Sphere).Select(r => r.Position))
+                    {
+                        gridhexSph.Add(new Point3D(pos.x, pos.y, pos.z));
 
-                    //}
+                    }
 
-                    //foreach (VVector pos in gridhex.Where(r => r.SeedType == SeedTypeEnum.Void).Select(r => r.Position))
-                    //{
-                    //    gridhexVoid.Add(new Point3D(pos.x, pos.y, pos.z));
+                    foreach (VVector pos in gridhex.Where(r => r.SeedType == SeedTypeEnum.Void).Select(r => r.Position))
+                    {
+                        gridhexVoid.Add(new Point3D(pos.x, pos.y, pos.z));
 
-                    //}
+                    }
 
                     // MessageBox.Show("Total seeds in gridhex", gridhex.Count.ToString());
                     Output += "\nEvaluating sphere locations using 3D CVT, this could take several minutes ...";
                     // var cvt = new CVT3D(target.MeshGeometry, new CVTSettings(gridhex.Count));
                     //var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(gridhex.Count(g => g.SeedType == SeedTypeEnum.Sphere)));
-                    var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(gridhex.Count(g => g.SeedType == SeedTypeEnum.Sphere), bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, SpacingSelected.Value, Radius));
+                    // var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(gridhex.Count(g => g.SeedType == SeedTypeEnum.Sphere), bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, SpacingSelected.Value, Radius));
 
-                    //var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(gridhex.Count(g => g.SeedType == SeedTypeEnum.Sphere), gridhexSph, gridhexVoid));
+                    var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(gridhexSph, gridhexVoid, gridhex.Count(g => g.SeedType == SeedTypeEnum.Sphere)));
                     var cvtGenerators = cvt.CalculateGenerators();
                     ProgressValue += 15.0;
                     // Check to make sure each point is at least SelectedSpacing distance away from every other point. If not 
@@ -895,11 +895,13 @@ namespace MAAS_SFRThelper.ViewModels
                             d = SpacingSelected.Value;
                         }
 
-                        if (SpacingSelected.Value <= d)
-                        {
-                            retval.Add(new seedPointModel(cvtpt, SeedTypeEnum.Sphere));
-                        }
+                        // Uncomment below if CVT uses random sampling to avoid spheres clubbing together
 
+                        //if (SpacingSelected.Value <= d)
+                        //{
+                        //    retval.Add(new seedPointModel(cvtpt, SeedTypeEnum.Sphere));
+                        //}
+                        retval.Add(new seedPointModel(cvtpt, SeedTypeEnum.Sphere));
 
                     }
 

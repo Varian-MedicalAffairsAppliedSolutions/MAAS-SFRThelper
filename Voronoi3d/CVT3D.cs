@@ -71,6 +71,10 @@ namespace Voronoi3d
 
         protected List<Point3D> GenerateRandomPoints(int count, MeshGeometry3D mesh3d)
         {
+            if (_settings.SelectedSamplingMethod == RandomEngine.HEXGRID)
+            {
+                RandomEngineFactory.initializeHex(_settings.SphereLocations);
+            }
             IRandom3D rand = RandomEngineFactory.Create(_settings.SelectedSamplingMethod);
             var points = rand
                 .GetRandomNumbers(mesh3d)
