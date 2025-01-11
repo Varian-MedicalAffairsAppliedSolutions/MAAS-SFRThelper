@@ -823,15 +823,21 @@ namespace MAAS_SFRThelper.ViewModels
                     // Extra dialog box for calculating number of points for seed placement CVT
                     // MessageBox.Show("Calculating number of spheres needed.");
                     // Output += "\nEvaluating number of spheres, this could take several minutes ...";
+                    // spacingSelected.Value = spacingSelected.Value * 2;
                     var gridhex = BuildHexGrid(10.0, bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract, ptvRetractVoid);
 
                     // make list of the points in gridhex_sph, gridhex_void
                     List<Point3D> gridhexSph = new List<Point3D>();
                     List<Point3D> gridhexVoid = new List<Point3D>();
+                    Random rand = new Random();
 
                     foreach (VVector pos in gridhex.Where(r => r.SeedType == SeedTypeEnum.Sphere).Select(r => r.Position))
                     {
                         gridhexSph.Add(new Point3D(pos.x, pos.y, pos.z));
+                        //if (rand.Next(1, 10) % 2 == 0)
+                        //{
+                        //    gridhexSph.Add(new Point3D(pos.x, pos.y, pos.z));
+                        //}
 
                     }
 
@@ -892,16 +898,19 @@ namespace MAAS_SFRThelper.ViewModels
                         }
                         else
                         {
-                            d = SpacingSelected.Value;
+                            d = 2.10 * sphereRadius;
+                            // d = SpacingSelected.Value;
                         }
 
                         // Uncomment below if CVT uses random sampling to avoid spheres clubbing together
 
-                        //if (SpacingSelected.Value <= d)
-                        //{
-                        //    retval.Add(new seedPointModel(cvtpt, SeedTypeEnum.Sphere));
-                        //}
-                        retval.Add(new seedPointModel(cvtpt, SeedTypeEnum.Sphere));
+                        // if (SpacingSelected.Value <= d)
+                        if (2.10*sphereRadius <= d)
+
+                        {
+                            retval.Add(new seedPointModel(cvtpt, SeedTypeEnum.Sphere));
+                        }
+                        //retval.Add(new seedPointModel(cvtpt, SeedTypeEnum.Sphere));
 
                     }
 
@@ -912,12 +921,12 @@ namespace MAAS_SFRThelper.ViewModels
 
                 Output += $"\nPTV volume: {target.Volume.ToString()}";
                 Output += $"\nApproximate sphere volume: {((0.987053856 * 4 / 3) * Math.PI * 0.1 * 0.1 * 0.1 * sphereRadius * sphereRadius * sphereRadius * grid.Count(g => g.SeedType == SeedTypeEnum.Sphere)).ToString()}";
-                Output += $"\nRatio (total sphere Volume/PTV volume): {(((0.987053856 * 4 / 3) * Math.PI * 0.1 * 0.1 * 0.1 * sphereRadius * sphereRadius * sphereRadius * grid.Count(g => g.SeedType == SeedTypeEnum.Sphere)) / (target.Volume)).ToString()}";
+                Output += $"\nRatio (total sphere Volume/PTV volume): {(((100*0.987053856 * 4 / 3) * Math.PI * 0.1 * 0.1 * 0.1 * sphereRadius * sphereRadius * sphereRadius * grid.Count(g => g.SeedType == SeedTypeEnum.Sphere)) / (target.Volume)).ToString()} %";
 
 
                 // Set a message box to add display the total sphere volume and give users choice of 
                 // going forward or cancelling run
-                MessageBoxResult result = MessageBox.Show("Approx sphere volume fraction", (((0.987053856 * 4 / 3) * Math.PI * 0.1 * 0.1 * 0.1 * sphereRadius * sphereRadius * sphereRadius * grid.Count(g => g.SeedType == SeedTypeEnum.Sphere)) / (target.Volume)).ToString(),
+                MessageBoxResult result = MessageBox.Show("Approx sphere volume ratio", (((0.987053856 * 4 / 3) * Math.PI * 0.1 * 0.1 * 0.1 * sphereRadius * sphereRadius * sphereRadius * grid.Count(g => g.SeedType == SeedTypeEnum.Sphere)) / (target.Volume)).ToString(),
                 MessageBoxButton.OKCancel, MessageBoxImage.Question);
 
                 // Check the user's response

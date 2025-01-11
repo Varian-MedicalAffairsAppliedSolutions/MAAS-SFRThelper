@@ -32,15 +32,27 @@ namespace Voronoi3d.RandomEngines
         public IEnumerable<CVT3D.Point3D> GetRandomNumbers(MeshGeometry3D mesh3d)
         {
             var vertices = mesh3d.Positions;
+           
             List<CVT3D.Point3D> CVTpoints = new List<CVT3D.Point3D>();
             foreach (var point in Points)
             {
                 CVTpoints.Add(new CVT3D.Point3D(point.X, point.Y, point.Z));
             }
-            foreach (var vertex in vertices)
-            {
-                CVTpoints.Add(new CVT3D.Point3D(vertex.X, vertex.Y, vertex.Z));
-            }
+
+            // find the total number of points in CVTpoints - this will be the number of points being passed in from SFRThelper
+            //int indexSpacing = vertices.Count/(2*Points.Count);
+
+            //for (var index = indexSpacing; index < vertices.Count; index += indexSpacing)
+            //{
+            //   var vertex = vertices.ElementAt(index);
+            //   CVTpoints.Add(new CVT3D.Point3D(vertex.X, vertex.Y, vertex.Z));
+            //}
+
+            //foreach (var vertex in vertices)
+            //{
+            //    CVTpoints.Add(new CVT3D.Point3D(vertex.X, vertex.Y, vertex.Z));
+            //}
+
             return CVTpoints;
         }
     }

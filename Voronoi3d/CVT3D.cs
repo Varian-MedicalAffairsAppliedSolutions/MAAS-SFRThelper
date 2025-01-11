@@ -64,22 +64,27 @@ namespace Voronoi3d
         {
             var numberOfPoints = _settings.NumberOfGenerators;
             var maxIterations = _settings.MaxNumberOfIterations;
-            List<CVT3D.Point3D> points = GenerateRandomPoints(numberOfPoints, _mesh);
+            List<CVT3D.Point3D> points = GenerateRandomPoints(numberOfPoints, _mesh, _settings.SelectedSamplingMethod);
             List<CVT3D.Point3D> generators = LloydRelaxation(points, maxIterations, _mesh);
             return generators;
         }
 
-        protected List<Point3D> GenerateRandomPoints(int count, MeshGeometry3D mesh3d)
+        protected List<Point3D> GenerateRandomPoints(int count, MeshGeometry3D mesh3d, RandomEngine currentEngine)
         {
-            if (_settings.SelectedSamplingMethod == RandomEngine.HEXGRID)
+            if (currentEngine == RandomEngine.HEXGRID)
             {
                 RandomEngineFactory.initializeHex(_settings.SphereLocations);
             }
-            IRandom3D rand = RandomEngineFactory.Create(_settings.SelectedSamplingMethod);
+            int toTake = currentEngine == RandomEngine.HEXGRID ? count : count;
+            IRandom3D rand = RandomEngineFactory.Create(currentEngine);
             var points = rand
                 .GetRandomNumbers(mesh3d)
-                .Take(count)
+                .Take(toTake)
                 .Select(p => new Point3D(p.X, p.Y, p.Z));
+                //if (currentEngine != RandomEngine.HEXGRID)
+                //{   
+                //    points = points.Take(count);
+                //}
             return points.ToList();
         }
 
@@ -122,7 +127,7 @@ namespace Voronoi3d
             List<Point3D> previousPoints = new List<Point3D>();
 
             // Generate random points inside the mesh
-            List<Point3D> randomPoints = GenerateRandomPoints(_settings.NumberOfSamplingPoints, mesh3d);
+            List<Point3D> randomPoints = GenerateRandomPoints(_settings.NumberOfSamplingPoints, mesh3d, RandomEngine.HALTONSEQUENCE);
 
             for (int iter = 0; iter < iterations; iter++)
             {
