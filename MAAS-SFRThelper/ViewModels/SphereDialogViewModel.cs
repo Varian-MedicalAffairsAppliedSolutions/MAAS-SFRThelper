@@ -555,113 +555,113 @@ namespace MAAS_SFRThelper.ViewModels
             // the height of a triangle will be h = √3/2 × a
 
             var retval = new List<seedPointModel>();
-            void CreateLayer(double zCoord, double x0, double y0)
-            {
+            //void CreateLayer(double zCoord, double x0, double y0)
+            //{
 
-                // create planar hexagonal sphere packing grid
-                var yeven = Arange(y0, y0 + Ysize, 2.0 * A * LateralScalingFactor); // Tenzin - make a drop down menu and rather than having a 2.0, put some variable in it
-                // 2 is the scaling factor --- changed to 4 and tested -- Matt - 2 and 4 reduces number of spheres overall (makes sense - verified by measurements?)
+            //    // create planar hexagonal sphere packing grid
+            //    var yeven = Arange(y0, y0 + Ysize, 2.0 * A * LateralScalingFactor); // Tenzin - make a drop down menu and rather than having a 2.0, put some variable in it
+            //    // 2 is the scaling factor --- changed to 4 and tested -- Matt - 2 and 4 reduces number of spheres overall (makes sense - verified by measurements?)
 
-                var xeven = Arange(x0, x0 + Xsize, LateralScalingFactor * SpacingSelected.Value);
-                // int yRow = 0;
+            //    var xeven = Arange(x0, x0 + Xsize, LateralScalingFactor * SpacingSelected.Value);
+            //    // int yRow = 0;
 
-                foreach (var y in yeven)
-                {
-                    // int xSpot = yRow%2 == 0 ? 1 : 0; // start x spot counter at 1 if y is even and start x spot counter at 0 is y is odd
-                    foreach (var x in xeven)
-                    {
+            //    foreach (var y in yeven)
+            //    {
+            //        // int xSpot = yRow%2 == 0 ? 1 : 0; // start x spot counter at 1 if y is even and start x spot counter at 0 is y is odd
+            //        foreach (var x in xeven)
+            //        {
 
-                        var pt1 = new VVector(x, y, zCoord);
-                        var pt2 = new VVector(x + (SpacingSelected.Value / 2.0) * LateralScalingFactor, y + A * LateralScalingFactor, zCoord);
+            //            var pt1 = new VVector(x, y, zCoord);
+            //            var pt2 = new VVector(x + (SpacingSelected.Value / 2.0) * LateralScalingFactor, y + A * LateralScalingFactor, zCoord);
 
-                        bool isInsideptvRetract1 = ptvRetract.IsPointInsideSegment(pt1);
-                        bool isInsideptvRetract2 = ptvRetract.IsPointInsideSegment(pt2);
+            //            bool isInsideptvRetract1 = ptvRetract.IsPointInsideSegment(pt1);
+            //            bool isInsideptvRetract2 = ptvRetract.IsPointInsideSegment(pt2);
 
-                        if (isInsideptvRetract1)
-                        {
-                            retval.Add(new seedPointModel(pt1, SeedTypeEnum.Sphere));
-                        }
+            //            if (isInsideptvRetract1)
+            //            {
+            //                retval.Add(new seedPointModel(pt1, SeedTypeEnum.Sphere));
+            //            }
 
-                        if (isInsideptvRetract2)
-                        {
-                            retval.Add(new seedPointModel(pt2, SeedTypeEnum.Sphere));
-                        }
+            //            if (isInsideptvRetract2)
+            //            {
+            //                retval.Add(new seedPointModel(pt2, SeedTypeEnum.Sphere));
+            //            }
 
-                        // Void setup
-                        // Both layers A and B find equidistant point from A and B above and below and use these points
+            //            // Void setup
+            //            // Both layers A and B find equidistant point from A and B above and below and use these points
 
-                        // Pt 1
+            //            // Pt 1
 
-                        //var mxA = (x + (x - LateralScalingFactor * SpacingSelected.Value)) / 2.0;  // midpoint of x
-                        //var myA = (y + (y + 2.0 * A * LateralScalingFactor)) / 2.0;  // midpoint of y
-                        //var slopeA = (2.0 * A) / (SpacingSelected.Value); // slope
-                        //var pt1VoidA = new VVector(mxA + (Math.Sqrt(3) / 2.0) * 2.0 * A * LateralScalingFactor, myA - (3 / 2.0) * LateralScalingFactor * SpacingSelected.Value, zCoord + A / 3);
-                        //var pt2VoidA = new VVector(mxA - (Math.Sqrt(3) / 2.0) * 2.0 * A * LateralScalingFactor, myA + (3 / 2.0) * LateralScalingFactor * SpacingSelected.Value, zCoord - A / 3);
+            //            //var mxA = (x + (x - LateralScalingFactor * SpacingSelected.Value)) / 2.0;  // midpoint of x
+            //            //var myA = (y + (y + 2.0 * A * LateralScalingFactor)) / 2.0;  // midpoint of y
+            //            //var slopeA = (2.0 * A) / (SpacingSelected.Value); // slope
+            //            //var pt1VoidA = new VVector(mxA + (Math.Sqrt(3) / 2.0) * 2.0 * A * LateralScalingFactor, myA - (3 / 2.0) * LateralScalingFactor * SpacingSelected.Value, zCoord + A / 3);
+            //            //var pt2VoidA = new VVector(mxA - (Math.Sqrt(3) / 2.0) * 2.0 * A * LateralScalingFactor, myA + (3 / 2.0) * LateralScalingFactor * SpacingSelected.Value, zCoord - A / 3);
 
-                        // Pt 2
-                        //var mxB = (x + (SpacingSelected.Value / 2.0) * LateralScalingFactor + x + (SpacingSelected.Value / 2.0) * LateralScalingFactor - LateralScalingFactor * SpacingSelected.Value) / 2.0;
-                        //var myB = (y + A * LateralScalingFactor + y + A * LateralScalingFactor + 2.0 * A * LateralScalingFactor) / 2.0;
-                        //var slopeB = (2.0 * A * LateralScalingFactor) / (LateralScalingFactor * SpacingSelected.Value); // slope
-                        //var pt1VoidB = new VVector(mxB + (Math.Sqrt(3) / 2.0) * 2.0 * A * LateralScalingFactor, myB - (3 / 2.0) * LateralScalingFactor * SpacingSelected.Value, zCoord + A * Math.Sqrt(2) / 6);
-                        //var pt2VoidB = new VVector(mxB - (Math.Sqrt(3) / 2.0) * 2.0 * A * LateralScalingFactor, myB + (3 / 2.0) * LateralScalingFactor * SpacingSelected.Value, zCoord - A * Math.Sqrt(2) / 6);
+            //            // Pt 2
+            //            //var mxB = (x + (SpacingSelected.Value / 2.0) * LateralScalingFactor + x + (SpacingSelected.Value / 2.0) * LateralScalingFactor - LateralScalingFactor * SpacingSelected.Value) / 2.0;
+            //            //var myB = (y + A * LateralScalingFactor + y + A * LateralScalingFactor + 2.0 * A * LateralScalingFactor) / 2.0;
+            //            //var slopeB = (2.0 * A * LateralScalingFactor) / (LateralScalingFactor * SpacingSelected.Value); // slope
+            //            //var pt1VoidB = new VVector(mxB + (Math.Sqrt(3) / 2.0) * 2.0 * A * LateralScalingFactor, myB - (3 / 2.0) * LateralScalingFactor * SpacingSelected.Value, zCoord + A * Math.Sqrt(2) / 6);
+            //            //var pt2VoidB = new VVector(mxB - (Math.Sqrt(3) / 2.0) * 2.0 * A * LateralScalingFactor, myB + (3 / 2.0) * LateralScalingFactor * SpacingSelected.Value, zCoord - A * Math.Sqrt(2) / 6);
 
-                        // var ptVoid = new VVector((x + x + (SpacingSelected.Value / 2.0))/2, ( y + y + A * LateralScalingFactor)/2, zCoord);
-                        // We want to elminate partial spheres - so if we put a check in here - if the point is in ptvRetract, we add it to retval
-                        // if it is not inside sphere, we don't add this point to retval
-
-
-                        // Check for void pts
-                        //bool isInsideptvRetractVoid1A = ptvRetractVoid.IsPointInsideSegment(pt1VoidA); // change to ptvVoid later ptvRetract for testing
-                        //bool isInsideptvRetractVoid2A = ptvRetractVoid.IsPointInsideSegment(pt2VoidA);
-
-                        //bool isInsideptvRetractVoid1A = ptvRetractVoid.IsPointInsideSegment(pt1VoidA); // change to ptvVoid later ptvRetract for testing
-                        //bool isInsideptvRetractVoid2A = ptvRetractVoid.IsPointInsideSegment(pt2VoidA);
+            //            // var ptVoid = new VVector((x + x + (SpacingSelected.Value / 2.0))/2, ( y + y + A * LateralScalingFactor)/2, zCoord);
+            //            // We want to elminate partial spheres - so if we put a check in here - if the point is in ptvRetract, we add it to retval
+            //            // if it is not inside sphere, we don't add this point to retval
 
 
-                        //if (isInsideptvRetractVoid1A)
-                        //{
-                        //    retval.Add(new seedPointModel(pt1VoidA, SeedTypeEnum.Void));
-                        //}
+            //            // Check for void pts
+            //            //bool isInsideptvRetractVoid1A = ptvRetractVoid.IsPointInsideSegment(pt1VoidA); // change to ptvVoid later ptvRetract for testing
+            //            //bool isInsideptvRetractVoid2A = ptvRetractVoid.IsPointInsideSegment(pt2VoidA);
 
-                        //if (isInsideptvRetractVoid2A)
-                        //{
-                        //    retval.Add(new seedPointModel(pt2VoidA, SeedTypeEnum.Void));
-                        //}
-
-                        //bool isInsideptvRetractVoid1B = ptvRetractVoid.IsPointInsideSegment(pt1VoidB); // change to ptvVoid later ptvRetract for testing
-                        //bool isInsideptvRetractVoid2B = ptvRetractVoid.IsPointInsideSegment(pt2VoidB);
+            //            //bool isInsideptvRetractVoid1A = ptvRetractVoid.IsPointInsideSegment(pt1VoidA); // change to ptvVoid later ptvRetract for testing
+            //            //bool isInsideptvRetractVoid2A = ptvRetractVoid.IsPointInsideSegment(pt2VoidA);
 
 
-                        //if (isInsideptvRetractVoid1B)
-                        //{
-                        //    retval.Add(new seedPointModel(pt1VoidB, SeedTypeEnum.Void));
-                        //}
+            //            //if (isInsideptvRetractVoid1A)
+            //            //{
+            //            //    retval.Add(new seedPointModel(pt1VoidA, SeedTypeEnum.Void));
+            //            //}
 
-                        //if (isInsideptvRetractVoid2B)
-                        //{
-                        //    retval.Add(new seedPointModel(pt2VoidB, SeedTypeEnum.Void));
-                        //}
+            //            //if (isInsideptvRetractVoid2A)
+            //            //{
+            //            //    retval.Add(new seedPointModel(pt2VoidA, SeedTypeEnum.Void));
+            //            //}
+
+            //            //bool isInsideptvRetractVoid1B = ptvRetractVoid.IsPointInsideSegment(pt1VoidB); // change to ptvVoid later ptvRetract for testing
+            //            //bool isInsideptvRetractVoid2B = ptvRetractVoid.IsPointInsideSegment(pt2VoidB);
 
 
-                        // Old code
-                        // retval.Add(new VVector(x, y, zCoord));
-                        // retval.Add(new VVector(x + (SpacingSelected.Value / 2.0), y + A, zCoord ));
-                        // messy sphere change
-                        // retval.Add(new VVector(x + (SpacingSelected.Value / 2.0), y + A, zCoord + A/4)); 
+            //            //if (isInsideptvRetractVoid1B)
+            //            //{
+            //            //    retval.Add(new seedPointModel(pt1VoidB, SeedTypeEnum.Void));
+            //            //}
 
-                        // xSpot++;
-                        //ProgressValue += progressMax / ((double)yeven.Count() * (double)xeven.Count());
-                    }
-                    //  yRow++;
-                }
-            }
-            var zRange = Arange(Zstart, Zstart + Zsize, 2.0 * A);
-            foreach (var z in zRange)
-            {
-                CreateLayer(z, Xstart, Ystart);
-                CreateLayer(z + A, Xstart + (SpacingSelected.Value / 2.0), Ystart + (A / 2.0));
-                ProgressValue += progressMax / (double)zRange.Count();
-            }
+            //            //if (isInsideptvRetractVoid2B)
+            //            //{
+            //            //    retval.Add(new seedPointModel(pt2VoidB, SeedTypeEnum.Void));
+            //            //}
+
+
+            //            // Old code
+            //            // retval.Add(new VVector(x, y, zCoord));
+            //            // retval.Add(new VVector(x + (SpacingSelected.Value / 2.0), y + A, zCoord ));
+            //            // messy sphere change
+            //            // retval.Add(new VVector(x + (SpacingSelected.Value / 2.0), y + A, zCoord + A/4)); 
+
+            //            // xSpot++;
+            //            //ProgressValue += progressMax / ((double)yeven.Count() * (double)xeven.Count());
+            //        }
+            //        //  yRow++;
+            //    }
+            //}
+            //var zRange = Arange(Zstart, Zstart + Zsize, 2.0 * A);
+            //foreach (var z in zRange)
+            //{
+            //    CreateLayer(z, Xstart, Ystart);
+            //    CreateLayer(z + A, Xstart + (SpacingSelected.Value / 2.0), Ystart + (A / 2.0));
+            //    ProgressValue += progressMax / (double)zRange.Count();
+            //}
 
             // Implement voids such that spheres touch ----------------------------------
             var r = SpacingSelected.Value / 2.0; 
@@ -671,9 +671,15 @@ namespace MAAS_SFRThelper.ViewModels
 
             // define HCP lattice vectors
             var a1 = new Vec3(ipA, 0.0, 0.0);
-            //var a2 = new Vec3(0.5 * ipA, (Math.Sqrt(3) / 2) * ipA, 0.0);
-            var a2 = new Vec3(0.0, ipA, 0.0);
+            var a2 = new Vec3(0.5 * ipA, (Math.Sqrt(3) / 2) * ipA, 0.0);
+            var a2void = new Vec3(0.0, ipA, 0.0);
             var a3 = new Vec3(0.0, 0.0, c);
+
+            var atomFrac = new List<Vec3>() 
+            {
+            new Vec3(0.0, 0.0, 0.0),
+            new Vec3(2.0/3.0, 1.0/3.0, 0.5)
+            };
 
             var octaFrac = new List<Vec3>()
             {
@@ -695,6 +701,7 @@ namespace MAAS_SFRThelper.ViewModels
                 return (f.X * a1) + (f.Y * a2) + (f.Z * a3);
             };
 
+            var atoms = new List<Vec3>();
             var voidVec = new List<Vec3>();
            // var tetPositions = new List<VVector>();
 
@@ -712,13 +719,17 @@ namespace MAAS_SFRThelper.ViewModels
                         // The shift for cell (i,j,k) in cartesian:
                         // shift = i*a1 + j*a2 + k*a3
                         Vec3 cellShift = globalOffset + (i * a1) + (j * a2) + (k * a3);
+                        Vec3 cellShiftvoid = globalOffset + (i * a1) + (j * a2void) + (k * a3);
 
                         // Now compute the absolute (x,y,z) of each atom/void
                         // in this cell, and store if in bounds
 
+                        foreach (var fA in atomFrac)
+                            atoms.Add(cellShift + frac2cart(fA));
+
                         foreach (var fO in octaFrac)
                         {
-                            Vec3 pos = cellShift + frac2cart(fO);
+                            Vec3 pos = cellShiftvoid + frac2cart(fO);
                             voidVec.Add(pos);
                         }
 
@@ -731,10 +742,22 @@ namespace MAAS_SFRThelper.ViewModels
                 }
             }
 
+            foreach (var atom in atoms)
+            {
+                var Pt = new VVector(atom.X, atom.Y, atom.Z);
+                bool isInsideptvRetract = ptvRetract.IsPointInsideSegment(Pt);
+                if (isInsideptvRetract)
+                {
+                    retval.Add(new seedPointModel(Pt, SeedTypeEnum.Sphere));
+                }
+
+            }
+
+
             foreach (var vec in voidVec)
             {
                 var vPt = new VVector(vec.X, vec.Y, vec.Z);
-                bool isInsideptvRetractVoid = ptvRetract.IsPointInsideSegment(vPt);
+                bool isInsideptvRetractVoid = ptvRetractVoid.IsPointInsideSegment(vPt);
                 if (isInsideptvRetractVoid)
                 {
                     retval.Add(new seedPointModel(vPt, SeedTypeEnum.Void));
@@ -1019,6 +1042,9 @@ namespace MAAS_SFRThelper.ViewModels
                 }
 
                 Output += $"\nPTV volume: {target.Volume.ToString()}";
+                Output += $"\nTotal spheres: {grid.Count(g => g.SeedType == SeedTypeEnum.Sphere).ToString()}";
+                Output += $"\nSphere radius: {sphereRadius.ToString()}";
+                Output += $"\nSphere volume: {((0.987053856 * 4 / 3) * Math.PI * 0.1 * 0.1 * 0.1 * sphereRadius * sphereRadius * sphereRadius).ToString()}";
                 Output += $"\nApproximate sphere volume: {((0.987053856 * 4 / 3) * Math.PI * 0.1 * 0.1 * 0.1 * sphereRadius * sphereRadius * sphereRadius * grid.Count(g => g.SeedType == SeedTypeEnum.Sphere)).ToString()}";
                 Output += $"\nRatio (total sphere Volume/PTV volume): {(((100*0.987053856 * 4 / 3) * Math.PI * 0.1 * 0.1 * 0.1 * sphereRadius * sphereRadius * sphereRadius * grid.Count(g => g.SeedType == SeedTypeEnum.Sphere)) / (target.Volume)).ToString()} %";
 
