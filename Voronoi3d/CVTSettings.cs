@@ -43,12 +43,29 @@ namespace Voronoi3d
             StoppingCriterion = new CounterDecorator(new NoDiffAfterThreeIterationsStoppingCriterion());
         }
 
-        public CVTSettings(List<Point3D> gridhexSph, List<Point3D> gridhexVoid, int n_generators)
+        //public CVTSettings(List<Point3D> gridhexSph, List<Point3D> gridhexVoid, int n_generators)
+        //{
+        //    InitializeDefaults(gridhexSph, gridhexVoid, n_generators);
+        //}
+
+        //private void InitializeDefaults(List<Point3D> gridhexSph, List<Point3D> gridhexVoid, int n_generators = 32)
+        //{
+
+        //    NumberOfGenerators = n_generators;
+        //    NumberOfSamplingPoints = 3000;
+        //    SelectedSamplingMethod = RandomEngine.HEXGRID;
+        //    MaxNumberOfIterations = 1500;
+        //    StoppingCriterion = new CounterDecorator(new NoDiffAfterThreeIterationsStoppingCriterion());
+        //    SphereLocations = gridhexSph;
+        //    VoidLocations = gridhexVoid;
+        //}
+
+        public CVTSettings(List<Point3D> gridhexSph, int n_generators)
         {
-            InitializeDefaults(gridhexSph, gridhexVoid, n_generators);
+            InitializeDefaults(gridhexSph, n_generators);
         }
 
-        private void InitializeDefaults(List<Point3D> gridhexSph, List<Point3D> gridhexVoid, int n_generators = 32)
+        private void InitializeDefaults(List<Point3D> gridhexSph, int n_generators = 32)
         {
 
             NumberOfGenerators = n_generators;
@@ -57,7 +74,7 @@ namespace Voronoi3d
             MaxNumberOfIterations = 1500;
             StoppingCriterion = new CounterDecorator(new NoDiffAfterThreeIterationsStoppingCriterion());
             SphereLocations = gridhexSph;
-            VoidLocations = gridhexVoid;
+            
         }
 
         public CVTSettings(double Xstart, double Xsize, double Ystart, double Ysize, double Zstart, double Zsize, double spacing, double rad, int n_generators)
