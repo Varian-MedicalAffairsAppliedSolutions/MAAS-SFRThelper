@@ -832,501 +832,591 @@ namespace MAAS_SFRThelper.ViewModels
 
             _esapiWorker.Run(sc =>
             {
-                // Retrieve the structure set from the plan
-                var plan = sc.PlanSetup;
-                var structureSet = plan.StructureSet;
+            // Retrieve the structure set from the plan
+            var plan = sc.PlanSetup;
+            var structureSet = plan.StructureSet;
 
-                // Define the sphere radius for the margin
-                double sphereRadius = Radius; // Change this value as needed
+            // Define the sphere radius for the margin
+            double sphereRadius = Radius; // Change this value as needed
 
-                // Make shrunk volume structure --  
-                // Structure ptv = structureSet.Structures.FirstOrDefault(x => x.Id == "PTV_High");
-                // var target_named = targetStructures[targetSelected]; // this is used to create PTV retract without having to pass target_name everywhere over and over again
-                // Structure ptv = structureSet.Structures.FirstOrDefault(x => x.Id == target_named);
-                Structure ptv = structureSet.Structures.FirstOrDefault(x => x.Id == targetStructures[targetSelected]);
-                // Structure ptvRetract = structureSet.AddStructure("CONTROL", "ptvRetract");
-                Structure ptvRetract = null;
-                if (structureSet.Structures.Any(st => st.Id.Equals("ptvRetract", StringComparison.OrdinalIgnoreCase)))
+            // Make shrunk volume structure --  
+            // Structure ptv = structureSet.Structures.FirstOrDefault(x => x.Id == "PTV_High");
+            // var target_named = targetStructures[targetSelected]; // this is used to create PTV retract without having to pass target_name everywhere over and over again
+            // Structure ptv = structureSet.Structures.FirstOrDefault(x => x.Id == target_named);
+            Structure ptv = structureSet.Structures.FirstOrDefault(x => x.Id == targetStructures[targetSelected]);
+            // Structure ptvRetract = structureSet.AddStructure("CONTROL", "ptvRetract");
+            Structure ptvRetract = null;
+            if (structureSet.Structures.Any(st => st.Id.Equals("ptvRetract", StringComparison.OrdinalIgnoreCase)))
+            {
+                ptvRetract = structureSet.Structures.First(st => st.Id.Equals("ptvRetract", StringComparison.OrdinalIgnoreCase));
+            }
+            else
+            {
+                ptvRetract = structureSet.AddStructure("CONTROL", "ptvRetract");
+            }
+            double margin = vThresh == 100 ? -1.01 * sphereRadius : -sphereRadius * vThresh / 100.0;
+            ptvRetract.SegmentVolume = ptv.Margin(margin);
+
+            // void structure
+            Structure ptvRetractVoid = null;
+            if (structureSet.Structures.Any(st => st.Id.Equals("ptvRetractVoid", StringComparison.OrdinalIgnoreCase)))
+            {
+                ptvRetractVoid = structureSet.Structures.First(st => st.Id.Equals("ptvRetractVoid", StringComparison.OrdinalIgnoreCase));
+            }
+            else
+            {
+                ptvRetractVoid = structureSet.AddStructure("CONTROL", "ptvRetractVoid");
+            }
+            //double marginVoid = vThresh == 100 ? -1.1 * 2.0 * sphereRadius : -sphereRadius * 2.0 * vThresh / 100.0;
+            //ptvRetractVoid.SegmentVolume = ptv.Margin(marginVoid);
+
+            double marginVoid = vThresh == 100 ? -1.01 * (spacingSelected.Value - 2 * Radius) / 2 : -(spacingSelected.Value - 2 * Radius) * vThresh / 200.0;
+            ptvRetractVoid.SegmentVolume = ptv.LargeMargin(marginVoid);
+
+            // Total lattice structure with all spheres
+            Structure structMain = null;
+
+            var target_name = targetStructures[targetSelected];
+            var target_initial = sc.StructureSet.Structures.Where(x => x.Id == target_name).First();
+            Structure target = null;
+            bool deleteAutoTarget = false;
+
+            if (!target_initial.IsHighResolution)
+            {
+                target = sc.StructureSet.AddStructure("PTV", "AutoTarget");
+                AddContoursToMain(sc.Image.ZSize, ref target, ref target_initial);
+                target.ConvertToHighResolution();
+                deleteAutoTarget = true;
+                // MessageBox.Show("Created HiRes target.");
+            }
+            else
+            {
+                target = target_initial;
+            }
+
+            if (target == null)
+            {
+                //MessageBox.Show($"Could not find target with Id: {target_name}");
+                return;
+            }
+
+            // Generate a regular grid accross the dummie bounding box 
+            var bounds = target.MeshGeometry.Bounds;
+
+            // If alignGrid calculate z to snap to
+            double z0 = bounds.Z;
+            double zf = bounds.Z + bounds.SizeZ;
+            if (alignGrid)
+            {
+                // Snap z to nearest z slice
+                // where z slices = img.origin.z + (c * zres)
+                // x, y, z --> dropdown all equal
+                // z0 --> rounded to nearest grid slice
+                var zSlices = new List<double>();
+                var plane_idx = (bounds.Z - sc.Image.Origin.z) / sc.Image.ZRes;
+                int plane_int = (int)Math.Round(plane_idx);
+
+                z0 = sc.Image.Origin.z + (plane_int * sc.Image.ZRes);
+                //MessageBox.Show($"Original z | Snapped z = {bounds.Z} | {Math.Round(z0, 2)}");
+                Output += $"\nOriginal z | Snapped z = {Math.Round(bounds.Z, 2)} | {Math.Round(z0, 2)}";
+                Thread.Sleep(100);
+            }
+
+            // Get points that are not in the image
+            List<seedPointModel> grid = null;
+
+            if (IsHex)
+            {
+                grid = BuildHexGrid(25.0, bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract, ptvRetractVoid);
+                structMain = CreateStructure(sc.StructureSet, "LatticeHex", false, true);
+            }
+            else if (IsRect)
+            {
+                var xcoords = Arange(bounds.X + XShift, bounds.X + bounds.SizeX + XShift, SpacingSelected.Value);
+                var ycoords = Arange(bounds.Y + XShift, bounds.Y + bounds.SizeY + YShift, SpacingSelected.Value);
+                var zcoords = Arange(z0, zf, SpacingSelected.Value);
+
+                grid = BuildGrid(25.0, xcoords, ycoords, zcoords, ptvRetract, ptvRetractVoid);
+                structMain = CreateStructure(sc.StructureSet, "LatticeRect", false, true);
+            }
+            else if (IsCVT3D)
+            {
+                // Extra dialog box for calculating number of points for seed placement CVT
+                // MessageBox.Show("Calculating number of spheres needed.");
+                // Output += "\nEvaluating number of spheres, this could take several minutes ...";
+                // spacingSelected.Value = spacingSelected.Value * 2;
+                var gridhex = BuildHexGrid(10.0, bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract, ptvRetractVoid);
+
+                // make list of the points in gridhex_sph, gridhex_void
+                List<Point3D> gridhexSph = new List<Point3D>();
+                List<Point3D> gridhexVoid = new List<Point3D>();
+                Random rand = new Random();
+
+                foreach (VVector pos in gridhex.Where(r => r.SeedType == SeedTypeEnum.Sphere).Select(r => r.Position))
                 {
-                    ptvRetract = structureSet.Structures.First(st => st.Id.Equals("ptvRetract", StringComparison.OrdinalIgnoreCase));
-                }
-                else
-                {
-                    ptvRetract = structureSet.AddStructure("CONTROL", "ptvRetract");
-                }
-                double margin = vThresh == 100 ? -1.01 * sphereRadius : -sphereRadius * vThresh / 100.0;
-                ptvRetract.SegmentVolume = ptv.Margin(margin);
-
-                // void structure
-                Structure ptvRetractVoid = null;
-                if (structureSet.Structures.Any(st => st.Id.Equals("ptvRetractVoid", StringComparison.OrdinalIgnoreCase)))
-                {
-                    ptvRetractVoid = structureSet.Structures.First(st => st.Id.Equals("ptvRetractVoid", StringComparison.OrdinalIgnoreCase));
-                }
-                else
-                {
-                    ptvRetractVoid = structureSet.AddStructure("CONTROL", "ptvRetractVoid");
-                }
-                //double marginVoid = vThresh == 100 ? -1.1 * 2.0 * sphereRadius : -sphereRadius * 2.0 * vThresh / 100.0;
-                //ptvRetractVoid.SegmentVolume = ptv.Margin(marginVoid);
-
-                double marginVoid = vThresh == 100 ? -1.01 * (spacingSelected.Value - 2*Radius)/2 : -(spacingSelected.Value - 2 * Radius) * vThresh / 200.0;
-                ptvRetractVoid.SegmentVolume = ptv.LargeMargin(marginVoid);
-
-                // Total lattice structure with all spheres
-                Structure structMain = null;
-
-                var target_name = targetStructures[targetSelected];
-                var target_initial = sc.StructureSet.Structures.Where(x => x.Id == target_name).First();
-                Structure target = null;
-                bool deleteAutoTarget = false;
-
-                if (!target_initial.IsHighResolution)
-                {
-                    target = sc.StructureSet.AddStructure("PTV", "AutoTarget");
-                    AddContoursToMain(sc.Image.ZSize, ref target, ref target_initial);
-                    target.ConvertToHighResolution();
-                    deleteAutoTarget = true;
-                    // MessageBox.Show("Created HiRes target.");
-                }
-                else
-                {
-                    target = target_initial;
-                }
-
-                if (target == null)
-                {
-                    //MessageBox.Show($"Could not find target with Id: {target_name}");
-                    return;
-                }
-
-                // Generate a regular grid accross the dummie bounding box 
-                var bounds = target.MeshGeometry.Bounds;
-
-                // If alignGrid calculate z to snap to
-                double z0 = bounds.Z;
-                double zf = bounds.Z + bounds.SizeZ;
-                if (alignGrid)
-                {
-                    // Snap z to nearest z slice
-                    // where z slices = img.origin.z + (c * zres)
-                    // x, y, z --> dropdown all equal
-                    // z0 --> rounded to nearest grid slice
-                    var zSlices = new List<double>();
-                    var plane_idx = (bounds.Z - sc.Image.Origin.z) / sc.Image.ZRes;
-                    int plane_int = (int)Math.Round(plane_idx);
-
-                    z0 = sc.Image.Origin.z + (plane_int * sc.Image.ZRes);
-                    //MessageBox.Show($"Original z | Snapped z = {bounds.Z} | {Math.Round(z0, 2)}");
-                    Output += $"\nOriginal z | Snapped z = {Math.Round(bounds.Z, 2)} | {Math.Round(z0, 2)}";
-                    Thread.Sleep(100);
-                }
-
-                // Get points that are not in the image
-                List<seedPointModel> grid = null;
-
-                if (IsHex)
-                {
-                    grid = BuildHexGrid(25.0, bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract, ptvRetractVoid);
-                    structMain = CreateStructure(sc.StructureSet, "LatticeHex", false, true);
-                }
-                else if (IsRect)
-                {
-                    var xcoords = Arange(bounds.X + XShift, bounds.X + bounds.SizeX + XShift, SpacingSelected.Value);
-                    var ycoords = Arange(bounds.Y + XShift, bounds.Y + bounds.SizeY + YShift, SpacingSelected.Value);
-                    var zcoords = Arange(z0, zf, SpacingSelected.Value);
-
-                    grid = BuildGrid(25.0, xcoords, ycoords, zcoords, ptvRetract, ptvRetractVoid);
-                    structMain = CreateStructure(sc.StructureSet, "LatticeRect", false, true);
-                }
-                else if (IsCVT3D)
-                {
-                    // Extra dialog box for calculating number of points for seed placement CVT
-                    // MessageBox.Show("Calculating number of spheres needed.");
-                    // Output += "\nEvaluating number of spheres, this could take several minutes ...";
-                    // spacingSelected.Value = spacingSelected.Value * 2;
-                    var gridhex = BuildHexGrid(10.0, bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract, ptvRetractVoid);
-
-                    // make list of the points in gridhex_sph, gridhex_void
-                    List<Point3D> gridhexSph = new List<Point3D>();
-                    List<Point3D> gridhexVoid = new List<Point3D>();
-                    Random rand = new Random();
-
-                    foreach (VVector pos in gridhex.Where(r => r.SeedType == SeedTypeEnum.Sphere).Select(r => r.Position))
-                    {
                         gridhexSph.Add(new Point3D(pos.x, pos.y, pos.z));
                         //if (rand.Next(1, 10) % 2 == 0)
                         //{
                         //    gridhexSph.Add(new Point3D(pos.x, pos.y, pos.z));
                         //}
 
-                    }
-
-                    foreach (VVector pos in gridhex.Where(r => r.SeedType == SeedTypeEnum.Void).Select(r => r.Position))
-                    {
-                        gridhexVoid.Add(new Point3D(pos.x, pos.y, pos.z));
-
-                    }
-
-                    // MessageBox.Show("Total seeds in gridhex", gridhex.Count.ToString());
-                    Output += "\nEvaluating sphere locations using 3D CVT, this could take several minutes ...";
-                    // var cvt = new CVT3D(target.MeshGeometry, new CVTSettings(gridhex.Count));
-                    //var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(gridhex.Count(g => g.SeedType == SeedTypeEnum.Sphere)));
-                    // var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(gridhex.Count(g => g.SeedType == SeedTypeEnum.Sphere), bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, SpacingSelected.Value, Radius));
-                    var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(gridhexSph, gridhex.Count(g => g.SeedType == SeedTypeEnum.Sphere)));
-
-                    //var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(gridhexSph, gridhexVoid, gridhex.Count(g => g.SeedType == SeedTypeEnum.Sphere)));
-                    var cvtGenerators = cvt.CalculateGenerators();
-                    ProgressValue += 15.0;
-                    // Check to make sure each point is at least SelectedSpacing distance away from every other point. If not 
-                    // remove that point from the list. We could search for another point if one gets rejected to preserve
-                    // total number of points but for that we'd have to change Voronio3D. Alternatively, we could add another option
-                    // in Voronoi3D to be able to use cubic or hex grids. But that would also require modification of Voronoi3D which we 
-                    // will look into later. For now we just do a simple check to make sure included point is at least a minimum distance away from
-                    // every other point.
-
-                    var retval = new List<seedPointModel>();
-                    int idx = -1;
-                    double d = 0;
-                    //check to make sure cvt spheres don't overlap
-                    foreach (var i in cvtGenerators)
-                    {
-                        idx++;
-                        var cvtpt = new VVector(i.X, i.Y, i.Z);
-
-                        if (idx > 0)
-                        {
-                            int num_points = retval.Count;
-                            double[] dists = Enumerable.Repeat(1.0, num_points).ToArray();
-                            int j = 0;
-                            // foreach (int j = 0; j < num_points; j++)
-                            foreach (VVector pos in retval.Where(r => r.SeedType == SeedTypeEnum.Sphere).Select(r => r.Position))
-                            {
-                                double dist = Math.Sqrt(
-                                    Math.Pow(cvtpt[0] - pos.x, 2) +
-                                    Math.Pow(cvtpt[1] - pos.y, 2) +
-                                    Math.Pow(cvtpt[2] - pos.z, 2)
-                                );
-
-                                dists[j] = dist;
-                                j++;
-                            }
-
-                            if (num_points > 0)
-                            {
-                                d = dists.Min();
-                            }
-
-                        }
-                        else
-                        {
-                            d = 2.10 * sphereRadius;
-                            // d = SpacingSelected.Value;
-                        }
-
-                        // Uncomment below if CVT uses random sampling to avoid spheres clubbing together
-
-                        // if (SpacingSelected.Value <= d)
-                        if (2.10*sphereRadius <= d)
-
-                        {
-                            retval.Add(new seedPointModel(cvtpt, SeedTypeEnum.Sphere));
-                        }
-                        //retval.Add(new seedPointModel(cvtpt, SeedTypeEnum.Sphere));
-
-                    }
-
-                    grid = retval; // cvtGenerators.Select(p => new VVector(p.X, p.Y, p.Z)).ToList();
-                    Output += $"Total seeds in gridCVT: {grid.Count.ToString()}";
-                    structMain = CreateStructure(sc.StructureSet, "CVT3D", false, true);
                 }
 
-                Output += $"\nPTV volume: {target.Volume.ToString()}";
-                Output += $"\nTotal spheres: {grid.Count(g => g.SeedType == SeedTypeEnum.Sphere).ToString()}";
-                Output += $"\nSphere radius: {sphereRadius.ToString()}";
-                Output += $"\nSphere volume: {((0.987053856 * 4 / 3) * Math.PI * 0.1 * 0.1 * 0.1 * sphereRadius * sphereRadius * sphereRadius).ToString()}";
-                Output += $"\nApproximate sphere volume: {((0.987053856 * 4 / 3) * Math.PI * 0.1 * 0.1 * 0.1 * sphereRadius * sphereRadius * sphereRadius * grid.Count(g => g.SeedType == SeedTypeEnum.Sphere)).ToString()}";
-                Output += $"\nRatio (total sphere Volume/PTV volume): {(((100*0.987053856 * 4 / 3) * Math.PI * 0.1 * 0.1 * 0.1 * sphereRadius * sphereRadius * sphereRadius * grid.Count(g => g.SeedType == SeedTypeEnum.Sphere)) / (target.Volume)).ToString()} %";
-
-
-                // Set a message box to add display the total sphere volume and give users choice of 
-                // going forward or cancelling run
-                MessageBoxResult result = MessageBox.Show("Approx sphere volume ratio", (((0.987053856 * 4 / 3) * Math.PI * 0.1 * 0.1 * 0.1 * sphereRadius * sphereRadius * sphereRadius * grid.Count(g => g.SeedType == SeedTypeEnum.Sphere)) / (target.Volume)).ToString(),
-                MessageBoxButton.OKCancel, MessageBoxImage.Question);
-
-                // Check the user's response
-                if (result == MessageBoxResult.Cancel)
+                foreach (VVector pos in gridhex.Where(r => r.SeedType == SeedTypeEnum.Void).Select(r => r.Position))
                 {
-                    // User chose to cancel; close the application
-                    // Environment.Exit(0);
-                    Output += "\n Sphere creation has been cancelled. Please close the window!";
+                    gridhexVoid.Add(new Point3D(pos.x, pos.y, pos.z));
 
-                    return;
                 }
 
-                // 4. Make spheres
-                // This loop removes any already existing spheres prior to creating new spheres
-                int sphere_count = 0;
+                // MessageBox.Show("Total seeds in gridhex", gridhex.Count.ToString());
+                Output += "\nEvaluating sphere locations using 3D CVT, this could take several minutes ...";
+                // var cvt = new CVT3D(target.MeshGeometry, new CVTSettings(gridhex.Count));
+                //var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(gridhex.Count(g => g.SeedType == SeedTypeEnum.Sphere)));
+                // var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(gridhex.Count(g => g.SeedType == SeedTypeEnum.Sphere), bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, SpacingSelected.Value, Radius));
+                var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(gridhexSph, gridhex.Count(g => g.SeedType == SeedTypeEnum.Sphere)));
 
-                var prevSpheres = sc.StructureSet.Structures.Where(x => x.Id.Contains("Sphere")).ToList();
-                int deleted_spheres = 0;
-                foreach (var sp in prevSpheres)
+                //var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(gridhexSph, gridhexVoid, gridhex.Count(g => g.SeedType == SeedTypeEnum.Sphere)));
+                var cvtGenerators = cvt.CalculateGenerators();
+                ProgressValue += 15.0;
+                // Check to make sure each point is at least SelectedSpacing distance away from every other point. If not 
+                // remove that point from the list. We could search for another point if one gets rejected to preserve
+                // total number of points but for that we'd have to change Voronio3D. Alternatively, we could add another option
+                // in Voronoi3D to be able to use cubic or hex grids. But that would also require modification of Voronoi3D which we 
+                // will look into later. For now we just do a simple check to make sure included point is at least a minimum distance away from
+                // every other point.
+
+                var retval = new List<seedPointModel>();
+                int idx = -1;
+                double d = 0;
+                //check to make sure cvt spheres don't overlap
+                foreach (var i in cvtGenerators)
                 {
-                    sc.StructureSet.RemoveStructure(sp);
-                    deleted_spheres++;
-                }
-                if (deleted_spheres > 0) { MessageBox.Show($"{deleted_spheres} pre-existing spheres deleted "); }
+                    idx++;
+                    var cvtpt = new VVector(i.X, i.Y, i.Z);
 
-
-                // Hold on to single sphere ids
-                var singleIds = new List<string>();
-                var singleVols = new List<double>();
-
-                // Starting message
-                Output += "\nCreating spheres, this could take several minutes ...";
-                //MessageBox.Show("About to create spheres.");
-
-                // Create all individual spheres
-                double progressUpdate = createNullsVoids ? 70.0 : 80.0;
-                foreach (VVector ctr in grid.Where(g => g.SeedType == SeedTypeEnum.Sphere).Select(g => g.Position))
-                {
-                    Structure currentSphere = null;
-
-                    if (!createSingle)
+                    if (idx > 0)
                     {
-                        // Create a new structure and build sphere on that
-                        var singleId = $"Sphere_{sphere_count}";
-                        currentSphere = CreateStructure(sc.StructureSet, singleId, false, true);
+                        int num_points = retval.Count;
+                        double[] dists = Enumerable.Repeat(1.0, num_points).ToArray();
+                        int j = 0;
+                        // foreach (int j = 0; j < num_points; j++)
+                        foreach (VVector pos in retval.Where(r => r.SeedType == SeedTypeEnum.Sphere).Select(r => r.Position))
+                        {
+                            double dist = Math.Sqrt(
+                                Math.Pow(cvtpt[0] - pos.x, 2) +
+                                Math.Pow(cvtpt[1] - pos.y, 2) +
+                                Math.Pow(cvtpt[2] - pos.z, 2)
+                            );
+
+                            dists[j] = dist;
+                            j++;
+                        }
+
+                        if (num_points > 0)
+                        {
+                            d = dists.Min();
+                        }
 
                     }
                     else
                     {
-                        currentSphere = structMain;
-
+                        d = 2.10 * sphereRadius;
+                        // d = SpacingSelected.Value;
                     }
-                    BuildSphere(currentSphere, ctr, Radius, sc.Image);
 
-                    // Crop to target
-                    currentSphere.SegmentVolume = currentSphere.SegmentVolume.And(target);
+                    // Uncomment below if CVT uses random sampling to avoid spheres clubbing together
 
-                    if (!createSingle)
+                    // if (SpacingSelected.Value <= d)
+                    if (2.10 * sphereRadius <= d)
+
                     {
-
-                        structMain.SegmentVolume = structMain.Or(currentSphere.SegmentVolume);
-
+                        retval.Add(new seedPointModel(cvtpt, SeedTypeEnum.Sphere));
                     }
-                    sphere_count++;
+                    //retval.Add(new seedPointModel(cvtpt, SeedTypeEnum.Sphere));
 
-                    singleIds.Add(currentSphere.Id);
-                    singleVols.Add(currentSphere.Volume);
-                    ProgressValue += progressUpdate / (double)grid.Count(g => g.SeedType == SeedTypeEnum.Sphere);
                 }
 
+                grid = retval; // cvtGenerators.Select(p => new VVector(p.X, p.Y, p.Z)).ToList();
+                Output += $"Total seeds in gridCVT: {grid.Count.ToString()}";
+                structMain = CreateStructure(sc.StructureSet, "CVT3D", false, true);
+            }
 
-                // Nulls and voids using complement
-                if (createNullsVoids)
+            Output += $"\nPTV volume: {target.Volume.ToString()}";
+            Output += $"\nTotal spheres: {grid.Count(g => g.SeedType == SeedTypeEnum.Sphere).ToString()}";
+            Output += $"\nSphere radius: {sphereRadius.ToString()}";
+            Output += $"\nSphere volume: {((0.987053856 * 4 / 3) * Math.PI * 0.1 * 0.1 * 0.1 * sphereRadius * sphereRadius * sphereRadius).ToString()}";
+            Output += $"\nApproximate sphere volume: {((0.987053856 * 4 / 3) * Math.PI * 0.1 * 0.1 * 0.1 * sphereRadius * sphereRadius * sphereRadius * grid.Count(g => g.SeedType == SeedTypeEnum.Sphere)).ToString()}";
+            Output += $"\nRatio (total sphere Volume/PTV volume): {(((100 * 0.987053856 * 4 / 3) * Math.PI * 0.1 * 0.1 * 0.1 * sphereRadius * sphereRadius * sphereRadius * grid.Count(g => g.SeedType == SeedTypeEnum.Sphere)) / (target.Volume)).ToString()} %";
+
+
+            // Set a message box to add display the total sphere volume and give users choice of 
+            // going forward or cancelling run
+            MessageBoxResult result = MessageBox.Show("Approx sphere volume ratio", (((0.987053856 * 4 / 3) * Math.PI * 0.1 * 0.1 * 0.1 * sphereRadius * sphereRadius * sphereRadius * grid.Count(g => g.SeedType == SeedTypeEnum.Sphere)) / (target.Volume)).ToString(),
+            MessageBoxButton.OKCancel, MessageBoxImage.Question);
+
+            // Check the user's response
+            if (result == MessageBoxResult.Cancel)
+            {
+                // User chose to cancel; close the application
+                // Environment.Exit(0);
+                Output += "\n Sphere creation has been cancelled. Please close the window!";
+
+                return;
+            }
+
+            // 4. Make spheres
+            // This loop removes any already existing spheres prior to creating new spheres
+            int sphere_count = 0;
+
+            var prevSpheres = sc.StructureSet.Structures.Where(x => x.Id.Contains("Sphere")).ToList();
+            int deleted_spheres = 0;
+            foreach (var sp in prevSpheres)
+            {
+                sc.StructureSet.RemoveStructure(sp);
+                deleted_spheres++;
+            }
+            if (deleted_spheres > 0) { MessageBox.Show($"{deleted_spheres} pre-existing spheres deleted "); }
+
+
+            // Hold on to single sphere ids
+            var singleIds = new List<string>();
+            var singleVols = new List<double>();
+
+            // Starting message
+            Output += "\nCreating spheres, this could take several minutes ...";
+            //MessageBox.Show("About to create spheres.");
+
+            // Create all individual spheres
+            double progressUpdate = createNullsVoids ? 70.0 : 80.0;
+            foreach (VVector ctr in grid.Where(g => g.SeedType == SeedTypeEnum.Sphere).Select(g => g.Position))
+            {
+                Structure currentSphere = null;
+
+                if (!createSingle)
                 {
-                    try
+                    // Create a new structure and build sphere on that
+                    var singleId = $"Sphere_{sphere_count}";
+                    currentSphere = CreateStructure(sc.StructureSet, singleId, false, true);
+
+                }
+                else
+                {
+                    currentSphere = structMain;
+
+                }
+                BuildSphere(currentSphere, ctr, Radius, sc.Image);
+
+                // Crop to target
+                currentSphere.SegmentVolume = currentSphere.SegmentVolume.And(target);
+
+                if (!createSingle)
+                {
+
+                    structMain.SegmentVolume = structMain.Or(currentSphere.SegmentVolume);
+
+                }
+                sphere_count++;
+
+                singleIds.Add(currentSphere.Id);
+                singleVols.Add(currentSphere.Volume);
+                ProgressValue += progressUpdate / (double)grid.Count(g => g.SeedType == SeedTypeEnum.Sphere);
+            }
+
+
+            // Nulls and voids using complement
+            if (createNullsVoids)
+            {
+                try
+                {
+                    Output += "\nCreating nulls and voids ... ";
+
+                    if (isRect)
                     {
-                        Output += "\nCreating nulls and voids ... ";
-
-                        if (isRect)
+                        string structName = "Voids";
+                        int voidCount = 0;
+                        var prevStruct = structureSet.Structures.FirstOrDefault(x => x.Id == structName);
+                        if (prevStruct != null)
                         {
-                            string structName = "Voids";
-                            int voidCount = 0;
-                            var prevStruct = structureSet.Structures.FirstOrDefault(x => x.Id == structName);
-                            if (prevStruct != null)
-                            {
-                                structureSet.RemoveStructure(prevStruct);
-
-                            }
-
-                            var voidStructure = structureSet.AddStructure("CONTROL", structName);
-                            voidStructure.ConvertToHighResolution(); // all structures are high res - if structures are made not hi-res comment this
-
-                            foreach (VVector ctr in grid.Where(g => g.SeedType == SeedTypeEnum.Void).Select(g => g.Position))
-                            {
-                                Structure currentVoid = null;
-
-                                currentVoid = voidStructure;
-
-                                BuildSphere(currentVoid, ctr, Radius / 2, sc.Image);
-
-                                // Crop to target
-                                currentVoid.SegmentVolume = currentVoid.SegmentVolume.And(target);
-
-                                voidStructure.SegmentVolume = voidStructure.Or(currentVoid.SegmentVolume);
-                                voidCount++;
-
-                            }
+                            structureSet.RemoveStructure(prevStruct);
 
                         }
 
-                        if (isHex)
+                        var voidStructure = structureSet.AddStructure("CONTROL", structName);
+                        voidStructure.ConvertToHighResolution(); // all structures are high res - if structures are made not hi-res comment this
+
+                        foreach (VVector ctr in grid.Where(g => g.SeedType == SeedTypeEnum.Void).Select(g => g.Position))
                         {
-                            string structName = "Voids";
-                            int voidCount = 0;
-                            var prevStruct = structureSet.Structures.FirstOrDefault(x => x.Id == structName);
-                            if (prevStruct != null)
-                            {
-                                structureSet.RemoveStructure(prevStruct);
+                            Structure currentVoid = null;
 
-                            }
+                            currentVoid = voidStructure;
 
-                            var voidStructure = structureSet.AddStructure("CONTROL", structName);
-                            voidStructure.ConvertToHighResolution(); // all structures are high res - if structures are made not hi-res comment this
+                            BuildSphere(currentVoid, ctr, Radius / 2, sc.Image);
 
-                            foreach (VVector ctr in grid.Where(g => g.SeedType == SeedTypeEnum.Void).Select(g => g.Position))
-                            {
-                                Structure currentVoid = null;
+                            // Crop to target
+                            currentVoid.SegmentVolume = currentVoid.SegmentVolume.And(target);
 
-                                currentVoid = voidStructure;
-
-                                BuildSphere(currentVoid, ctr, ((float)spacingSelected.Value - 2*Radius) / 4, sc.Image);
-
-                                // Crop to target
-                                currentVoid.SegmentVolume = currentVoid.SegmentVolume.And(target);
-
-                                voidStructure.SegmentVolume = voidStructure.Or(currentVoid.SegmentVolume);
-                                voidCount++; 
-
-                            }
-
-                            //var voidFactor = (spacingSelected.Value - 2.0 * radius) / 2.0;
-                            //Output += "\nCreating nulls and voids ... ";
-                            //Output += $"\nVoidFactor = {voidFactor}";
-
-                            //var voidStructureL1 = sc.StructureSet.AddStructure("CONTROL", "VoidL1");
-                            //voidStructureL1.SegmentVolume = structMain.LargeMargin(voidFactor).And(target.LargeMargin(-1 * sphereRadius/2));
-                            //voidStructureL1.SegmentVolume = target.LargeMargin(-1 * sphereRadius/2).Sub(voidStructureL1.SegmentVolume);
-                            //Output += "\nL1 has been created";
-
-                            //var voidStructureL2 = sc.StructureSet.AddStructure("CONTROL", "VoidL2");
-                            //voidStructureL2.Color = System.Windows.Media.Color.FromRgb(160, 32, 240);
-                            //voidStructureL2.SegmentVolume = target.LargeMargin(-1.75 * sphereRadius).And(structMain.LargeMargin(voidFactor));
-                            //// Output += $"\nVoid Stucture L2 AND volume = {voidStructureL2.Volume}";
-                            //voidStructureL2.SegmentVolume = target.LargeMargin(-1.75 * sphereRadius).Sub(voidStructureL2.SegmentVolume);
-                            //Output += "\nL2 has been created";
-
-                            //var voidStructureL3 = sc.StructureSet.AddStructure("CONTROL", "VoidL3");
-                            //voidStructureL3.Color = System.Windows.Media.Color.FromRgb(0, 255, 255);
-                            //voidStructureL3.SegmentVolume = voidStructureL2.LargeMargin(-sphereRadius / 4);
-
-                            Output += "\n Voids have been created";
-                            // voidStructureL3.SegmentVolume = target.Margin(-1 * spacingSelected.Value / 2).Sub(structMain.Margin(1.2 * voidFactor));
-
+                            voidStructure.SegmentVolume = voidStructure.Or(currentVoid.SegmentVolume);
+                            voidCount++;
 
                         }
 
-                        if (isCVT3D)
+                    }
+
+                    if (isHex)
+                    {
+                        string structName = "Voids";
+                        int voidCount = 0;
+                        var prevStruct = structureSet.Structures.FirstOrDefault(x => x.Id == structName);
+                        if (prevStruct != null)
                         {
-                            var gridhex = BuildHexGrid(10.0, bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract, ptvRetractVoid);
+                            structureSet.RemoveStructure(prevStruct);
+
+                        }
+
+                        var voidStructure = structureSet.AddStructure("CONTROL", structName);
+                        voidStructure.ConvertToHighResolution(); // all structures are high res - if structures are made not hi-res comment this
+
+                        foreach (VVector ctr in grid.Where(g => g.SeedType == SeedTypeEnum.Void).Select(g => g.Position))
+                        {
+                            Structure currentVoid = null;
+
+                            currentVoid = voidStructure;
+
+                            BuildSphere(currentVoid, ctr, ((float)spacingSelected.Value - 2 * Radius) / 4, sc.Image);
+
+                            // Crop to target
+                            currentVoid.SegmentVolume = currentVoid.SegmentVolume.And(target);
+
+                            voidStructure.SegmentVolume = voidStructure.Or(currentVoid.SegmentVolume);
+                            voidCount++;
+
+                        }
+
+                        //var voidFactor = (spacingSelected.Value - 2.0 * radius) / 2.0;
+                        //Output += "\nCreating nulls and voids ... ";
+                        //Output += $"\nVoidFactor = {voidFactor}";
+
+                        //var voidStructureL1 = sc.StructureSet.AddStructure("CONTROL", "VoidL1");
+                        //voidStructureL1.SegmentVolume = structMain.LargeMargin(voidFactor).And(target.LargeMargin(-1 * sphereRadius/2));
+                        //voidStructureL1.SegmentVolume = target.LargeMargin(-1 * sphereRadius/2).Sub(voidStructureL1.SegmentVolume);
+                        //Output += "\nL1 has been created";
+
+                        //var voidStructureL2 = sc.StructureSet.AddStructure("CONTROL", "VoidL2");
+                        //voidStructureL2.Color = System.Windows.Media.Color.FromRgb(160, 32, 240);
+                        //voidStructureL2.SegmentVolume = target.LargeMargin(-1.75 * sphereRadius).And(structMain.LargeMargin(voidFactor));
+                        //// Output += $"\nVoid Stucture L2 AND volume = {voidStructureL2.Volume}";
+                        //voidStructureL2.SegmentVolume = target.LargeMargin(-1.75 * sphereRadius).Sub(voidStructureL2.SegmentVolume);
+                        //Output += "\nL2 has been created";
+
+                        //var voidStructureL3 = sc.StructureSet.AddStructure("CONTROL", "VoidL3");
+                        //voidStructureL3.Color = System.Windows.Media.Color.FromRgb(0, 255, 255);
+                        //voidStructureL3.SegmentVolume = voidStructureL2.LargeMargin(-sphereRadius / 4);
+
+                        Output += "\n Voids have been created";
+                        // voidStructureL3.SegmentVolume = target.Margin(-1 * spacingSelected.Value / 2).Sub(structMain.Margin(1.2 * voidFactor));
+
+
+                    }
+
+                    //if (isCVT3D)
+                    //{
+
+                    //    var cvtSeeds = new List<(double x, double y, double z)>();
+                    //    foreach (VVector pos in grid.Where(r => r.SeedType == SeedTypeEnum.Sphere).Select(r => r.Position))
+                    //    {
+                    //        cvtSeeds.Add((pos.x, pos.y, pos.z));
+                    //    }
+                    //    Output += $"Total seeds in in cvtSeeds: {cvtSeeds.Count().ToString()}";
+                    //    //int k = (int) Math.Floor(cvtSeeds.Count()/2.0); // Number of clusters
+                    //    //List<(double x, double y, double z)> centroids = KMeans(cvtSeeds, k);
+
+                    //    var normalizationParams = GetNormalizationParams(cvtSeeds);
+                    //    cvtSeeds = NormalizePoints(cvtSeeds, normalizationParams);
+                    //    int k = 3; // Number of neighbors
+
+                    //    double minDistance = spacingSelected.Value; // Minimum distance between centroids
+
+                    //    var clusters = KNearestNeighbors(cvtSeeds, k);
+                    //    var centroids = new List<(double x, double y, double z)>();
+                    //    foreach (var cluster in clusters)
+                    //    {
+                    //        var centroid = FindCentroid(cluster, 0.1); // Add random perturbation
+                    //        centroid = AdjustCentroid(centroid, centroids, minDistance); // Ensure separation                                
+                    //        var denormalizedCentroid = DenormalizePoint(centroid, normalizationParams);
+                    //        centroids.Add(denormalizedCentroid);
+                    //    }
+                    //    //foreach (var centroid in centroids)
+                    //    //{
+                    //    //    Console.WriteLine($"({centroid.x}, {centroid.y}, {centroid.z})");
+                    //    //}
+
+
+                    //    foreach (var centroid in centroids)
+                    //    {
+                    //        double cx = centroid.x;
+                    //        double cy = centroid.y;
+                    //        double cz = centroid.z;
+                    //        var voidpt = new VVector(cx, cy, cz);
+                    //        grid.Add(new seedPointModel(voidpt, SeedTypeEnum.Void));
+                    //    }
+                    //    Output += $"Total voids in gridCVT: {grid.Where(r => r.SeedType == SeedTypeEnum.Void).Count().ToString()}";
+
+
+                    //    string structName = "Voids";
+                    //    int voidCount = 0;
+                    //    var prevStruct = structureSet.Structures.FirstOrDefault(x => x.Id == structName);
+                    //    if (prevStruct != null)
+                    //    {
+                    //        structureSet.RemoveStructure(prevStruct);
+
+                    //    }
+
+                    //    var voidStructure = structureSet.AddStructure("CONTROL", structName);
+                    //    voidStructure.ConvertToHighResolution(); // all structures are high res - if structures are made not hi-res comment this
+
+                    //    foreach (VVector ctr in grid.Where(g => g.SeedType == SeedTypeEnum.Void).Select(g => g.Position))
+
+                    //    {
+                    //        Structure currentVoid = null;
+
+                    //        currentVoid = voidStructure;
+
+                    //        BuildSphere(currentVoid, ctr, ((float)spacingSelected.Value - 2 * Radius) / 4, sc.Image);
+
+                    //        // Crop to target
+                    //        currentVoid.SegmentVolume = currentVoid.SegmentVolume.And(target);
+
+                    //        voidStructure.SegmentVolume = voidStructure.Or(currentVoid.SegmentVolume);
+                    //        voidCount++;
+
+                    //    }
+                    //    Output += "\nVoidCVT has been created";
+
+                    //}
+
+
+                    if (isCVT3D)
+                    {
+                        var gridhex = BuildHexGrid(10.0, bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract, ptvRetractVoid);
 
                             // make list of the points in gridhex_sph, gridhex_void
-                            List<Point3D> gridhexVoid = new List<Point3D>();
-                            Random rand = new Random();
+                        List<Point3D> gridhexVoid = new List<Point3D>();
+                        Random rand = new Random();
 
                             foreach (VVector pos in gridhex.Where(r => r.SeedType == SeedTypeEnum.Void).Select(r => r.Position))
                             {
-                                gridhexVoid.Add(new Point3D(pos.x, pos.y, pos.z));
+                                //gridhexVoid.Add(new Point3D(pos.x, pos.y, pos.z));
+                                if (rand.Next(1, 10) % 2 == 0)
+                                {
+                                    gridhexVoid.Add(new Point3D(pos.x, pos.y, pos.z));
+                                }
 
                             }
                             var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(gridhexVoid, gridhex.Count(g => g.SeedType == SeedTypeEnum.Void)));
-                            var cvtGenerators = cvt.CalculateGenerators();
-                            var retval = new List<seedPointModel>();
-                            int idx = -1;
-                            double d = 0;
-                            //check to make sure cvt spheres don't overlap
-                            foreach (var i in cvtGenerators)
+                        var cvtGenerators = cvt.CalculateGenerators();
+                        var retval = new List<seedPointModel>();
+                        int idx = -1;
+                        double d = 0;
+                        //check to make sure cvt spheres don't overlap
+                        foreach (var i in cvtGenerators)
+                        {
+                            idx++;
+                            var cvtpt = new VVector(i.X, i.Y, i.Z);
+
+                            if (idx > 0)
                             {
-                                idx++;
-                                var cvtpt = new VVector(i.X, i.Y, i.Z);
-
-                                if (idx > 0)
+                                int num_points = retval.Count;
+                                double[] dists = Enumerable.Repeat(1.0, num_points).ToArray();
+                                int j = 0;
+                                // foreach (int j = 0; j < num_points; j++)
+                                foreach (VVector pos in retval.Where(r => r.SeedType == SeedTypeEnum.Void).Select(r => r.Position))
                                 {
-                                    int num_points = retval.Count;
-                                    double[] dists = Enumerable.Repeat(1.0, num_points).ToArray();
-                                    int j = 0;
-                                    // foreach (int j = 0; j < num_points; j++)
-                                    foreach (VVector pos in retval.Where(r => r.SeedType == SeedTypeEnum.Void).Select(r => r.Position))
-                                    {
-                                        double dist = Math.Sqrt(
-                                            Math.Pow(cvtpt[0] - pos.x, 2) +
-                                            Math.Pow(cvtpt[1] - pos.y, 2) +
-                                            Math.Pow(cvtpt[2] - pos.z, 2)
-                                        );
+                                    double dist = Math.Sqrt(
+                                        Math.Pow(cvtpt[0] - pos.x, 2) +
+                                        Math.Pow(cvtpt[1] - pos.y, 2) +
+                                        Math.Pow(cvtpt[2] - pos.z, 2)
+                                    );
 
-                                        dists[j] = dist;
-                                        j++;
-                                    }
-
-                                    if (num_points > 0)
-                                    {
-                                        d = dists.Min();
-                                    }
-
-                                }
-                                else
-                                {
-                                    d = 2.10 * sphereRadius;
-                                    // d = SpacingSelected.Value;
+                                    dists[j] = dist;
+                                    j++;
                                 }
 
-                                // Uncomment below if CVT uses random sampling to avoid spheres clubbing together
-
-                                // if (SpacingSelected.Value <= d)
-                                if (2.10 * sphereRadius <= d)
-
+                                if (num_points > 0)
                                 {
-                                    retval.Add(new seedPointModel(cvtpt, SeedTypeEnum.Void));
+                                    d = dists.Min();
                                 }
-                                //retval.Add(new seedPointModel(cvtpt, SeedTypeEnum.Sphere));
 
                             }
-
-                            grid = retval; // cvtGenerators.Select(p => new VVector(p.X, p.Y, p.Z)).ToList();
-
-                            string structName = "Voids";
-                            int voidCount = 0;
-                            var prevStruct = structureSet.Structures.FirstOrDefault(x => x.Id == structName);
-                            if (prevStruct != null)
+                            else
                             {
-                                structureSet.RemoveStructure(prevStruct);
-
+                                d = 2.10 * sphereRadius;
+                                // d = SpacingSelected.Value;
                             }
 
-                            var voidStructure = structureSet.AddStructure("CONTROL", structName);
-                            voidStructure.ConvertToHighResolution(); // all structures are high res - if structures are made not hi-res comment this
+                            // Uncomment below if CVT uses random sampling to avoid spheres clubbing together
 
-                            foreach (VVector ctr in grid.Where(g => g.SeedType == SeedTypeEnum.Void).Select(g => g.Position))
+                            // if (SpacingSelected.Value <= d)
+                            if (2.10 * sphereRadius <= d)
+
                             {
-                                Structure currentVoid = null;
-
-                                currentVoid = voidStructure;
-
-                                BuildSphere(currentVoid, ctr, ((float)spacingSelected.Value - 2 * Radius) / 4, sc.Image);
-
-                                // Crop to target
-                                currentVoid.SegmentVolume = currentVoid.SegmentVolume.And(target);
-
-                                voidStructure.SegmentVolume = voidStructure.Or(currentVoid.SegmentVolume);
-                                voidCount++;
-
+                                retval.Add(new seedPointModel(cvtpt, SeedTypeEnum.Void));
                             }
-                            //var voidFactor = (spacingSelected.Value - 2.0 * radius) / 2.0;
-                            //var voidStructureCVT = sc.StructureSet.AddStructure("CONTROL", "VoidCVT");
-                            //voidStructureCVT.Color = System.Windows.Media.Color.FromRgb(0, 255, 255);
-                            //voidStructureCVT.SegmentVolume = (target.LargeMargin(-1.75 * sphereRadius).And(structMain.LargeMargin(voidFactor)));
-                            //voidStructureCVT.SegmentVolume = voidStructureCVT.LargeMargin(-sphereRadius/4);
-                            Output += "\nVoidCVT has been created";
-                            // voidStructureL3.SegmentVolume = target.Margin(-1 * spacingSelected.Value / 2).Sub(structMain.Margin(1.2 * voidFactor));
+                            //retval.Add(new seedPointModel(cvtpt, SeedTypeEnum.Sphere));
 
                         }
+
+                        grid = retval; // cvtGenerators.Select(p => new VVector(p.X, p.Y, p.Z)).ToList();
+
+                        string structName = "Voids";
+                        int voidCount = 0;
+                        var prevStruct = structureSet.Structures.FirstOrDefault(x => x.Id == structName);
+                        if (prevStruct != null)
+                        {
+                            structureSet.RemoveStructure(prevStruct);
+
+                        }
+
+                        var voidStructure = structureSet.AddStructure("CONTROL", structName);
+                        voidStructure.ConvertToHighResolution(); // all structures are high res - if structures are made not hi-res comment this
+
+                        foreach (VVector ctr in grid.Where(g => g.SeedType == SeedTypeEnum.Void).Select(g => g.Position))
+                        {
+                            Structure currentVoid = null;
+
+                            currentVoid = voidStructure;
+
+                            var voidRadius = ((float)spacingSelected.Value - 2 * Radius) / 4;
+
+                            if (voidRadius >= (float)Radius)
+                            {
+                                voidRadius = (float)Radius;
+
+                            }
+
+                            BuildSphere(currentVoid, ctr, voidRadius, sc.Image);
+
+                            // Crop to target
+                            currentVoid.SegmentVolume = currentVoid.SegmentVolume.And(target);
+
+                            voidStructure.SegmentVolume = voidStructure.Or(currentVoid.SegmentVolume);
+                            voidCount++;
+
+                        }
+                        //var voidFactor = (spacingSelected.Value - 2.0 * radius) / 2.0;
+                        //var voidStructureCVT = sc.StructureSet.AddStructure("CONTROL", "VoidCVT");
+                        //voidStructureCVT.Color = System.Windows.Media.Color.FromRgb(0, 255, 255);
+                        //voidStructureCVT.SegmentVolume = (target.LargeMargin(-1.75 * sphereRadius).And(structMain.LargeMargin(voidFactor)));
+                        //voidStructureCVT.SegmentVolume = voidStructureCVT.LargeMargin(-sphereRadius/4);
+                        Output += "\nVoidCVT has been created";
+                        // voidStructureL3.SegmentVolume = target.Margin(-1 * spacingSelected.Value / 2).Sub(structMain.Margin(1.2 * voidFactor));
+
+                    }
+
                         ProgressValue += 100 - ProgressValue;
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show(ex.Message);
+                        MessageBox.Show(ex.InnerException.ToString());
 
                     }
                 }
@@ -1405,6 +1495,165 @@ namespace MAAS_SFRThelper.ViewModels
             //MessageBox.Show("Created spheres close tool to view. \nFor different sphere locations rerun with different x and y shift values.");
 
         }
+
+        //static List<(double x, double y, double z)> KMeans(List<(double x, double y, double z)> points, int k)
+        //{
+        //    Random random = new Random();
+
+        //    // Initialize centroids randomly from the points
+        //    List<(double x, double y, double z)> centroids = points.OrderBy(_ => random.Next()).Take(k).ToList();
+        //    Console.WriteLine("Initial centroids:");
+        //    centroids.ForEach(c => Console.WriteLine($"({c.x}, {c.y}, {c.z})"));
+
+        //    List<(double x, double y, double z)> previousCentroids;
+
+        //    while (true)
+        //    {
+        //        // Assign points to the nearest centroid
+        //        var clusters = points.GroupBy(p =>
+        //            centroids.OrderBy(c => Distance(p, c)).First()).ToList();
+
+        //        Console.WriteLine("Clusters:");
+        //        foreach (var cluster in clusters)
+        //        {
+        //            Console.WriteLine($"Cluster around centroid ({cluster.Key.x}, {cluster.Key.y}, {cluster.Key.z}):");
+        //            foreach (var point in cluster)
+        //            {
+        //                Console.WriteLine($"  Point: ({point.x}, {point.y}, {point.z})");
+        //            }
+        //        }
+
+        //        // Update centroids
+        //        previousCentroids = new List<(double x, double y, double z)>(centroids);
+
+        //        centroids = clusters.Select(cluster =>
+        //        {
+        //            if (cluster.Any())
+        //            {
+        //                return (
+        //                    x: cluster.Average(p => p.x),
+        //                    y: cluster.Average(p => p.y),
+        //                    z: cluster.Average(p => p.z)
+        //                );
+        //            }
+        //            else
+        //            {
+        //                // If a cluster is empty, keep the previous centroid
+        //                int index = clusters.IndexOf(cluster);
+        //                return previousCentroids[index];
+        //            }
+        //        }).ToList();
+
+        //        Console.WriteLine("Updated centroids:");
+        //        centroids.ForEach(c => Console.WriteLine($"({c.x}, {c.y}, {c.z})"));
+
+        //        // Check for convergence (if centroids do not change)
+        //        if (!centroids.Where((c, i) => c != previousCentroids[i]).Any())
+        //            break;
+        //    }
+
+        //    return centroids;
+        //}
+
+        static (double minX, double maxX, double minY, double maxY, double minZ, double maxZ) GetNormalizationParams(List<(double x, double y, double z)> points)
+        {
+            return (
+                minX: points.Min(p => p.x),
+                maxX: points.Max(p => p.x),
+                minY: points.Min(p => p.y),
+                maxY: points.Max(p => p.y),
+                minZ: points.Min(p => p.z),
+                maxZ: points.Max(p => p.z)
+            );
+        }
+
+        static List<(double x, double y, double z)> NormalizePoints(List<(double x, double y, double z)> points, (double minX, double maxX, double minY, double maxY, double minZ, double maxZ) normalizationParams)
+        {
+            return points.Select(p => (
+                x: (p.x - normalizationParams.minX) / (normalizationParams.maxX - normalizationParams.minX),
+                y: (p.y - normalizationParams.minY) / (normalizationParams.maxY - normalizationParams.minY),
+                z: (p.z - normalizationParams.minZ) / (normalizationParams.maxZ - normalizationParams.minZ)
+            )).ToList();
+        }
+
+        static (double x, double y, double z) DenormalizePoint((double x, double y, double z) point, (double minX, double maxX, double minY, double maxY, double minZ, double maxZ) normalizationParams)
+        {
+            return (
+                x: point.x * (normalizationParams.maxX - normalizationParams.minX) + normalizationParams.minX,
+                y: point.y * (normalizationParams.maxY - normalizationParams.minY) + normalizationParams.minY,
+                z: point.z * (normalizationParams.maxZ - normalizationParams.minZ) + normalizationParams.minZ
+            );
+        }
+
+        static List<List<(double x, double y, double z)>> KNearestNeighbors(List<(double x, double y, double z)> points, int k)
+        {
+            var clusters = new List<List<(double x, double y, double z)>>();
+            var visited = new HashSet<(double x, double y, double z)>();
+
+            foreach (var point in points)
+            {
+                if (visited.Contains(point))
+                    continue;
+
+                // Find k-nearest neighbors for the point, excluding the point itself
+                var neighbors = points
+                    .Where(p => p != point && !visited.Contains(p))
+                    .OrderBy(p => Distance(point, p))
+                    .Take(k) // Take only k neighbors
+                    .ToList();
+
+                clusters.Add(neighbors);
+
+                // Mark neighbors as visited
+                foreach (var neighbor in neighbors)
+                {
+                    visited.Add(neighbor);
+                }
+            }
+
+            return clusters;
+        }
+
+        static (double x, double y, double z) FindCentroid(List<(double x, double y, double z)> cluster, double perturbation)
+        {
+            var random = new Random();
+            var centroid = (
+                x: cluster.Average(p => p.x),
+                y: cluster.Average(p => p.y),
+                z: cluster.Average(p => p.z)
+            );
+
+            // Add a small random perturbation to the centroid
+            centroid = (
+                x: centroid.x + (random.NextDouble() - 0.5) * 2 * perturbation,
+                y: centroid.y + (random.NextDouble() - 0.5) * 2 * perturbation,
+                z: centroid.z + (random.NextDouble() - 0.5) * 2 * perturbation
+            );
+
+            return centroid;
+        }
+
+        static (double x, double y, double z) AdjustCentroid((double x, double y, double z) centroid, List<(double x, double y, double z)> otherCentroids, double minDistance)
+        {
+            foreach (var other in otherCentroids)
+            {
+                if (Distance(centroid, other) < minDistance)
+                {
+                    centroid = (
+                        x: centroid.x + minDistance,
+                        y: centroid.y + minDistance,
+                        z: centroid.z + minDistance
+                    );
+                }
+            }
+            return centroid;
+        }
+
+        static double Distance((double x, double y, double z) p1, (double x, double y, double z) p2)
+        {
+            return Math.Sqrt(Math.Pow(p1.x - p2.x, 2) + Math.Pow(p1.y - p2.y, 2) + Math.Pow(p1.z - p2.z, 2));
+        }
+        // -----------------------------------
 
         private VVector[] CreateContour(VVector center, double radius, int nOfPoints)
         {
