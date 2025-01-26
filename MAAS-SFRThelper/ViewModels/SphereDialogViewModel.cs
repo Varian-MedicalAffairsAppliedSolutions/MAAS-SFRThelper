@@ -962,11 +962,7 @@ namespace MAAS_SFRThelper.ViewModels
 
                 }
 
-                foreach (VVector pos in gridhex.Where(r => r.SeedType == SeedTypeEnum.Void).Select(r => r.Position))
-                {
-                    gridhexVoid.Add(new Point3D(pos.x, pos.y, pos.z));
-
-                }
+              
 
                 // MessageBox.Show("Total seeds in gridhex", gridhex.Count.ToString());
                 Output += "\nEvaluating sphere locations using 3D CVT, this could take several minutes ...";
@@ -1037,6 +1033,11 @@ namespace MAAS_SFRThelper.ViewModels
                 }
 
                 grid = retval; // cvtGenerators.Select(p => new VVector(p.X, p.Y, p.Z)).ToList();
+                foreach (var pos in gridhex.Where(r => r.SeedType == SeedTypeEnum.Void))
+                {
+                    grid.Add(pos);
+
+                }
                 Output += $"Total seeds in gridCVT: {grid.Count.ToString()}";
                 structMain = CreateStructure(sc.StructureSet, "CVT3D", false, true);
             }
@@ -1297,66 +1298,58 @@ namespace MAAS_SFRThelper.ViewModels
 
                     if (isCVT3D)
                     {
-                        var gridhex = BuildHexGrid(10.0, bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract, ptvRetractVoid);
+                        //var gridhex = BuildHexGrid(10.0, bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract, ptvRetractVoid);
 
-                            // make list of the points in gridhex_sph, gridhex_void
+                        // make list of the points in gridhex_sph, gridhex_void
                         List<Point3D> gridhexVoid = new List<Point3D>();
                         Random rand = new Random();
 
-                            foreach (VVector pos in gridhex.Where(r => r.SeedType == SeedTypeEnum.Void).Select(r => r.Position))
-                            {
-                                //gridhexVoid.Add(new Point3D(pos.x, pos.y, pos.z));
-                                if (rand.Next(1, 10) % 2 == 0)
-                                {
-                                    gridhexVoid.Add(new Point3D(pos.x, pos.y, pos.z));
-                                }
-
-                            }
-                            var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(gridhexVoid, gridhex.Count(g => g.SeedType == SeedTypeEnum.Void)));
-                        var cvtGenerators = cvt.CalculateGenerators();
-                        var retval = new List<seedPointModel>();
-                        int idx = -1;
-                        double d = 0;
-                        //check to make sure cvt spheres don't overlap
-                        foreach (var i in cvtGenerators)
+                        foreach (VVector pos in grid.Where(r => r.SeedType == SeedTypeEnum.Void).Select(r => r.Position))
                         {
-                            idx++;
-                            var cvtpt = new VVector(i.X, i.Y, i.Z);
+                             gridhexVoid.Add(new Point3D(pos.x, pos.y, pos.z));
+                            //if (rand.Next(1, 10) % 2 == 0)
+                            //{
+                            //    gridhexVoid.Add(new Point3D(pos.x, pos.y, pos.z));
+                            //}
 
-                            if (idx > 0)
+                        }
+                        //var cvt = new CVT3D(ptvRetractVoid.MeshGeometry, new CVTSettings(gridhexVoid, gridhexVoid.Count()));
+                        //var cvtGenerators = cvt.CalculateGenerators();
+                        var retval = grid.Where(r=>r.SeedType==SeedTypeEnum.Sphere).ToList();
+                        
+                        double d = 0;
+                            //check to make sure cvt spheres don't overlap
+                            //foreach (var i in cvtGenerators)
+                            foreach (var i in gridhexVoid)
                             {
-                                int num_points = retval.Count;
-                                double[] dists = Enumerable.Repeat(1.0, num_points).ToArray();
-                                int j = 0;
-                                // foreach (int j = 0; j < num_points; j++)
-                                foreach (VVector pos in retval.Where(r => r.SeedType == SeedTypeEnum.Void).Select(r => r.Position))
-                                {
-                                    double dist = Math.Sqrt(
-                                        Math.Pow(cvtpt[0] - pos.x, 2) +
-                                        Math.Pow(cvtpt[1] - pos.y, 2) +
-                                        Math.Pow(cvtpt[2] - pos.z, 2)
-                                    );
 
-                                    dists[j] = dist;
-                                    j++;
-                                }
+                                var cvtpt = new VVector(i.X, i.Y, i.Z);
 
-                                if (num_points > 0)
-                                {
-                                    d = dists.Min();
-                                }
+                            int num_points = retval.Count();
+                            double[] dists = Enumerable.Repeat(1.0, num_points).ToArray();
+                            int j = 0;
+                            // foreach (int j = 0; j < num_points; j++)
+                            foreach (VVector pos in retval.Select(r => r.Position))
+                            {
+                                double dist = Math.Sqrt(
+                                    Math.Pow(cvtpt[0] - pos.x, 2) +
+                                    Math.Pow(cvtpt[1] - pos.y, 2) +
+                                    Math.Pow(cvtpt[2] - pos.z, 2)
+                                );
 
+                                dists[j] = dist;
+                                j++;
                             }
-                            else
+
+                            if (num_points > 0)
                             {
-                                d = 2.10 * sphereRadius;
-                                // d = SpacingSelected.Value;
+                                d = dists.Min();
                             }
 
                             // Uncomment below if CVT uses random sampling to avoid spheres clubbing together
 
                             // if (SpacingSelected.Value <= d)
-                            if (2.10 * sphereRadius <= d)
+                            if (1.2*sphereRadius <= d)
 
                             {
                                 retval.Add(new seedPointModel(cvtpt, SeedTypeEnum.Void));
