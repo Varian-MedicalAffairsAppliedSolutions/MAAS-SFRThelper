@@ -663,51 +663,51 @@ namespace MAAS_SFRThelper.ViewModels
             //    ProgressValue += progressMax / (double)zRange.Count();
             //}
 
-            // Implement voids such that spheres touch ----------------------------------
-            var r = SpacingSelected.Value / 2.0; 
-            var ipA = 2.0 * r;
-            var c_over_a = Math.Sqrt(8.0/3.0);
-            var c = c_over_a * ipA; // out of plane
+            // Initial parameters
+            var r = SpacingSelected.Value / 2.0;  // sphere radius
+            var ipA = 2.0 * r;                    // in-plane spacing
+            var c_over_a = Math.Sqrt(8.0 / 3.0);    // ideal c/a ratio
+            var c = c_over_a * ipA;               // out of plane spacing
 
-            // define HCP lattice vectors
+            // Lattice vectors
             var a1 = new Vec3(ipA, 0.0, 0.0);
-            var a2 = new Vec3(0.5 * ipA, (Math.Sqrt(3) / 2) * ipA, 0.0);
-            var a2void = new Vec3(0.0, ipA, 0.0);
+            var a2 = new Vec3(-0.5 * ipA, (Math.Sqrt(3) / 2) * ipA, 0.0);
+            // Modified a2void to maintain hexagonal symmetry while being offset
+            var a2void = new Vec3(-0.5 * ipA, (Math.Sqrt(3) / 2) * ipA, 0.0);
             var a3 = new Vec3(0.0, 0.0, c);
 
-            var atomFrac = new List<Vec3>() 
-            {
-            new Vec3(0.0, 0.0, 0.0),
-            new Vec3(2.0/3.0, 1.0/3.0, 0.5)
-            };
+            // Base motif - 2 atoms per unit cell
+            var atomFrac = new List<Vec3>()
+{
+    new Vec3(0.0, 0.0, 0.0),         // Atom at origin
+    new Vec3(1.0/3.0, 2.0/3.0, 0.5)  // Atom in upper layer
+};
 
+            // Modified octahedral void positions
             var octaFrac = new List<Vec3>()
-            {
-                new Vec3(1.0/3.0, 2.0/3.0, 1.0/4.0),
-                new Vec3(2.0/3.0, 1.0/3.0, 3.0/4.0)
-            };
-
-            var tetraFrac = new List<Vec3>()
-            {
-                new Vec3(1.0/3.0, 2.0/3.0, 1.0/12.0),
-                new Vec3(1.0/3.0, 2.0/3.0, 5.0/12.0),
-                new Vec3(2.0/3.0, 1.0/3.0, 7.0/12.0),
-                new Vec3(2.0/3.0, 1.0/3.0, 11.0/12.0)
-            };
+{
+    new Vec3(0.5, 0.5, 0.25),    // Adjusted position
+    new Vec3(0.0, 0.0, 0.75)     // Adjusted position
+};
 
             Func<Vec3, Vec3> frac2cart = (f) =>
             {
-                // R = x*a1 + y*a2 + z*a3
                 return (f.X * a1) + (f.Y * a2) + (f.Z * a3);
+            };
+
+            Func<Vec3, Vec3> frac2cartVoid = (f) =>
+            {
+                var basePos = (f.X * a1) + (f.Y * a2void) + (f.Z * a3);
+                // Add slight offset to position voids correctly
+                return basePos + new Vec3(ipA * 0.25, ipA * 0.0, 0.0);
             };
 
             var atoms = new List<Vec3>();
             var voidVec = new List<Vec3>();
-           // var tetPositions = new List<VVector>();
 
             var nx = (int)(Math.Ceiling(Xsize / ipA) + 2);
             var ny = (int)(Math.Ceiling(Ysize / (Math.Sqrt(3) / 2) * ipA) + 2);
-            var nz = (int)(Math.Ceiling(Zsize / c ) + 2);
+            var nz = (int)(Math.Ceiling(Zsize / c) + 2);
             Vec3 globalOffset = new Vec3(Xstart, Ystart, Zstart);
 
             for (int i = 0; i < nx; i++)
@@ -716,32 +716,24 @@ namespace MAAS_SFRThelper.ViewModels
                 {
                     for (int k = 0; k < nz; k++)
                     {
-                        // The shift for cell (i,j,k) in cartesian:
-                        // shift = i*a1 + j*a2 + k*a3
                         Vec3 cellShift = globalOffset + (i * a1) + (j * a2) + (k * a3);
-                        Vec3 cellShiftvoid = globalOffset + (i * a1) + (j * a2void) + (k * a3);
-
-                        // Now compute the absolute (x,y,z) of each atom/void
-                        // in this cell, and store if in bounds
+                        Vec3 cellShiftVoid = globalOffset + (i * a1) + (j * a2void) + (k * a3);
 
                         foreach (var fA in atomFrac)
+                        {
                             atoms.Add(cellShift + frac2cart(fA));
+                        }
 
                         foreach (var fO in octaFrac)
                         {
-                            Vec3 pos = cellShiftvoid + frac2cart(fO);
+                            Vec3 pos = cellShiftVoid + frac2cartVoid(fO);
                             voidVec.Add(pos);
                         }
-
-                        //foreach (var fT in tetraFrac)
-                        //{
-                        //    Vec3 pos = cellShift + frac2cart(fT);
-                        //    voidVec.Add(pos);
-                        //}
                     }
                 }
             }
 
+            // Boundary checking remains the same
             foreach (var atom in atoms)
             {
                 var Pt = new VVector(atom.X, atom.Y, atom.Z);
@@ -750,9 +742,7 @@ namespace MAAS_SFRThelper.ViewModels
                 {
                     retval.Add(new seedPointModel(Pt, SeedTypeEnum.Sphere));
                 }
-
             }
-
 
             foreach (var vec in voidVec)
             {
@@ -762,9 +752,7 @@ namespace MAAS_SFRThelper.ViewModels
                 {
                     retval.Add(new seedPointModel(vPt, SeedTypeEnum.Void));
                 }
-
             }
-
 
             // RETURN SEED AND VOID LOCATIONS
 
@@ -927,8 +915,9 @@ namespace MAAS_SFRThelper.ViewModels
 
             if (IsHex)
             {
-                grid = BuildHexGrid(25.0, bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract, ptvRetractVoid);
-                structMain = CreateStructure(sc.StructureSet, "LatticeHex", false, true);
+                    //grid = BuildHexGrid(25.0, bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptv, ptvRetractVoid);
+                    grid = BuildHexGrid(25.0, bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract, ptvRetractVoid);
+                    structMain = CreateStructure(sc.StructureSet, "LatticeHex", false, true);
             }
             else if (IsRect)
             {
