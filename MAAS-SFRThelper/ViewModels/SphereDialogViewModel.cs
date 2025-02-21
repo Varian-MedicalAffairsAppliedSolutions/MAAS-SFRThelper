@@ -855,11 +855,11 @@ namespace MAAS_SFRThelper.ViewModels
             {
                 ptvRetractVoid = structureSet.AddStructure("CONTROL", "ptvRetractVoid");
             }
-            //double marginVoid = vThresh == 100 ? -1.1 * 2.0 * sphereRadius : -sphereRadius * 2.0 * vThresh / 100.0;
-            //ptvRetractVoid.SegmentVolume = ptv.Margin(marginVoid);
+                double marginVoid = vThresh == 100 ? -1.05 * 2.0 * sphereRadius : -sphereRadius * 2.0 * vThresh / 100.0;
+                ptvRetractVoid.SegmentVolume = ptv.LargeMargin(marginVoid);
 
-            double marginVoid = vThresh == 100 ? -1.01 * (spacingSelected.Value - 2 * Radius) / 2 : -(spacingSelected.Value - 2 * Radius) * vThresh / 200.0;
-            ptvRetractVoid.SegmentVolume = ptv.LargeMargin(marginVoid);
+            //double marginVoid = vThresh == 100 ? -1.01 * (spacingSelected.Value - 2 * Radius) / 2 : -(spacingSelected.Value - 2 * Radius) * vThresh / 200.0;
+            //ptvRetractVoid.SegmentVolume = ptv.LargeMargin(marginVoid);
 
             // Total lattice structure with all spheres
             Structure structMain = null;
@@ -1302,8 +1302,8 @@ namespace MAAS_SFRThelper.ViewModels
                             //}
 
                         }
-                        //var cvt = new CVT3D(ptvRetractVoid.MeshGeometry, new CVTSettings(gridhexVoid, gridhexVoid.Count()));
-                        //var cvtGenerators = cvt.CalculateGenerators();
+                        var cvt = new CVT3D(ptvRetractVoid.MeshGeometry, new CVTSettings(gridhexVoid, gridhexVoid.Count()));
+                        var cvtGenerators = cvt.CalculateGenerators();
                         var retval = grid.Where(r=>r.SeedType==SeedTypeEnum.Sphere).ToList();
                         
                         double d = 0;
@@ -1339,9 +1339,13 @@ namespace MAAS_SFRThelper.ViewModels
 
                             // if (SpacingSelected.Value <= d)
                             if (1.2*sphereRadius <= d)
-
                             {
-                                retval.Add(new seedPointModel(cvtpt, SeedTypeEnum.Void));
+                                bool isInsideptvRetractVoid = ptvRetractVoid.IsPointInsideSegment(cvtpt);
+                                if (isInsideptvRetractVoid)
+                                {
+                                    retval.Add(new seedPointModel(cvtpt, SeedTypeEnum.Void));
+                                }
+                                 //   retval.Add(new seedPointModel(cvtpt, SeedTypeEnum.Void));
                             }
                             //retval.Add(new seedPointModel(cvtpt, SeedTypeEnum.Sphere));
 
