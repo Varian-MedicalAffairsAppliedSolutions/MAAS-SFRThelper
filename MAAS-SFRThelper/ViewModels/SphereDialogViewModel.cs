@@ -678,17 +678,17 @@ namespace MAAS_SFRThelper.ViewModels
 
             // Base motif - 2 atoms per unit cell
             var atomFrac = new List<Vec3>()
-{
-    new Vec3(0.0, 0.0, 0.0),         // Atom at origin
-    new Vec3(1.0/3.0, 2.0/3.0, 0.5)  // Atom in upper layer
-};
+            {
+                new Vec3(0.0, 0.0, 0.0),         // Atom at origin
+                new Vec3(1.0/3.0, 2.0/3.0, 0.5)  // Atom in upper layer
+            };
 
             // Modified octahedral void positions
             var octaFrac = new List<Vec3>()
-{
-    new Vec3(0.5, 0.5, 0.25),    // Adjusted position
-    new Vec3(0.0, 0.0, 0.75)     // Adjusted position
-};
+            {
+                new Vec3(0.5, 0.5, 0.25),    // Adjusted position
+                new Vec3(0.0, 0.0, 0.75)     // Adjusted position
+            };
 
             Func<Vec3, Vec3> frac2cart = (f) =>
             {
@@ -1327,6 +1327,134 @@ namespace MAAS_SFRThelper.ViewModels
 
                         //}
 
+                        //if (isCVT3D)
+                        //{
+                        //    //var gridhex = BuildHexGrid(10.0, bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract, ptvRetractVoid);
+
+                        //    // make list of the points in gridhex_sph, gridhex_void
+                        //    List<Point3D> gridhexVoid = new List<Point3D>();
+                        //    Random rand = new Random();
+
+                        //    foreach (VVector pos in grid.Where(r => r.SeedType == SeedTypeEnum.Void).Select(r => r.Position))
+                        //    {
+                        //        gridhexVoid.Add(new Point3D(pos.x, pos.y, pos.z));
+                        //        //if (rand.Next(1, 10) % 2 == 0)
+                        //        //{
+                        //        //    gridhexVoid.Add(new Point3D(pos.x, pos.y, pos.z));
+                        //        //}
+
+                        //    }
+                        //    var cvt = new CVT3D(ptvRetractVoid.MeshGeometry, new CVTSettings(gridhexVoid, gridhexVoid.Count()));
+                        //    var cvtGenerators = cvt.CalculateGenerators();
+                        //    var retval = grid.Where(r => r.SeedType == SeedTypeEnum.Sphere).ToList();
+
+                        //    double d = 0;
+                        //    //check to make sure cvt spheres don't overlap
+                        //    //foreach (var i in cvtGenerators)
+                        //    foreach (var i in gridhexVoid)
+                        //    {
+
+                        //        var cvtpt = new VVector(i.X, i.Y, i.Z);
+
+                        //        int num_points = retval.Count();
+                        //        double[] dists = Enumerable.Repeat(1.0, num_points).ToArray();
+                        //        int j = 0;
+                        //        // foreach (int j = 0; j < num_points; j++)
+                        //        foreach (VVector pos in retval.Select(r => r.Position))
+                        //        {
+                        //            double dist = Math.Sqrt(
+                        //                Math.Pow(cvtpt[0] - pos.x, 2) +
+                        //                Math.Pow(cvtpt[1] - pos.y, 2) +
+                        //                Math.Pow(cvtpt[2] - pos.z, 2)
+                        //            );
+
+                        //            dists[j] = dist;
+                        //            j++;
+                        //        }
+
+                        //        if (num_points > 0)
+                        //        {
+                        //            d = dists.Min();
+                        //        }
+
+                        //        // Uncomment below if CVT uses random sampling to avoid spheres clubbing together
+
+                        //        // if (SpacingSelected.Value <= d)
+                        //        if (1.2 * sphereRadius <= d)
+                        //        {
+                        //            bool isInsideptvRetractVoid = ptvRetractVoid.IsPointInsideSegment(cvtpt);
+                        //            if (isInsideptvRetractVoid)
+                        //            {
+                        //                retval.Add(new seedPointModel(cvtpt, SeedTypeEnum.Void));
+                        //            }
+                        //            //   retval.Add(new seedPointModel(cvtpt, SeedTypeEnum.Void));
+                        //        }
+                        //        //retval.Add(new seedPointModel(cvtpt, SeedTypeEnum.Sphere));
+
+                        //    }
+
+                        //    grid = retval; // cvtGenerators.Select(p => new VVector(p.X, p.Y, p.Z)).ToList();
+
+                        //    //string structName = "Voids";
+                        //    int voidCount = 0;
+                        //    //var prevStruct = structureSet.Structures.FirstOrDefault(x => x.Id == structName);
+                        //    //if (prevStruct != null)
+                        //    //{
+                        //    //    structureSet.RemoveStructure(prevStruct);
+
+                        //    //}
+
+                        //    //var voidStructure = structureSet.AddStructure("CONTROL", structName);
+                        //    //voidStructure.ConvertToHighResolution(); // all structures are high res - if structures are made not hi-res comment this
+
+                        //    foreach (VVector ctr in grid.Where(g => g.SeedType == SeedTypeEnum.Void).Select(g => g.Position))
+                        //    {
+                        //        if (isPointInsideBBox(sphereBox, ctr))
+                        //        {
+
+                        //            Structure currentVoid = null;
+
+                        //            currentVoid = voidStructure;
+
+                        //            //var voidRadius = ((float)spacingSelected.Value - 2 * Radius) / 4;
+
+                        //            //if (voidRadius >= (float)Radius)
+                        //            //{
+                        //            //    voidRadius = (float)Radius;
+
+                        //            //}
+
+                        //            BuildSphere(currentVoid, ctr, voidRadius, sc.Image);
+
+                        //            // Crop to target
+                        //            currentVoid.SegmentVolume = currentVoid.SegmentVolume.And(target);
+
+                        //            voidStructure.SegmentVolume = voidStructure.Or(currentVoid.SegmentVolume);
+                        //            voidCount++;
+
+
+                        //            if (isCore)
+                        //            {
+                        //                Structure currentCore = null;
+                        //                currentCore = coreVoid;
+                        //                BuildSphere(currentCore, ctr, coreRadius, sc.Image);
+                        //                currentCore.SegmentVolume = currentCore.SegmentVolume.And(target);
+                        //                coreVoid.SegmentVolume = coreVoid.Or(currentCore.SegmentVolume);
+
+                        //            }
+
+                        //        }
+
+                        //    }
+                        //    //var voidFactor = (spacingSelected.Value - 2.0 * radius) / 2.0;
+                        //    //var voidStructureCVT = sc.StructureSet.AddStructure("CONTROL", "VoidCVT");
+                        //    //voidStructureCVT.Color = System.Windows.Media.Color.FromRgb(0, 255, 255);
+                        //    //voidStructureCVT.SegmentVolume = (target.LargeMargin(-1.75 * sphereRadius).And(structMain.LargeMargin(voidFactor)));
+                        //    //voidStructureCVT.SegmentVolume = voidStructureCVT.LargeMargin(-sphereRadius/4);
+                        //    Output += "\nVoidCVT has been created";
+                        //    // voidStructureL3.SegmentVolume = target.Margin(-1 * spacingSelected.Value / 2).Sub(structMain.Margin(1.2 * voidFactor));
+
+                        //}
 
                         if (isCVT3D)
                         {
@@ -1345,8 +1473,32 @@ namespace MAAS_SFRThelper.ViewModels
                                 //}
 
                             }
-                            var cvt = new CVT3D(ptvRetractVoid.MeshGeometry, new CVTSettings(gridhexVoid, gridhexVoid.Count()));
-                            var cvtGenerators = cvt.CalculateGenerators();
+
+                            List<Point3D> gridhexSph = new List<Point3D>();
+                            
+                            foreach (VVector pos in grid.Where(r => r.SeedType == SeedTypeEnum.Sphere).Select(r => r.Position))
+                            {
+                                gridhexSph.Add(new Point3D(pos.x, pos.y, pos.z));
+                                //if (rand.Next(1, 10) % 2 == 0)
+                                //{
+                                //    gridhexVoid.Add(new Point3D(pos.x, pos.y, pos.z));
+                                //}
+
+                            }
+                        
+                            // var cvt = new CVT3D(ptvRetractVoid.MeshGeometry, new CVTSettings(gridhexVoid, gridhexVoid.Count()));
+                            var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(
+                                                                            gridhexSph,
+                                                                            bounds.X + XShift,
+                                                                            bounds.SizeX,
+                                                                            bounds.Y + YShift,
+                                                                            bounds.SizeY,
+                                                                            z0,
+                                                                            bounds.SizeZ,
+                                                                            SpacingSelected.Value,
+                                                                            sphereRadius,
+                                                                            false, // Set this to false initially until the void calculation is fully working
+                                                                            gridhexSph.Count > 0 ? gridhexSph.Count : 32)); var cvtGenerators = cvt.CalculateGenerators();
                             var retval = grid.Where(r => r.SeedType == SeedTypeEnum.Sphere).ToList();
 
                             double d = 0;
@@ -1381,7 +1533,7 @@ namespace MAAS_SFRThelper.ViewModels
                                 // Uncomment below if CVT uses random sampling to avoid spheres clubbing together
 
                                 // if (SpacingSelected.Value <= d)
-                                if (1.2 * sphereRadius <= d)
+                                if (1.01 * sphereRadius <= d)
                                 {
                                     bool isInsideptvRetractVoid = ptvRetractVoid.IsPointInsideSegment(cvtpt);
                                     if (isInsideptvRetractVoid)
@@ -1398,16 +1550,7 @@ namespace MAAS_SFRThelper.ViewModels
 
                             //string structName = "Voids";
                             int voidCount = 0;
-                            //var prevStruct = structureSet.Structures.FirstOrDefault(x => x.Id == structName);
-                            //if (prevStruct != null)
-                            //{
-                            //    structureSet.RemoveStructure(prevStruct);
-
-                            //}
-
-                            //var voidStructure = structureSet.AddStructure("CONTROL", structName);
-                            //voidStructure.ConvertToHighResolution(); // all structures are high res - if structures are made not hi-res comment this
-
+                            
                             foreach (VVector ctr in grid.Where(g => g.SeedType == SeedTypeEnum.Void).Select(g => g.Position))
                             {
                                 if (isPointInsideBBox(sphereBox, ctr))
@@ -1416,14 +1559,6 @@ namespace MAAS_SFRThelper.ViewModels
                                     Structure currentVoid = null;
 
                                     currentVoid = voidStructure;
-
-                                    //var voidRadius = ((float)spacingSelected.Value - 2 * Radius) / 4;
-
-                                    //if (voidRadius >= (float)Radius)
-                                    //{
-                                    //    voidRadius = (float)Radius;
-
-                                    //}
 
                                     BuildSphere(currentVoid, ctr, voidRadius, sc.Image);
 
@@ -1447,15 +1582,11 @@ namespace MAAS_SFRThelper.ViewModels
                                 }
 
                             }
-                            //var voidFactor = (spacingSelected.Value - 2.0 * radius) / 2.0;
-                            //var voidStructureCVT = sc.StructureSet.AddStructure("CONTROL", "VoidCVT");
-                            //voidStructureCVT.Color = System.Windows.Media.Color.FromRgb(0, 255, 255);
-                            //voidStructureCVT.SegmentVolume = (target.LargeMargin(-1.75 * sphereRadius).And(structMain.LargeMargin(voidFactor)));
-                            //voidStructureCVT.SegmentVolume = voidStructureCVT.LargeMargin(-sphereRadius/4);
+                            
                             Output += "\nVoidCVT has been created";
-                            // voidStructureL3.SegmentVolume = target.Margin(-1 * spacingSelected.Value / 2).Sub(structMain.Margin(1.2 * voidFactor));
-
+                            
                         }
+
 
                         ProgressValue += 100 - ProgressValue;
                     }

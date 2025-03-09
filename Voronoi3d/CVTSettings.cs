@@ -23,6 +23,8 @@ namespace Voronoi3d
         public double Spacing { get; private set; }
         public double SphereRadius { get; private set; }
 
+        public bool VoidCalc { get; set; }
+
         public CVTSettings()
         {
             InitializeDefaults();
@@ -98,6 +100,30 @@ namespace Voronoi3d
             SizeZ = Zsize;
             Spacing = spacing;
             SphereRadius = rad;
+        }
+
+        public CVTSettings(List<Point3D> gridhexSph, double Xstart, double Xsize, double Ystart, double Ysize, double Zstart, double Zsize, double spacing, double rad, bool voidCalc, int n_generators)
+        {
+            InitializeDefaults(gridhexSph, Xstart, Xsize, Ystart, Ysize, Zstart, Zsize, spacing, rad, voidCalc, n_generators);
+        }
+        // Change this in CVTSettings.cs
+        private void InitializeDefaults(List<Point3D> gridhexSph, double Xstart, double Xsize, double Ystart, double Ysize, double Zstart, double Zsize, double spacing, double rad, bool voidCalc, int n_generators = 32)
+        {
+            NumberOfGenerators = n_generators;
+            NumberOfSamplingPoints = 3000;
+            SelectedSamplingMethod = RandomEngine.HEXGRID;
+            MaxNumberOfIterations = 1500;
+            StoppingCriterion = new CounterDecorator(new NoDiffAfterThreeIterationsStoppingCriterion());
+            StartX = Xstart;
+            SizeX = Xsize;
+            StartY = Ystart;
+            SizeY = Ysize;
+            StartZ = Zstart;
+            SizeZ = Zsize;
+            Spacing = spacing;
+            SphereRadius = rad;
+            VoidCalc = voidCalc; // Fixed: Now properly sets voidCalc from parameter
+            SphereLocations = gridhexSph; // Ensure sphere locations are set
         }
 
         public static CVTSettings DefaultSettings()
