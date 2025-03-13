@@ -360,7 +360,7 @@ namespace MAAS_SFRThelper.ViewModels
 
             // Set valid spacings based on CT img z resolution
             // ValidSpacings = new List<Spacing>();
-            for (int i = 1; i < 40; i++) // changed 30 to 40 to include 30 for WashU method @ 7/5 - Matt
+            for (int i = 1; i < 80; i++) // changed to 80 to allow larger spacings with small slice thicknesses (0.625mm slices gives up to 50mm)
             {
                 ValidSpacings.Add(new Spacing(spacing * i));
             }
