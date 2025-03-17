@@ -115,21 +115,7 @@ namespace MAAS_SFRThelper.ViewModels
             set
             {
                 SetProperty(ref isHex, value);
-                /* if (isHex)
-                 {
-                     createNullsVoids = false;
-                     nullVoidsEnabled = false;
-                 }
-                 else
-                 {
-                     nullVoidsEnabled = true;
-                 }*/
-                //// MessageBox.Show("IsHex" + IsHex);
-                //if (IsHex)
-                //{
-                //    IsRect = false;
-                //    UpdateValidSpacings();
-                //}
+                
             }
         }
 
@@ -141,11 +127,7 @@ namespace MAAS_SFRThelper.ViewModels
             set
             {
                 SetProperty(ref isRect, value);
-                // MessageBox.Show("IsRect" + IsRect);
-                //if (IsRect){
-                //    IsHex = false;
-                //    UpdateValidSpacings();
-                //}                
+                                
             }
         }
 
@@ -159,20 +141,14 @@ namespace MAAS_SFRThelper.ViewModels
                 if (IsCVT3D)
                 {
                     LSFVisibility = false;
-                    // createNullsVoids = false;
-                    // nullVoidsEnabled = false;
+                    
                 }
                 else
                 {
                     LSFVisibility = true;
                     // nullVoidsEnabled = true;
                 }
-                //// MessageBox.Show("IsHex" + IsHex);
-                //if (IsHex)
-                //{
-                //    IsRect = false;
-                //    UpdateValidSpacings();
-                //}
+               
             }
         }
         private bool _LSFVisibility;
@@ -182,27 +158,6 @@ namespace MAAS_SFRThelper.ViewModels
             set { SetProperty(ref _LSFVisibility, value); }
         }
 
-        //private Visibility _lsfVisibility; // = Visibility.Hidden;
-        //public Visibility LSFVisibility
-        //{
-        //    get => _lsfVisibility;
-        //    set
-        //    {
-        //        if (IsCVT3D)
-        //        {
-        //            _lsfVisibility = Visibility.Collapsed;
-
-        //        }
-        //        else
-        //        {
-        //            _lsfVisibility = Visibility.Visible;
-        //            // OnPropertyChanged(nameof(LSFVisibility)); // Notify the UI
-
-        //        }
-
-        //    }
-
-        //}
 
         private double _LateralScalingFactor;
         public double LateralScalingFactor
@@ -271,10 +226,7 @@ namespace MAAS_SFRThelper.ViewModels
 
         // private List<Spacing> validSpacings;
         public ObservableCollection<Spacing> ValidSpacings { get; set; }
-        //{
-        //    get { return validSpacings; }
-        //    set { SetProperty(ref validSpacings, value); }
-        //}
+        
 
         private Spacing spacingSelected;
         public Spacing SpacingSelected
@@ -415,31 +367,6 @@ namespace MAAS_SFRThelper.ViewModels
             return radius > 0 && spacingSelected != null && radius <= spacingSelected.Value / 2;
 
         }
-
-        /*
-        private void UpdateValidSpacings()
-        {
-            ValidSpacings.Clear();
-            var spacing = scriptContext.Image.ZRes;
-             for (int i = 1; i < 60; i++) // changed 30 to 40 to include 30 for WashU method @ 7/5 - Matt
-                {
-                if (IsHex)
-                {
-                   // ValidSpacings.Add(new Spacing(spacing * Math.Sqrt(3) * i)); // this actually does not make sense because Zres determines Zcoords, and these should not have a sqrt 3
-                   ValidSpacings.Add(new Spacing(spacing * i));
-                }
-                if (IsRect)
-                {
-                    ValidSpacings.Add(new Spacing(spacing * i));
-
-                }
-
-            }
-      
-             // Default to first value
-             SpacingSelected = ValidSpacings.FirstOrDefault();
-        }
-        */
 
         private void AddContoursToMain(int zSize, ref Structure PrimaryStructure, ref Structure SecondaryStructure)
         {
@@ -1225,26 +1152,7 @@ namespace MAAS_SFRThelper.ViewModels
                                 }
                             }
 
-                            //var voidFactor = (spacingSelected.Value - 2.0 * radius) / 2.0;
-                            //Output += "\nCreating nulls and voids ... ";
-                            //Output += $"\nVoidFactor = {voidFactor}";
-
-                            //var voidStructureL1 = sc.StructureSet.AddStructure("CONTROL", "VoidL1");
-                            //voidStructureL1.SegmentVolume = structMain.LargeMargin(voidFactor).And(target.LargeMargin(-1 * sphereRadius/2));
-                            //voidStructureL1.SegmentVolume = target.LargeMargin(-1 * sphereRadius/2).Sub(voidStructureL1.SegmentVolume);
-                            //Output += "\nL1 has been created";
-
-                            //var voidStructureL2 = sc.StructureSet.AddStructure("CONTROL", "VoidL2");
-                            //voidStructureL2.Color = System.Windows.Media.Color.FromRgb(160, 32, 240);
-                            //voidStructureL2.SegmentVolume = target.LargeMargin(-1.75 * sphereRadius).And(structMain.LargeMargin(voidFactor));
-                            //// Output += $"\nVoid Stucture L2 AND volume = {voidStructureL2.Volume}";
-                            //voidStructureL2.SegmentVolume = target.LargeMargin(-1.75 * sphereRadius).Sub(voidStructureL2.SegmentVolume);
-                            //Output += "\nL2 has been created";
-
-                            //var voidStructureL3 = sc.StructureSet.AddStructure("CONTROL", "VoidL3");
-                            //voidStructureL3.Color = System.Windows.Media.Color.FromRgb(0, 255, 255);
-                            //voidStructureL3.SegmentVolume = voidStructureL2.LargeMargin(-sphereRadius / 4);
-
+                            
                             Output += "\n Voids have been created";
                             // voidStructureL3.SegmentVolume = target.Margin(-1 * spacingSelected.Value / 2).Sub(structMain.Margin(1.2 * voidFactor));
 
@@ -1398,67 +1306,8 @@ namespace MAAS_SFRThelper.ViewModels
 
                     }
                 }
-                //{
-                //    var voidFactor = (spacingSelected.Value - 2.0 * radius) / 2.0;
-                //    Output += "\nCreating nulls and voids ... ";
-                //    Output += $"\nVoidFactor = {voidFactor}";
-
-                //    var voidStructureL1 = sc.StructureSet.AddStructure("CONTROL", "VoidL1");
-                //    voidStructureL1.SegmentVolume = structMain.LargeMargin(0.8 * voidFactor).And(target.LargeMargin(-1 * sphereRadius / 2));
-                //    voidStructureL1.SegmentVolume = target.LargeMargin(-1 * sphereRadius / 2).Sub(voidStructureL1.SegmentVolume);
-                //    Output += "\nL1 has been created";
-
-                //    var voidStructureL2 = sc.StructureSet.AddStructure("CONTROL", "VoidL2");
-                //    voidStructureL2.Color = System.Windows.Media.Color.FromRgb(160, 32, 240);
-                //    voidStructureL2.SegmentVolume = target.LargeMargin(-1.75 * sphereRadius).And(structMain.LargeMargin(voidFactor));
-                //    // Output += $"\nVoid Stucture L2 AND volume = {voidStructureL2.Volume}";
-                //    voidStructureL2.SegmentVolume = target.LargeMargin(-1.75 * sphereRadius).Sub(voidStructureL2.SegmentVolume);
-                //    Output += "\nL2 has been created";
-
-                //    var voidStructureL3 = sc.StructureSet.AddStructure("CONTROL", "VoidL3");
-                //    voidStructureL3.Color = System.Windows.Media.Color.FromRgb(0, 255, 255);
-                //    voidStructureL3.SegmentVolume = voidStructureL2.LargeMargin(-sphereRadius / 4);
-                //    Output += "\nL3 has been created";
-                //    // voidStructureL3.SegmentVolume = target.Margin(-1 * spacingSelected.Value / 2).Sub(structMain.Margin(1.2 * voidFactor));
-
-                //    ProgressValue += 5.0;
-                //}
+                
                 Output += "\nCreated spheres. Please close the tool to view";
-
-                // var volThresh = singleVols.Max() * (VThresh / 100);
-
-
-
-                //foreach (string id_ in singleIds.Distinct()) // distinct does 
-                //{
-                //    // delete small spheres
-                //    var singleSphere = scriptContext.StructureSet.Structures.Where(x => x.Id == id_).FirstOrDefault();
-                //    if (singleSphere != null)
-                //    {
-                //        if (singleSphere.Volume <= volThresh || singleSphere.Volume == 0)
-                //        {
-                //            // Delete
-                //            //MessageBox.Show($"Deleted sphere based on volume threshold: {singleSphere.Volume} >= {volThresh}");
-                //            scriptContext.StructureSet.RemoveStructure(singleSphere);
-                //            continue;
-                //        }
-                //    }
-
-                //    // If here sphere is big enough
-                //    // Set the lattice struct segment = lattice struct segment.
-                //    // TODO: try other boolean ops to create mainStructure
-
-                //    //structMain.SegmentVolume = structMain.SegmentVolume.Or(singleSphere); // OLD method
-                //    AddContoursToMain(ref structMain, ref singleSphere);
-
-                //    // If delete individual delete 
-                //    if (!createSingle)
-                //    {
-                //        scriptContext.StructureSet.RemoveStructure(singleSphere);
-                //    }
-
-
-                //}
 
                 // Delete the autogenerated target if it exists
                 if (deleteAutoTarget)
@@ -1688,18 +1537,6 @@ namespace MAAS_SFRThelper.ViewModels
             // Matt email 7/15/24
             // https://github.com/VarianAPIs/Varian-Code-Samples/blob/master/webinars%20%26%20workshops/06%20Apr%202018%20Webinar/Eclipse%20Scripting%20API/Projects/CreateOptStructures/CreateOptStructures.cs
 
-
-            // Retrieve the structure set from the plan
-            // var plan = scriptContext.PlanSetup;
-            // var structureSet = plan.StructureSet;
-
-            // Define the sphere radius for the margin
-            // double sphereRadius = Radius; // Change this value as needed
-
-            // Make shrunk volume structure
-            // Structure ptv = structureSet.Structures.FirstOrDefault(x => x.Id == "PTV_High");
-            // Structure ptvRetract = structureSet.AddStructure("PTV", "ptvRetract");
-            // ptvRetract.SegmentVolume = ptv.Margin(-1.25*sphereRadius);
 
             // Build spheres
             BuildSpheres(true);
