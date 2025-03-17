@@ -1,4 +1,6 @@
-﻿using Voronoi3d.RandomEngines;
+﻿using System.Collections.Generic;
+using System.Windows.Media.Media3D;
+using Voronoi3d.RandomEngines;
 using Voronoi3d.StoppingCriteria;
 
 namespace Voronoi3d
@@ -10,6 +12,18 @@ namespace Voronoi3d
         public RandomEngine SelectedSamplingMethod { get; protected set; }
         public int MaxNumberOfIterations { get; protected set; }
         public IStoppingCriterion StoppingCriterion { get; protected set; }
+        public List<Point3D> SphereLocations { get; private set; }
+        public List<Point3D> VoidLocations { get; private set; }
+        public double StartX { get; private set; }
+        public double SizeX { get; private set; }
+        public double StartY { get; private set; }
+        public double SizeY { get; private set; }
+        public double StartZ { get; private set; }
+        public double SizeZ { get; private set; }
+        public double Spacing { get; private set; }
+        public double SphereRadius { get; private set; }
+
+        public bool VoidCalc { get; set; }
 
         public CVTSettings()
         {
@@ -18,17 +32,98 @@ namespace Voronoi3d
 
         public CVTSettings(int n_generators)
         {
-              InitializeDefaults(n_generators); 
+            InitializeDefaults(n_generators);
         }
 
         private void InitializeDefaults(int n_generators = 32)
         {
-            
+
             NumberOfGenerators = n_generators;
             NumberOfSamplingPoints = 3000;
-            SelectedSamplingMethod = RandomEngine.HALTONSEQUENCE;
+            SelectedSamplingMethod = RandomEngine.HEXGRID;
             MaxNumberOfIterations = 1500;
             StoppingCriterion = new CounterDecorator(new NoDiffAfterThreeIterationsStoppingCriterion());
+        }
+
+        //public CVTSettings(List<Point3D> gridhexSph, List<Point3D> gridhexVoid, int n_generators)
+        //{
+        //    InitializeDefaults(gridhexSph, gridhexVoid, n_generators);
+        //}
+
+        //private void InitializeDefaults(List<Point3D> gridhexSph, List<Point3D> gridhexVoid, int n_generators = 32)
+        //{
+
+        //    NumberOfGenerators = n_generators;
+        //    NumberOfSamplingPoints = 3000;
+        //    SelectedSamplingMethod = RandomEngine.HEXGRID;
+        //    MaxNumberOfIterations = 1500;
+        //    StoppingCriterion = new CounterDecorator(new NoDiffAfterThreeIterationsStoppingCriterion());
+        //    SphereLocations = gridhexSph;
+        //    VoidLocations = gridhexVoid;
+        //}
+
+        public CVTSettings(List<Point3D> gridhexSph, int n_generators)
+        {
+            InitializeDefaults(gridhexSph, n_generators);
+        }
+
+        private void InitializeDefaults(List<Point3D> gridhexSph, int n_generators = 32)
+        {
+
+            NumberOfGenerators = n_generators;
+            NumberOfSamplingPoints = 3000;
+            SelectedSamplingMethod = RandomEngine.HEXGRID;
+            MaxNumberOfIterations = 1500;
+            StoppingCriterion = new CounterDecorator(new NoDiffAfterThreeIterationsStoppingCriterion());
+            SphereLocations = gridhexSph;
+            
+        }
+
+        public CVTSettings(double Xstart, double Xsize, double Ystart, double Ysize, double Zstart, double Zsize, double spacing, double rad, int n_generators)
+        {
+            InitializeDefaults(Xstart, Xsize, Ystart, Ysize, Zstart, Zsize, spacing, rad, n_generators);
+        }
+
+        private void InitializeDefaults(double Xstart, double Xsize, double Ystart, double Ysize, double Zstart, double Zsize, double spacing, double rad, int n_generators = 32)
+        {
+
+            NumberOfGenerators = n_generators;
+            NumberOfSamplingPoints = 3000;
+            SelectedSamplingMethod = RandomEngine.HEXGRID;
+            MaxNumberOfIterations = 1500;
+            StoppingCriterion = new CounterDecorator(new NoDiffAfterThreeIterationsStoppingCriterion());
+            StartX = Xstart;
+            SizeX = Xsize;
+            StartY = Ystart;
+            SizeY = Ysize;
+            StartZ = Zstart;
+            SizeZ = Zsize;
+            Spacing = spacing;
+            SphereRadius = rad;
+        }
+
+        public CVTSettings(List<Point3D> gridhexSph, double Xstart, double Xsize, double Ystart, double Ysize, double Zstart, double Zsize, double spacing, double rad, bool voidCalc, int n_generators)
+        {
+            InitializeDefaults(gridhexSph, Xstart, Xsize, Ystart, Ysize, Zstart, Zsize, spacing, rad, voidCalc, n_generators);
+        }
+        // Change this in CVTSettings.cs
+        private void InitializeDefaults(List<Point3D> gridhexSph, double Xstart, double Xsize, double Ystart, double Ysize, double Zstart, double Zsize, double spacing, double rad, bool voidCalc, int n_generators = 32)
+        {
+            NumberOfGenerators = n_generators;
+            NumberOfSamplingPoints = 3000;
+            SelectedSamplingMethod = RandomEngine.HEXGRID;
+            MaxNumberOfIterations = 1500;
+            StoppingCriterion = new CounterDecorator(new NoDiffAfterThreeIterationsStoppingCriterion());
+            StartX = Xstart;
+            SizeX = Xsize;
+            StartY = Ystart;
+            SizeY = Ysize;
+            StartZ = Zstart;
+            SizeZ = Zsize;
+            Spacing = spacing;
+            SphereRadius = rad;
+            VoidCalc = voidCalc; // Fixed: Now properly sets voidCalc from parameter
+            SphereLocations = gridhexSph; // Ensure sphere locations are set
         }
 
         public static CVTSettings DefaultSettings()
