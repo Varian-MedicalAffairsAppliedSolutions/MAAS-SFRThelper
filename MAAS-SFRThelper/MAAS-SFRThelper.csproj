@@ -170,9 +170,7 @@
       <Name>Voronoi3d</Name>
     </ProjectReference>
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="docs\" />
-  </ItemGroup>
+  <ItemGroup />
   <ItemGroup>
     <Resource Include="Resources\qrcode.bmp" />
   </ItemGroup>

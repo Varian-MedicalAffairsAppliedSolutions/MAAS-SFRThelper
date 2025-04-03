@@ -23,7 +23,7 @@ namespace VMS.TPS
         // Define the project information for EULA verification
         private const string PROJECT_NAME = "SFRThelper";
         private const string PROJECT_VERSION = "1.0.0";
-        private const string LICENSE_URL = "https://github.com/Varian-MedicalAffairsAppliedSolutions/MAAS-SFRThelper";
+        private const string LICENSE_URL = "https://varian-medicalaffairsappliedsolutions.github.io/MAAS-SFRThelper/";
         private const string GITHUB_URL = "https://github.com/Varian-MedicalAffairsAppliedSolutions/MAAS-SFRThelper";
 
         public Script()
