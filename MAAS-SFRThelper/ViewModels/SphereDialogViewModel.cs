@@ -597,10 +597,18 @@ namespace MAAS_SFRThelper.ViewModels
             var c = c_over_a * ipA;               // out of plane spacing
 
             // Lattice vectors
-            var a1 = new Vec3(ipA, 0.0, 0.0);
-            var a2 = new Vec3(-0.5 * ipA, (Math.Sqrt(3) / 2) * ipA, 0.0);
-            // Modified a2void to maintain hexagonal symmetry while being offset
-            var a2void = new Vec3(-0.5 * ipA, (Math.Sqrt(3) / 2) * ipA, 0.0);
+            //var a1 = new Vec3(ipA, 0.0, 0.0);
+            //var a2 = new Vec3(-0.5 * ipA, (Math.Sqrt(3) / 2) * ipA, 0.0);
+            //// Modified a2void to maintain hexagonal symmetry while being offset
+            //var a2void = new Vec3(-0.5 * ipA, (Math.Sqrt(3) / 2) * ipA, 0.0);
+            //var a3 = new Vec3(0.0, 0.0, c);
+
+            // revised above to do lateral scaling
+            // Lattice vectors with lateral scaling
+            var a1 = new Vec3(ipA * LateralScalingFactor, 0.0, 0.0);
+            var a2 = new Vec3(-0.5 * ipA * LateralScalingFactor, (Math.Sqrt(3) / 2) * ipA * LateralScalingFactor, 0.0);
+            var a2void = new Vec3(-0.5 * ipA * LateralScalingFactor, (Math.Sqrt(3) / 2) * ipA * LateralScalingFactor, 0.0);
+            // No scaling for a3 since it's the vertical component
             var a3 = new Vec3(0.0, 0.0, c);
 
             // Base motif - 2 atoms per unit cell
@@ -622,18 +630,30 @@ namespace MAAS_SFRThelper.ViewModels
                 return (f.X * a1) + (f.Y * a2) + (f.Z * a3);
             };
 
+            //Func<Vec3, Vec3> frac2cartVoid = (f) =>
+            //{
+            //    var basePos = (f.X * a1) + (f.Y * a2void) + (f.Z * a3);
+            //    // Add slight offset to position voids correctly
+            //    return basePos + new Vec3(ipA * 0.25, ipA * 0.0, 0.0);
+            //};
+
+            // revised above to incorporate lateral scaling for voids
             Func<Vec3, Vec3> frac2cartVoid = (f) =>
             {
                 var basePos = (f.X * a1) + (f.Y * a2void) + (f.Z * a3);
                 // Add slight offset to position voids correctly
-                return basePos + new Vec3(ipA * 0.25, ipA * 0.0, 0.0);
+                // The offset in X and Y should also be scaled
+                return basePos + new Vec3(ipA * 0.25 * LateralScalingFactor, ipA * 0.0, 0.0);
             };
 
             var atoms = new List<Vec3>();
             var voidVec = new List<Vec3>();
 
-            var nx = (int)(Math.Ceiling(Xsize / ipA) + 2);
-            var ny = (int)(Math.Ceiling(Ysize / (Math.Sqrt(3) / 2) * ipA) + 2);
+            //var nx = (int)(Math.Ceiling(Xsize / ipA) + 2);
+            //var ny = (int)(Math.Ceiling(Ysize / (Math.Sqrt(3) / 2) * ipA) + 2);
+            // revised above for lateral scaling
+            var nx = (int)(Math.Ceiling(Xsize / (ipA * LateralScalingFactor)) + 2);
+            var ny = (int)(Math.Ceiling(Ysize / ((Math.Sqrt(3) / 2) * ipA * LateralScalingFactor)) + 2);
             var nz = (int)(Math.Ceiling(Zsize / c) + 2);
             Vec3 globalOffset = new Vec3(Xstart, Ystart, Zstart);
 
