@@ -6,7 +6,7 @@ on:
       dateInput:
         description: 'Expiration Date'
         required: true
-        default: '1/1/2024'
+        default: '6/1/2025'
 
 jobs:
   build:
@@ -20,13 +20,19 @@ jobs:
       BUILD_NUMBER: ${{ github.run_number }}
 
     steps:
+    - name: Get Current Date
+      id: currentDate
+      uses: Kaven-Universe/github-action-current-date-time@v1
+      with:
+        format: "MM/DD/YYYY"
+
     - name: Checkout
       uses: actions/checkout@v3
       with:
         fetch-depth: 0
 
     - name: Setup MSBuild
-      uses: microsoft/setup-msbuild@v1
+      uses: microsoft/setup-msbuild@v2
 
     - name: Navigate to Workspace
       run: cd $GITHUB_WORKSPACE
@@ -55,7 +61,7 @@ jobs:
       run: nuget install ${{ env.PROJECT_ROOT }}/packages.config -OutputDirectory packages
 
     - name: Add VIC GitHub NuGet repository
-      run: nuget source add
+      run: nuget source add `
         -Name github `
         -Source "https://nuget.pkg.github.com/Varian-MedicalAffairsAppliedSolutions/index.json" `
         -UserName craman96 `
@@ -85,7 +91,7 @@ jobs:
         "NORMALIZED_FILE_PATH=$($normalizedFilePath)" >> $env:GITHUB_OUTPUT
     
     - name: Create Release
-      uses: softprops/action-gh-release@v0.1.13
+      uses: softprops/action-gh-release@v2.0.9
       with:
         name: ${{env.PROJECT_NAME}}${{ steps.update_assembly_info.outputs.RELEASE_NAME }}-EclipseV16.1
         tag_name: ${{env.PROJECT_NAME}}${{ steps.update_assembly_info.outputs.RELEASE_NAME }}-EclipseV16.1
@@ -95,5 +101,5 @@ jobs:
         body: |
           This is an official release of the **`${{ env.PROJECT_NAME }}`** project.
           Supported Eclipse version: `v16.1`.
-          The generated dll is valid until `${{ github.event.inputs.dateInput }}`.
+          The generated dll is valid until `${{ github.event.inputs.dateInput }}`, and generated on `${{ steps.currentDate.outputs.time }}`.
         files: ${{ steps.zip_release.outputs.NORMALIZED_FILE_PATH }}

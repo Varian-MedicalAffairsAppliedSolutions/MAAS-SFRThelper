@@ -14,7 +14,8 @@ using VMS.TPS.Common.Model.API;
 [assembly: AssemblyCopyright("Copyright ©  2021")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
-[assembly: AssemblyExpirationDate("07/31/2025")]
+[assembly: AssemblyExpirationDate("06/30/2025")]
+
 
 
 // Setting ComVisible to false makes the types in this assembly not visible
