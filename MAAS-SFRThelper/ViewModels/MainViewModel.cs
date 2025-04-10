@@ -20,6 +20,7 @@ namespace MAAS_SFRThelper.ViewModels
             set { SetProperty(ref windowTitle, value); }
         }
 
+        public ScartViewModel ScartViewModel { get; }
         public OptimizationViewModel OptimizationViewModel { get; }
         internal EvaluationViewModel EvaluationViewModel { get; }
 
@@ -33,6 +34,7 @@ namespace MAAS_SFRThelper.ViewModels
 
         public MainViewModel(EsapiWorker esapi)
         {
+            ScartViewModel = new ScartViewModel(esapi);
             OptimizationViewModel = new OptimizationViewModel(esapi);
             EvaluationViewModel = new EvaluationViewModel(esapi);
             WindowTitle = AppConfig.GetValueByKey("ValidForClinicalUse") == "true" ? "MAAS-SFRTHelper" : "MAAS-SFRTHelper  \t NOT VALIDATED FOR CLINICAL USE";
