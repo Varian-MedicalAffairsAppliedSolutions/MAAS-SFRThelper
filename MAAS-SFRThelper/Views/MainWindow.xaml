@@ -18,15 +18,14 @@
                     <local:ScartView DataContext="{Binding ScartViewModel}"/>
                 </TabItem>
                 <TabItem Name="RapidRodsTab" Header="RapidRods" Style="{x:Null}"/>
-               
+                <TabItem Header="Evaluation" Style="{x:Null}" >
+                    <local:EvaluationView DataContext="{Binding EvaluationViewModel}"/>
+                </TabItem>
                 <TabItem Header="Optimization" Style="{x:Null}" Visibility="Hidden" >
                     <local:OptimizationView DataContext="{Binding OptimizationViewModel}" />
                     
                 </TabItem>
-                <TabItem Header="Evaluation" Style="{x:Null}"  Visibility="Hidden" >
-                    <local:EvaluationView DataContext="{Binding EvaluationViewModel}"/>
-                </TabItem>
-               
+                               
             </TabControl>
             
             
