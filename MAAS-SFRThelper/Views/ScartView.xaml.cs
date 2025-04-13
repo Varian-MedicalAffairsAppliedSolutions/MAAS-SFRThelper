@@ -15,12 +15,14 @@ using System.Windows.Shapes;
 
 namespace MAAS_SFRThelper.Views
 {
-    public partial class EvaluationView : UserControl
+    /// <summary>
+    /// Interaction logic for ScartView.xaml
+    /// </summary>
+    public partial class ScartView : UserControl
     {
-        public EvaluationView()
+        public ScartView()
         {
             InitializeComponent();
         }
     }
 }
-

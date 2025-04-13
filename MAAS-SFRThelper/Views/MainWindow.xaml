@@ -14,15 +14,21 @@
             </Grid.RowDefinitions>
             <TabControl>
                 <TabItem Name="SphereLatticeTab" Header="SphereLattice" Style="{x:Null}"/>
+                <TabItem Header="SCART" Style="{x:Null}" >
+                    <local:ScartView DataContext="{Binding ScartViewModel}"/>
+                </TabItem>
                 <TabItem Name="RapidRodsTab" Header="RapidRods" Style="{x:Null}"/>
+                <TabItem Header="Evaluation" Style="{x:Null}" >
+                    <local:EvaluationView DataContext="{Binding EvaluationViewModel}"/>
+                </TabItem>
                 <TabItem Header="Optimization" Style="{x:Null}" Visibility="Hidden" >
                     <local:OptimizationView DataContext="{Binding OptimizationViewModel}" />
                     
                 </TabItem>
-                <TabItem Header="Evaluation" Style="{x:Null}"  Visibility="Hidden" >
-                    <local:EvaluationView DataContext="{Binding EvaluationViewModel}"/>
-                </TabItem>
+                               
             </TabControl>
+            
+            
 
             <TextBlock Grid.Row="1" Name="Footer" Background="PaleVioletRed">
                 <Label Margin="0"><Hyperlink NavigateUri="http://medicalaffairs.varian.com/download/VarianLUSLA.pdf" RequestNavigate="Hyperlink_RequestNavigate">

@@ -643,7 +643,7 @@ namespace MAAS_SFRThelper.ViewModels
                 var basePos = (f.X * a1) + (f.Y * a2void) + (f.Z * a3);
                 // Add slight offset to position voids correctly
                 // The offset in X and Y should also be scaled
-                return basePos + new Vec3(ipA * 0.25 * LateralScalingFactor, ipA * 0.0, 0.0);
+                return basePos + new Vec3(ipA * 0.25 * LateralScalingFactor, ipA * 0.0, 0.0); 
             };
 
             var atoms = new List<Vec3>();
