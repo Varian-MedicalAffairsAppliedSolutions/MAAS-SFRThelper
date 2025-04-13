@@ -15,9 +15,6 @@ using System.Windows.Shapes;
 
 namespace MAAS_SFRThelper.Views
 {
-    /// <summary>
-    /// Interaction logic for EvaluationView.xaml
-    /// </summary>
     public partial class EvaluationView : UserControl
     {
         public EvaluationView()
@@ -26,3 +23,4 @@ namespace MAAS_SFRThelper.Views
         }
     }
 }
+
