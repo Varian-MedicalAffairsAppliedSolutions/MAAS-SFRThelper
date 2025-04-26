@@ -54,10 +54,57 @@ namespace MAAS_SFRThelper.ViewModels
 		public double DosePerFraction
 		{
 			get { return _dosePerFraction; }
-            set { SetProperty(ref _dosePerFraction, value); }
+            set { SetProperty(ref _dosePerFraction, value);
+
+                _esapiWorker.Run(sc =>
+                {
+                    if (NumberOfFractions != 0)
+                    {
+                        ShrinkFactor = CalculateShrinkPercentage();
+                        UpdateTotalDose();
+                    }
+
+                });
+                //if (NumberOfFractions != 0)
+                //{
+                //    ShrinkFactor = CalculateShrinkPercentage();
+                //}
+
+            }
         }
 
-        public List<int> Fractions { get; set; }
+        private double _shrinkFactor;
+
+        public double ShrinkFactor
+        {
+            get { return _shrinkFactor; }
+            set { SetProperty(ref _shrinkFactor, value); }
+        }
+
+        private bool _overrideChecked;
+
+        public bool OverrideChecked
+        {
+            get { return _overrideChecked; }
+            set { SetProperty(ref _overrideChecked, value); }
+        }
+
+        private string _doseUnit;
+
+        public string DoseUnit
+        {
+            get { return _doseUnit; }
+            set { SetProperty(ref _doseUnit, value); }
+        }
+
+        private string _totalDose;
+        public string TotalDose
+        {
+            get { return _totalDose; }
+            set { SetProperty(ref _totalDose, value); }
+        }
+
+        public ObservableCollection<int> Fractions { get; set; }
 
 		private int _numberOfFractions;
         private StructureSet _structureSet;
@@ -67,7 +114,19 @@ namespace MAAS_SFRThelper.ViewModels
         public int NumberOfFractions
 		{
 			get { return _numberOfFractions; }
-            set { SetProperty(ref _numberOfFractions, value); }
+            set { SetProperty(ref _numberOfFractions, value);
+                                
+                if (NumberOfFractions != 0 && DosePerFraction != 0)
+
+                {
+                    _esapiWorker.Run(sc =>
+                    {
+                        ShrinkFactor = CalculateShrinkPercentage();
+                        UpdateTotalDose();
+                    });
+                }
+
+            }
         }
 
 		public DelegateCommand GenerateSTV {  get; set; }
@@ -79,21 +138,58 @@ namespace MAAS_SFRThelper.ViewModels
             {
                 _structureSet = sc.StructureSet;
                 _plan = sc.PlanSetup;
+
+                if (_plan != null)
+                {
+                    DoseUnit = _plan.TotalDose.UnitAsString;
+                }
+                else
+                {
+                    if (_structureSet != null)
+                    {
+                        if (_structureSet.Patient.Courses.Any())
+                        {
+                            foreach (var course in _structureSet.Patient.Courses)
+                            {
+                                if (course.PlanSetups.Any())
+                                {
+                                    DoseUnit = course.PlanSetups.First().TotalDose.UnitAsString;
+                                }
+                            }
+                        }
+                    }
+                }
+
             });
 
             Structures = new ObservableCollection<string>();
             BindingOperations.EnableCollectionSynchronization(Structures, this);
-            Fractions = new List<int>() {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+            Fractions = new ObservableCollection<int>() {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+            BindingOperations.EnableCollectionSynchronization(Fractions, this);
             InfMargins = new List<int>() { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20};
             SupMargins = new List<int>() { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20};
 
             InfMargin = 5;
             SupMargin = 5;
-
+            
             SetPlanProperties();
 			SetStructures();
             GenerateSTV = new DelegateCommand(CreateSTV);
 				
+        }
+
+        // Update total dose
+        private void UpdateTotalDose()
+        {
+            if (NumberOfFractions > 0 && DosePerFraction > 0)
+            {
+                double total = DosePerFraction * NumberOfFractions;
+                TotalDose = $"{total:F1} {DoseUnit}";
+            }
+            else
+            {
+                TotalDose = "N/A";
+            }
         }
 
         private void CreateSTV()
@@ -104,8 +200,8 @@ namespace MAAS_SFRThelper.ViewModels
                 {
                     sc.Patient.BeginModifications();
                     Structure gtv = GetGtvFromId();
-                    double shrink = CalculateShrinkPercentage();
-                    Structure stv = CreateSTVStructure(gtv, shrink);
+                    // ShrinkFactor = CalculateShrinkPercentage();
+                    Structure stv = CreateSTVStructure(gtv);
 
                 });
             }
@@ -137,7 +233,7 @@ namespace MAAS_SFRThelper.ViewModels
 
         private void SetPlanProperties()
         {
-            _esapiWorker.Run(sc =>
+            _esapiWorker.RunWithWait(sc =>
             {
                 if (_plan != null)
                 {
@@ -155,6 +251,9 @@ namespace MAAS_SFRThelper.ViewModels
                         NumberOfFractions = _plan.NumberOfFractions.Value;
                     }
                     else { NumberOfFractions = 1; }
+
+                    // Initialize TotalDose
+                    UpdateTotalDose();
                 }
             });
         }
@@ -180,7 +279,7 @@ namespace MAAS_SFRThelper.ViewModels
             return ratio;
         }
 
-        private Structure CreateSTVStructure(Structure gtvStructure, double shrinkPercentage)
+        private Structure CreateSTVStructure(Structure gtvStructure)
         {
             // Create new structure for STV
             string stvId = GetUniqueStructureId(_structureSet, "STV");
@@ -321,7 +420,7 @@ namespace MAAS_SFRThelper.ViewModels
                 foreach (var polarPoint in polarPoints)
                 {
                     double theta = polarPoint.Item1;
-                    double rho = polarPoint.Item2 * shrinkPercentage; // Apply shrinkage
+                    double rho = polarPoint.Item2 * ShrinkFactor; // Apply shrinkage
 
                     // Convert back to Cartesian
                     double newX = centroidX + rho * Math.Cos(theta);
