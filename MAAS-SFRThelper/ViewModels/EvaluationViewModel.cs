@@ -681,6 +681,36 @@ namespace MAAS_SFRThelper.ViewModels
             set { SetProperty(ref _outputLog, value); }
         }
 
+        //IsIsocenterMethodSelected
+
+        private bool _isIsocenterMethodSelected;
+
+        public bool IsIsocenterMethodSelected
+        {
+            get { return _isIsocenterMethodSelected; }
+            set { SetProperty(ref _isIsocenterMethodSelected, value); }
+        }
+
+        //Is2DPlanarSelected
+
+        private bool _is2DPlanarSelected;
+
+        public bool Is2DPlanarSelected
+        {
+            get { return _is2DPlanarSelected; }
+            set { SetProperty(ref _is2DPlanarSelected, value); }
+        }
+
+        //Is3DEvaluationSelected
+
+        private bool _is3dEvaluationSelected;
+
+        public bool Is3DEvaluationSelected
+        {
+            get { return _is3dEvaluationSelected; }
+            set { SetProperty(ref _is3dEvaluationSelected, value); }
+        }
+
         // Compute status
         private bool _canCompute;
         public bool CanCompute

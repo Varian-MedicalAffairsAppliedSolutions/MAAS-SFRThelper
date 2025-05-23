@@ -24,6 +24,7 @@
 //}
 
 using System;
+using System.Diagnostics.Eventing.Reader;
 using System.Windows.Threading;
 using VMS.TPS.Common.Model.API;
 
@@ -51,4 +52,5 @@ public class EsapiWorker
         _dispatcher.BeginInvoke(a, _scriptContext).Wait();
     }
 
+    
 }

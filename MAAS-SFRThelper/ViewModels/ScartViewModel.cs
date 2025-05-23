@@ -104,6 +104,19 @@ namespace MAAS_SFRThelper.ViewModels
             set { SetProperty(ref _totalDose, value); }
         }
 
+        private string _outputText;
+
+        public string OutputText
+        {
+            get { return _outputText; }
+            set
+            {
+                SetProperty(ref _outputText, value);
+            }
+
+        }
+
+
         public ObservableCollection<int> Fractions { get; set; }
 
 		private int _numberOfFractions;
@@ -130,7 +143,7 @@ namespace MAAS_SFRThelper.ViewModels
         }
 
 		public DelegateCommand GenerateSTV {  get; set; }
-
+        public DelegateCommand RunAll { get; set; }
         public ScartViewModel(EsapiWorker esapiWorker)
         {
             _esapiWorker = esapiWorker;
@@ -175,7 +188,207 @@ namespace MAAS_SFRThelper.ViewModels
             SetPlanProperties();
 			SetStructures();
             GenerateSTV = new DelegateCommand(CreateSTV);
+            RunAll = new DelegateCommand(OnRunAll);
 				
+        }
+
+        private void OnRunAll()
+        {
+            OutputText += "\nGenerating SCART plan";
+            _esapiWorker.Run(sc =>
+            {
+                ContourSTV(sc);
+
+                if (_structureSet.Structures.Any(st => st.Id.Equals("STV") && !st.IsEmpty))
+                {
+                    if (_plan != null)
+                    {
+                        SetBeams(sc);
+
+                        if (_plan.Beams.Where(b => b.Technique.Id.Contains("ARC")).Count() >= 2)
+                        {
+                            Optimize(sc);
+                        }
+
+                        else
+                        {
+                            OutputText = "\nCould not generate beams";
+                        }
+                    }
+
+                    else 
+                    {
+                        OutputText += "\nPlease create a plan with at least one beam and restart application";
+                    }
+                   
+                }
+
+                
+                
+            });
+        }
+
+        private void Optimize(ScriptContext sc)
+        {
+
+            // 2 optimization objectives
+            // generate ring
+            var gtv = _structureSet.Structures.First(st => st.Id == GtvId);
+            var stv = _structureSet.Structures.First(st => st.Id == "STV");
+            string ringId = "GTVring.2-1.2";
+            Structure ring = null;
+            if (_structureSet.Structures.Any(s => s.Id.Equals(ringId, StringComparison.OrdinalIgnoreCase)))
+            {
+                ring = _structureSet.Structures.First(s => s.Id.Equals(ringId, StringComparison.OrdinalIgnoreCase));
+            }
+            else 
+            {
+                OutputText += "\nGenerating ring";
+                ring = _structureSet.AddStructure("CONTROL", ringId);
+            }
+            
+            ring.SegmentVolume=gtv.Margin(12).Sub(gtv.Margin(2));
+            var explan = _plan as ExternalPlanSetup;
+            OutputText += $"\nUpdating plan dose to {TotalDose} in {DosePerFraction} per fraction";
+            explan.SetPrescription(NumberOfFractions, new DoseValue(Convert.ToDouble(TotalDose.Split(' ').First()), explan.TotalDose.Unit), 1.0);
+            explan.OptimizationSetup.AddPointObjective(stv,
+                OptimizationObjectiveOperator.Lower, 
+                new DoseValue(Convert.ToDouble(TotalDose.Split(' ').First()),
+                explan.TotalDose.Unit), 
+                99, 
+                250);
+            explan.OptimizationSetup.AddPointObjective(ring, 
+                OptimizationObjectiveOperator.Upper, 
+                new DoseValue(Convert.ToDouble(TotalDose.Split(' ').First()) * 0.27,
+                explan.TotalDose.Unit), 
+                0, 
+                100); // TDO verify objective
+            explan.OptimizationSetup.AddAutomaticNormalTissueObjective(100);
+            if (explan.Beams.All(b => b.MLC == null))
+            {
+                OutputText += "\n ADD MLC TO FIELD AND RESTART APP";
+
+            }
+            else
+            {
+                OutputText += $"\n{explan.Beams.Where(b => b.MLC != null).First().MLC.Id}";
+
+                explan.OptimizeVMAT(new OptimizationOptionsVMAT(OptimizationIntermediateDoseOption.UseIntermediateDose, explan.Beams.Where(b=>b.MLC!=null).First().MLC.Id));
+                OutputText += "\nOptimized plan";
+                explan.CalculateDose();
+                OutputText += "\nCalculated dose";
+
+            }
+                
+            // TODO verify lower dose 
+            // TODO warn if stv overlaps oars
+            // TODO build UI so user can select lower dose at edge of target.
+            // TODO static field to treat mlc as global and auto select gtv and debug
+        }
+
+        private void SetBeams(ScriptContext sc)
+        {
+            // make sure there is a beam
+            if (_plan != null && _plan.Beams.Any(b => !b.IsSetupField))
+            {
+                if (_plan.Beams.Where(b => !b.IsSetupField && b.Technique.Id.Contains("ARC")).Count() >= 2)                
+                {
+                    FitAllBeams();
+                }
+                Beam beam = _plan.Beams.First(b => !b.IsSetupField);
+                VVector iso = new VVector(beam.IsocenterPosition.x, beam.IsocenterPosition.y, beam.IsocenterPosition.z);
+                string machine = beam.TreatmentUnit.Id;
+                string energy = beam.EnergyModeDisplayName;
+                string machineType = beam.TreatmentUnit.MachineModel;
+                int doseRate = beam.DoseRate;
+                
+                OutputText += "\nRemoving seed field";
+                (_plan as ExternalPlanSetup).RemoveBeam( beam );
+                OutputText += "\nRemoved seed field";
+                int numberOfFields = machineType=="RDS"?4:2;
+                var parameters = new ExternalBeamMachineParameters(machine, energy.Contains("-")?energy.Split('-').First():energy, doseRate, "SRS ARC", energy.Contains("-") ? "FFF" : null);
+                OutputText += $"\nparameters = {parameters.MachineId}, {parameters.EnergyModeId}, {parameters.DoseRate}";
+                double collimatorAngle = 15;
+                for ( int i = 0; i < numberOfFields; i++)
+                {
+                    (_plan as ExternalPlanSetup).AddConformalArcBeam(parameters, 
+                        i % 2 == 0 ? collimatorAngle : 360 - collimatorAngle,
+                        20,
+                        i % 2 == 0 ? 181 : 179,
+                        i % 2 == 0 ? 179 : 181,
+                        i % 2 == 0 ? GantryDirection.Clockwise : GantryDirection.CounterClockwise, 
+                        0,
+                        iso
+                        );   
+                    if (i > 1)
+                    {
+                        collimatorAngle = 30;
+                    }
+                }
+                
+                FitAllBeams();
+
+            // TODO for Halcyon use collimator angles 315, 0, 45, 90
+            // TODO tell user one field seed field inserting template for RDS vs non RDS
+            // TODO if more than one field tell user we use their fields so setup collimator angle and gantry rotations properly
+
+            }
+            else 
+            {
+                OutputText = "\nPlan does not have beams to copy";
+            }
+        }
+
+        private void FitAllBeams()
+        {
+           
+            if (_plan.Beams.Any(b => b.TreatmentUnit.MachineModel.Equals("RDS")))
+            {
+                OutputText += "\nSkipping beam fitting for halcyon machine";
+                ////if (_plan.Beams.Where(be => !be.IsSetupField).All(be => be.ControlPoints.First().CollimatorAngle == 0))
+                ////{
+                ////    double angle = 15.0;
+                ////    int fieldsModified = 0;
+
+                ////    foreach (var beam in _plan.Beams.Where(b => !b.IsSetupField))
+                ////    {
+                ////        // changing collimator rot to match template
+                ////        if (beam.ControlPoints.First().CollimatorAngle==0)
+                ////        {
+                ////            OutputText += "\nChange collimator rotation for field";
+                ////            fieldsModified++;
+                ////            var edits = beam.GetEditableParameters();
+                ////            edits.ControlPoints.First().CollimatorAngle = angle;
+                ////        }
+                        
+                        
+                ////    }
+
+                //}
+
+            }
+            else
+            {
+                //if (_plan.Beams.Where(be => !be.IsSetupField).Any(be => be.ControlPoints.First().CollimatorAngle == 0))
+                //{
+                //    foreach (var beam in _plan.Beams.Where(b => !b.IsSetupField))
+                //    {
+                //        // fit them to stv with 0 margin
+                        
+                //    }
+
+                //}
+                OutputText += "\nStarting beam fitting";
+                foreach (var beam in _plan.Beams.Where(b=>!b.IsSetupField))
+                {
+                    // fit them to stv with 0 margin
+                    Structure stv = _structureSet.Structures.First(st=>st.Id == "STV");
+                    beam.FitCollimatorToStructure(new FitToStructureMargins(0), stv, true, true, false); // don't want fitting to reset collimator
+                    // 
+                    OutputText += "\n\tFitting beam: " + beam.Id;
+                }
+            }
+           
         }
 
         // Update total dose
@@ -198,13 +411,24 @@ namespace MAAS_SFRThelper.ViewModels
             {
                 _esapiWorker.Run(sc =>
                 {
-                    sc.Patient.BeginModifications();
-                    Structure gtv = GetGtvFromId();
-                    // ShrinkFactor = CalculateShrinkPercentage();
-                    Structure stv = CreateSTVStructure(gtv);
-
+                    if (_structureSet.Structures.Any(st => st.Id.Equals("STV") && !st.IsEmpty))
+                    {
+                        OutputText += "\nUsing already existing STV";
+                        return;
+                    }
+                    ContourSTV(sc);
+                    OutputText += "\nGenerated STV";
                 });
+                
             }
+        }
+
+        private void ContourSTV(ScriptContext sc)
+        {
+            sc.Patient.BeginModifications();
+            Structure gtv = GetGtvFromId();
+            // ShrinkFactor = CalculateShrinkPercentage();
+            Structure stv = CreateSTVStructure(gtv);
         }
 
         private Structure GetGtvFromId()

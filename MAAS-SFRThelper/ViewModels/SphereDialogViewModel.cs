@@ -198,8 +198,8 @@ namespace MAAS_SFRThelper.ViewModels
             set { SetProperty(ref targetStructures, value); }
         }
 
-        private int targetSelected;
-        public int TargetSelected
+        private string targetSelected;
+        public string TargetSelected
         {
             get { return targetSelected; }
             set { SetProperty(ref targetSelected, value); }
@@ -325,7 +325,7 @@ namespace MAAS_SFRThelper.ViewModels
 
             // Target structures
             targetStructures = new List<string>();
-            targetSelected = -1;
+             
             //string planTargetId = null;
 
             SetStructures();
@@ -340,10 +340,15 @@ namespace MAAS_SFRThelper.ViewModels
                 string planTargetId = null;
                 foreach (var i in sc.StructureSet.Structures)
                 {
-                    if (i.DicomType != "PTV") continue;
-                    targetStructures.Add(i.Id);
-                    if (planTargetId == null) continue;
-                    if (i.Id == planTargetId) targetSelected = targetStructures.Count() - 1;
+                    if (i.DicomType.Contains ("TV") && !i.IsEmpty)
+                    {
+                        targetStructures.Add(i.Id);
+                    }
+                    
+                }
+                if (targetStructures.Any())
+                {
+                    targetSelected = targetStructures.Last();
                 }
             });
         }
@@ -726,7 +731,7 @@ namespace MAAS_SFRThelper.ViewModels
             }
 
             // Check target
-            if (targetSelected == -1)
+            if (targetSelected == null)
             {
                 MessageBox.Show("Must have target selected, canceling operation.");
                 return false;
@@ -778,7 +783,7 @@ namespace MAAS_SFRThelper.ViewModels
                 // Structure ptv = structureSet.Structures.FirstOrDefault(x => x.Id == "PTV_High");
                 // var target_named = targetStructures[targetSelected]; // this is used to create PTV retract without having to pass target_name everywhere over and over again
                 // Structure ptv = structureSet.Structures.FirstOrDefault(x => x.Id == target_named);
-                Structure ptv = structureSet.Structures.FirstOrDefault(x => x.Id == targetStructures[targetSelected]);
+                Structure ptv = structureSet.Structures.FirstOrDefault(x => x.Id == targetSelected);
                 // Structure ptvRetract = structureSet.AddStructure("CONTROL", "ptvRetract");
                 Structure ptvRetract = null;
                 if (structureSet.Structures.Any(st => st.Id.Equals("ptvRetract", StringComparison.OrdinalIgnoreCase)))
@@ -811,7 +816,7 @@ namespace MAAS_SFRThelper.ViewModels
                 // Total lattice structure with all spheres
                 Structure structMain = null;
 
-                var target_name = targetStructures[targetSelected];
+                var target_name = targetSelected;
                 var target_initial = sc.StructureSet.Structures.Where(x => x.Id == target_name).First();
                 Structure target = null;
                 bool deleteAutoTarget = false;

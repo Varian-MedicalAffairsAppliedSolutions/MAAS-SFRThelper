@@ -91,7 +91,7 @@
         <ComboBox Grid.Row="0" Grid.Column="1" 
                  SelectedItem="{Binding GtvId}"
                  ItemsSource="{Binding Structures}"
-                 Style="{StaticResource ComboBoxStyle}"/>
+                 Style="{StaticResource ComboBoxStyle}" Height="30" Margin="13,5,12,0" VerticalAlignment="Top"/>
 
         <TextBlock Grid.Row="0" Grid.Column="2" Style="{StaticResource ValueTextBlockStyle}"
                    HorizontalAlignment="Center">
@@ -144,10 +144,22 @@
                Style="{StaticResource LabelTextBlockStyle}"/>
 
 
-        <TextBox Grid.Row="3" Grid.Column="2" Text="{Binding ShrinkFactor}" IsEnabled="{Binding OverrideChecked}"/>
+        <TextBox Grid.Row="3" Grid.Column="2" Text="{Binding ShrinkFactor, StringFormat=N4}" Style="{StaticResource TextBoxStyle}" IsEnabled="{Binding OverrideChecked}"/>
 
-        <CheckBox Grid.Row="3" Grid.Column="3" Content="Override" IsChecked="{Binding OverrideChecked}"  />
+        <CheckBox Grid.Row="3" Grid.Column="3" Content="Override" IsChecked="{Binding OverrideChecked}" Margin="10,0,0,0" VerticalAlignment="Center" />
 
-
+        <!-- Row 4 -->
+        <StackPanel Grid.Row="4" Grid.ColumnSpan="4" Margin="5">
+            <TextBlock Text="Generate STV, Fit Fields, Optimize" HorizontalAlignment="Center">                
+            </TextBlock>
+            <Button Content="S.C.A.R.T !" Command="{Binding RunAll}" Style="{StaticResource ButtonStyle}">
+                
+            </Button>
+            
+        </StackPanel>
+        <ScrollViewer  Grid.Row="5" Grid.ColumnSpan="4" Height="150">
+            <TextBlock Text="{Binding OutputText}" TextWrapping="Wrap" />
+        </ScrollViewer>
+       
     </Grid>
 </UserControl>
