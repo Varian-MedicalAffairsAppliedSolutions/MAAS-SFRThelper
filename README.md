@@ -42,7 +42,7 @@ Options available:
 - Select GTV: Choose a structure representing the gross tumor volume.
 - Define STV Parameters: Specify percentage reduction or fixed margin from GTV to generate the STV.
 - Generate STV Structure: Creates a structure in the Eclipse workspace that can be used for dose painting or boost prescriptions.
-- Compatibility: Can be used with VMAT or CyberKnife-based planning.
+- Optimization: Optimize and develop appropriate treatment plans. 
 
 Note: The SCART tab reflects implementation aligned with emerging clinical research but is not validated for clinical use. For more background, refer to peer-reviewed studies describing SCART dosimetry and outcomes.
 
