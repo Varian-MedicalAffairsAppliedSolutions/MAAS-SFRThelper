@@ -4,17 +4,12 @@
 Tools to aid in the creation of structure patterns (spheres) or irregular stuctures (straight and angled rods) which can be evaluated or aid in the creation of treatment plans with the intention of not covering traditional PTVs homogeneously.  Spacially Fractionated Radiation Therapy aims to create hetrogenious dose distrubutions with intentionally large peak to valley ratios while underdosing a significant portion of target volume compared with evaluating a traditional radiotherapy PTV.
 
 ---
-
-## Screenshot
-
 ![image](https://github.com/user-attachments/assets/5bc58395-8f92-40f1-ba06-cee08dc40013)
-
-
 ---
 
 ## Features 
 
-### SphereLattice Tab
+### SphereLattice
 
 The SphereLattice tab is used to create spherical high-dose boost regions within a selected PTV. These spheres are arranged in a structured 3D pattern designed to create dose heterogeneity.
 
@@ -33,7 +28,7 @@ Options available:
 - Create spheres as single structure only: Reduces structure count by merging all spheres into one ROI.
 - Create void structures: Generates complementary voids (valleys) to guide dose distribution.
 
-### SCART Tab
+### SCART
 
 The SCART (Stereotactic Central Ablative Radiation Therapy) tab enables generation of a central high-dose boost volume (SCART Treatment Volume, or STV) within a selected gross tumor volume (GTV). This is based on the SCART technique which focuses ablative doses to the hypoxic tumor core while delivering lower peripheral doses. Users can define an inner STV within a selected GTV structure which can then be used in treatment planning systems to prescribe a higher dose compared to surrounding tissue.
 
@@ -46,7 +41,7 @@ Options available:
 
 Note: The SCART tab reflects implementation aligned with emerging clinical research but is not validated for clinical use. For more background, refer to peer-reviewed studies describing SCART dosimetry and outcomes.
 
-### RapidRods Tab
+### RapidRods
 
 The RapidRods tab supports creation of cylindrical rod-shaped dose structures. These are intended for experimental or directional SFRT planning techniques.
 
@@ -56,7 +51,7 @@ The RapidRods tab supports creation of cylindrical rod-shaped dose structures. T
 
 Note: This module is still experimental and in validation.
 
-### Evaluation Tab
+### Evaluation
 
 The Evaluation tab is currently under development. It will provide analysis tools and additional functionality for evaluating or optimizing created structures.
 
