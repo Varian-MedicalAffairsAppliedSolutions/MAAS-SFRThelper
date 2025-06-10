@@ -186,8 +186,10 @@ namespace MAAS_SFRThelper.ViewModels
             string stvId = GetUniqueStructureId(_structureSet, "STV");
             Structure stvStructure = _structureSet.AddStructure("CONTROL", stvId);
 
+            #if NET461 || NET48
             // Set color to red
             stvStructure.Color = (Color)ColorConverter.ConvertFromString("Red");
+            #endif
 
             // Check slices containing the GTV structure
             var gtvContours = new List<VVector[]>();
