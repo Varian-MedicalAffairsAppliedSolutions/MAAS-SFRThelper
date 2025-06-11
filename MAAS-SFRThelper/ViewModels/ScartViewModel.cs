@@ -73,6 +73,27 @@ namespace MAAS_SFRThelper.ViewModels
             }
         }
 
+        // Updated LowerDose property to trigger recalculation
+        private double _lowerDose = 5.0; // Default to previous standard value
+
+        public double LowerDose
+        {
+            get { return _lowerDose; }
+            set
+            {
+                SetProperty(ref _lowerDose, value);
+
+                // Trigger recalculation when lower dose changes (same pattern as other properties)
+                _esapiWorker.Run(sc =>
+                {
+                    if (NumberOfFractions != 0 && DosePerFraction != 0 && !OverrideChecked)
+                    {
+                        ShrinkFactor = CalculateShrinkPercentage();
+                    }
+                });
+            }
+        }
+
         private double _shrinkFactor;
 
         public double ShrinkFactor
@@ -493,7 +514,8 @@ namespace MAAS_SFRThelper.ViewModels
             // 24Gy x3 -> 21% (P/A = 21%)
             double dosepfx = _plan.TotalDose.Unit == DoseValue.DoseUnit.cGy ? DosePerFraction / 100.0 : DosePerFraction; 
             double totalDose = dosepfx * NumberOfFractions;
-            double protectionDose = 5.0; // Standard protection dose per the presentation
+            // double protectionDose = 5.0; // Standard protection dose per the presentation
+            double protectionDose = _plan.TotalDose.Unit == DoseValue.DoseUnit.cGy ? LowerDose / 100.0 : LowerDose;
             double protectionTotal = protectionDose * NumberOfFractions;
 
             // P/A ratio (Protection dose / Ablation dose)
