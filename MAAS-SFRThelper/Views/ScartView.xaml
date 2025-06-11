@@ -135,7 +135,7 @@
 
         <TextBlock Grid.Row="2" Grid.Column="2"
                    Style="{StaticResource LabelTextBlockStyle}">
-            <Run Text="Lower Dose (" />
+            <Run Text="Protection Dose (" />
             <Run Text="{Binding DoseUnit}" />
             <Run Text="):" />
         </TextBlock>

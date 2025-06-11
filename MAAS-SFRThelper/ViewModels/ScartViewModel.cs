@@ -278,12 +278,30 @@ namespace MAAS_SFRThelper.ViewModels
                 explan.TotalDose.Unit), 
                 99, 
                 250);
-            explan.OptimizationSetup.AddPointObjective(ring, 
-                OptimizationObjectiveOperator.Upper, 
-                new DoseValue(Convert.ToDouble(TotalDose.Split(' ').First()) * 0.27,
-                explan.TotalDose.Unit), 
-                0, 
+            //explan.OptimizationSetup.AddPointObjective(ring, 
+            //    OptimizationObjectiveOperator.Upper, 
+            //    new DoseValue(Convert.ToDouble(TotalDose.Split(' ').First()) * 0.27,
+            //    explan.TotalDose.Unit), 
+            //    0, 
+            //    100); // TDO verify objective
+
+            // Change to lower dose
+            double ringDoseLimit;
+            if (explan.TotalDose.Unit == DoseValue.DoseUnit.cGy)
+            {
+                ringDoseLimit = LowerDose * 100.0;  // Convert Gy to cGy if needed
+            }
+            else
+            {
+                ringDoseLimit = LowerDose;  // Use directly if already in Gy
+            }
+            explan.OptimizationSetup.AddPointObjective(ring,
+                OptimizationObjectiveOperator.Upper,
+                new DoseValue(ringDoseLimit,
+                explan.TotalDose.Unit),
+                0,
                 100); // TDO verify objective
+
             explan.OptimizationSetup.AddAutomaticNormalTissueObjective(100);
             if (explan.Beams.All(b => b.MLC == null))
             {
