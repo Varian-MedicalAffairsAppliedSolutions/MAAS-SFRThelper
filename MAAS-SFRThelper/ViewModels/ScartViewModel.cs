@@ -74,7 +74,7 @@ namespace MAAS_SFRThelper.ViewModels
         }
 
         // Updated LowerDose property to trigger recalculation
-        private double _lowerDose = 5.0; // Default to previous standard value
+        private double _lowerDose; // Default to previous standard value
 
         public double LowerDose
         {
@@ -286,15 +286,8 @@ namespace MAAS_SFRThelper.ViewModels
             //    100); // TDO verify objective
 
             // Change to lower dose
-            double ringDoseLimit;
-            if (explan.TotalDose.Unit == DoseValue.DoseUnit.cGy)
-            {
-                ringDoseLimit = LowerDose * 100.0;  // Convert Gy to cGy if needed
-            }
-            else
-            {
-                ringDoseLimit = LowerDose;  // Use directly if already in Gy
-            }
+            double ringDoseLimit = LowerDose;
+            
             explan.OptimizationSetup.AddPointObjective(ring,
                 OptimizationObjectiveOperator.Upper,
                 new DoseValue(ringDoseLimit,
@@ -311,7 +304,7 @@ namespace MAAS_SFRThelper.ViewModels
             else
             {
                 OutputText += $"\n{explan.Beams.Where(b => b.MLC != null).First().MLC.Id}";
-
+                OutputText += $"\n Optimizing please wait";
                 explan.OptimizeVMAT(new OptimizationOptionsVMAT(OptimizationIntermediateDoseOption.UseIntermediateDose, explan.Beams.Where(b=>b.MLC!=null).First().MLC.Id));
                 OutputText += "\nOptimized plan";
                 explan.CalculateDose();
@@ -506,9 +499,10 @@ namespace MAAS_SFRThelper.ViewModels
                     }
                     else
                     {
-                        DosePerFraction = _plan.TotalDose.Unit == DoseValue.DoseUnit.cGy ? 2400.0: 24.0;
+                        DosePerFraction = _plan.TotalDose.Unit == DoseValue.DoseUnit.cGy ? 2100.0 : 21.0;
+                        
                     }
-
+                    LowerDose = _plan.TotalDose.Unit == DoseValue.DoseUnit.cGy ? 300.0 : 3.0;
                     if (_plan.NumberOfFractions != null)
                     {
                         NumberOfFractions = _plan.NumberOfFractions.Value;
@@ -518,6 +512,13 @@ namespace MAAS_SFRThelper.ViewModels
                     // Initialize TotalDose
                     UpdateTotalDose();
                 }
+                //else
+                //{
+                //    // Set defaults when no plan is available
+                //    DosePerFraction = 21.0; // Default dose per fraction
+                //    NumberOfFractions = 1;  // Default number of fractions
+                //    UpdateTotalDose();
+                //}
             });
         }
 
