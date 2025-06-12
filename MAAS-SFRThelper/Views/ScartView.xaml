@@ -5,13 +5,13 @@
             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
             xmlns:local="clr-namespace:MAAS_SFRThelper.Views"
             mc:Ignorable="d"
-            d:DesignHeight="450" d:DesignWidth="800" 
+            d:DesignHeight="620" d:DesignWidth="600" 
             Background="White"
             FontFamily="Segoe UI">
 
     <UserControl.Resources>
         <Style x:Key="LabelTextBlockStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontSize" Value="12"/>
             <Setter Property="Foreground" Value="#34495E"/>
             <Setter Property="Margin" Value="0,5,10,5"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
@@ -19,7 +19,7 @@
         </Style>
 
         <Style x:Key="ValueTextBlockStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontSize" Value="12"/>
             <Setter Property="Foreground" Value="#2980B9"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Margin" Value="5"/>
@@ -32,8 +32,8 @@
             <Setter Property="Padding" Value="6,3"/>
             <Setter Property="BorderBrush" Value="#BDC3C7"/>
             <Setter Property="Background" Value="White"/>
-            <Setter Property="Width" Value="150"/>
-            <Setter Property="MaxDropDownHeight" Value="200"/>
+            <Setter Property="Width" Value="120"/>
+            <Setter Property="MaxDropDownHeight" Value="180"/>
             <Setter Property="IsEditable" Value="False"/>
             <Setter Property="ScrollViewer.CanContentScroll" Value="True"/>
             <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
@@ -46,7 +46,7 @@
             <Setter Property="Padding" Value="6,3"/>
             <Setter Property="BorderBrush" Value="#BDC3C7"/>
             <Setter Property="Background" Value="White"/>
-            <Setter Property="Width" Value="150"/>
+            <Setter Property="Width" Value="120"/>
         </Style>
 
         <Style x:Key="ButtonStyle" TargetType="Button">
@@ -83,15 +83,16 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!-- Row 0 -->
-        <TextBlock Text="GTV ID:" Grid.Row="0" Grid.Column="0" 
+        <TextBlock Text="GTV ID:" Grid.Row="0" Grid.Column="0"
                    Style="{StaticResource LabelTextBlockStyle}"/>
-        <ComboBox Grid.Row="0" Grid.Column="1" 
-                 SelectedItem="{Binding GtvId}"
-                 ItemsSource="{Binding Structures}"
-                 Style="{StaticResource ComboBoxStyle}"/>
+        <ComboBox Grid.Row="0" Grid.Column="1"
+                  SelectedItem="{Binding GtvId}" 
+                  ItemsSource="{Binding Structures}" 
+                  Style="{StaticResource ComboBoxStyle}" Height="30" Margin="13,5,12,0" VerticalAlignment="Top"/>
 
         <TextBlock Grid.Row="0" Grid.Column="2" Style="{StaticResource ValueTextBlockStyle}"
                    HorizontalAlignment="Center">
@@ -99,39 +100,83 @@
             <Run Text="{Binding TotalDose}" />
         </TextBlock>
 
-        <Button Content="Generate STV Only" 
-               Command="{Binding GenerateSTV}"
-               Style="{StaticResource ButtonStyle}"
-               Grid.Row="0" Grid.Column="3"
-               HorizontalAlignment="Center"/>
+        <Button Content="Generate STV"
+                Command="{Binding GenerateSTV}" 
+                Style="{StaticResource ButtonStyle}" 
+                Grid.Row="0" Grid.Column="3" 
+                HorizontalAlignment="Center"/>
 
         <!-- Row 1 -->
-        <TextBlock Grid.Row="1" Grid.Column="0" Text="Superior Margin:" 
+        <TextBlock Grid.Row="1" Grid.Column="0" Text="Superior Margin:"
                    Style="{StaticResource LabelTextBlockStyle}"/>
         <ComboBox Grid.Row="1" Grid.Column="1"
-                 SelectedItem="{Binding SupMargin}"                           
-                 ItemsSource="{Binding SupMargins}"
-                 Style="{StaticResource ComboBoxStyle}"/>
+                  SelectedItem="{Binding SupMargin}" 
+                  ItemsSource="{Binding SupMargins}" 
+                  Style="{StaticResource ComboBoxStyle}"/>
 
-        <TextBlock Grid.Row="1" Grid.Column="2" Text="Dose per Fraction:" 
-                   Style="{StaticResource LabelTextBlockStyle}"/>
+        <TextBlock Grid.Row="1" Grid.Column="2"
+                   Style="{StaticResource LabelTextBlockStyle}">
+            <Run Text="Dose per Fraction (" />
+            <Run Text="{Binding DoseUnit}" />
+            <Run Text="):" />
+        </TextBlock>
+
         <TextBox Grid.Row="1" Grid.Column="3"
-                 Text="{Binding DosePerFraction}"                           
+                 Text="{Binding DosePerFraction, UpdateSourceTrigger=PropertyChanged}" 
                  Style="{StaticResource TextBoxStyle}"/>
 
         <!-- Row 2 -->
-        <TextBlock Grid.Row="2" Grid.Column="0" Text="Inferior Margin:" 
+        <TextBlock Grid.Row="2" Grid.Column="0" Text="Inferior Margin:"
                    Style="{StaticResource LabelTextBlockStyle}"/>
-        <ComboBox Grid.Row="2" Grid.Column="1" 
-                 SelectedItem="{Binding InfMargin}"                           
-                 ItemsSource="{Binding InfMargins}"
-                 Style="{StaticResource ComboBoxStyle}"/>
+        <ComboBox Grid.Row="2" Grid.Column="1"
+                  SelectedItem="{Binding InfMargin}" 
+                  ItemsSource="{Binding InfMargins}" 
+                  Style="{StaticResource ComboBoxStyle}"/>
 
-        <TextBlock Grid.Row="2" Grid.Column="2" Text="Number of Fractions:" 
+        <TextBlock Grid.Row="2" Grid.Column="2"
+                   Style="{StaticResource LabelTextBlockStyle}">
+            <Run Text="Protection Dose (" />
+            <Run Text="{Binding DoseUnit}" />
+            <Run Text="):" />
+        </TextBlock>
+
+        <TextBox Grid.Row="2" Grid.Column="3"
+                 Text="{Binding LowerDose, UpdateSourceTrigger=PropertyChanged}" 
+                 Style="{StaticResource TextBoxStyle}"/>
+
+        <!-- Row 3 -->
+        <TextBlock Grid.Row="3" Grid.Column="0" Text="Number of Fractions:"
                    Style="{StaticResource LabelTextBlockStyle}"/>
-        <ComboBox Grid.Row="2" Grid.Column="3" 
-                 SelectedItem="{Binding SelectedFractions}"                           
-                 ItemsSource="{Binding Fractions}"
-                 Style="{StaticResource ComboBoxStyle}"/>
+        <ComboBox Grid.Row="3" Grid.Column="1"
+                  SelectedItem="{Binding NumberOfFractions}" 
+                  ItemsSource="{Binding Fractions}" 
+                  Style="{StaticResource ComboBoxStyle}"/>
+
+        <TextBlock Grid.Row="3" Grid.Column="2" Text="Shrink Factor:"
+                   Style="{StaticResource LabelTextBlockStyle}"/>
+        <TextBox Grid.Row="3" Grid.Column="3" 
+                 Text="{Binding ShrinkFactor, StringFormat=N4}" 
+                 Style="{StaticResource TextBoxStyle}" 
+                 IsEnabled="{Binding OverrideChecked}"/>
+
+        <!-- Row 4 -->
+        <CheckBox Grid.Row="4" Grid.Column="3" 
+                  Content="Override" 
+                  IsChecked="{Binding OverrideChecked}" 
+                  Margin="10,0,0,0" 
+                  VerticalAlignment="Center" />
+
+        <!-- Row 5 -->
+        <StackPanel Grid.Row="5" Grid.ColumnSpan="4" Margin="5">
+            <TextBlock Text="Generate STV, Fit Fields, Optimize" HorizontalAlignment="Center">
+            </TextBlock>
+            <Button Content="S.C.A.R.T !" Command="{Binding RunAll}" Style="{StaticResource ButtonStyle}">
+            </Button>
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="6" Grid.ColumnSpan="4" Height="150">
+            <TextBlock Text="{Binding OutputText}" TextWrapping="Wrap" />
+        </ScrollViewer>
+
     </Grid>
 </UserControl>

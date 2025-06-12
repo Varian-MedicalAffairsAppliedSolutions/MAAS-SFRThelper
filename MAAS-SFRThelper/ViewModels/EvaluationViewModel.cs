@@ -8,8 +8,11 @@
 //using System.Text;
 //using System.Threading.Tasks;
 //using System.Windows;
+//using System.Windows.Controls;
 //using System.Windows.Data;
 //using System.Windows.Media;
+//using System.Windows.Shapes;
+//using System.Windows.Threading;
 //using VMS.TPS.Common.Model.API;
 //using VMS.TPS.Common.Model.Types;
 
@@ -45,6 +48,42 @@
 //            set { SetProperty(ref _outputLog, value); }
 //        }
 
+//        //Is1DCAXSelected
+//        private bool _is1DCAXSelected;
+
+//        public bool Is1DCAXSelected
+//        {
+//            get { return _is1DCAXSelected; }
+//            set { SetProperty(ref _is1DCAXSelected, value); }
+//        }
+
+//        //IsIsocenterMethodSelected
+//        private bool _isIsocenterMethodSelected;
+
+//        public bool IsIsocenterMethodSelected
+//        {
+//            get { return _isIsocenterMethodSelected; }
+//            set { SetProperty(ref _isIsocenterMethodSelected, value); }
+//        }
+
+//        //Is2DPlanarSelected
+//        private bool _is2DPlanarSelected;
+
+//        public bool Is2DPlanarSelected
+//        {
+//            get { return _is2DPlanarSelected; }
+//            set { SetProperty(ref _is2DPlanarSelected, value); }
+//        }
+
+//        //Is3DEvaluationSelected
+//        private bool _is3dEvaluationSelected;
+
+//        public bool Is3DEvaluationSelected
+//        {
+//            get { return _is3dEvaluationSelected; }
+//            set { SetProperty(ref _is3dEvaluationSelected, value); }
+//        }
+
 //        // Compute status
 //        private bool _canCompute;
 //        public bool CanCompute
@@ -59,14 +98,81 @@
 //            }
 //        }
 
+//        // Canvas reference (will be set from the View)
+//        private Canvas _plotCanvas;
+//        public Canvas PlotCanvas
+//        {
+//            get { return _plotCanvas; }
+//            set
+//            {
+//                if (SetProperty(ref _plotCanvas, value))
+//                {
+//                    // Subscribe to size changed events for redrawing
+//                    if (_plotCanvas != null)
+//                    {
+//                        _plotCanvas.SizeChanged += PlotCanvas_SizeChanged;
+//                        _plotCanvas.Loaded += PlotCanvas_Loaded;
+//                    }
+//                }
+//            }
+//        }
+
+//        // Flag to track if we have data to plot
+//        private bool _hasPlotData = false;
+
+//        // Visibility controls with mutual exclusivity
+//        private bool _bTextVis = true;  // Start with text visible
+//        public bool bTextVis
+//        {
+//            get { return _bTextVis; }
+//            set
+//            {
+//                if (SetProperty(ref _bTextVis, value))
+//                {
+//                    OutputLog += $"bTextVis changed to: {value}\n";
+//                    // If text view is being turned on, turn off plot view
+//                    if (value && _bPlotVis)
+//                    {
+//                        _bPlotVis = false;
+//                        OutputLog += "bPlotVis set to false (mutual exclusivity)\n";
+//                        RaisePropertyChanged(nameof(bPlotVis));
+//                    }
+//                }
+//            }
+//        }
+
+//        private bool _bPlotVis = false;  // Start with plot hidden
+//        public bool bPlotVis
+//        {
+//            get { return _bPlotVis; }
+//            set
+//            {
+//                if (SetProperty(ref _bPlotVis, value))
+//                {
+//                    OutputLog += $"bPlotVis changed to: {value}\n";
+//                    // If plot view is being turned on, turn off text view
+//                    if (value && _bTextVis)
+//                    {
+//                        _bTextVis = false;
+//                        OutputLog += "bTextVis set to false (mutual exclusivity)\n";
+//                        RaisePropertyChanged(nameof(bTextVis));
+//                    }
+
+//                    // Redraw plot when switching to plot view
+//                    if (value && _hasPlotData)
+//                    {
+//                        RefreshPlot();
+//                    }
+//                }
+//            }
+//        }
+
 //        // Commands
 //        public DelegateCommand ComputeCommand { get; private set; }
 //        public DelegateCommand SaveCsvCommand { get; private set; }
+//        public DelegateCommand ShowPlotCommand { get; private set; }
 
 //        // Internal fields for the dose sampling
-//        //private readonly List<double> _distances = new List<double>();
-//        //private readonly List<double> _doseValues = new List<double>();
-//        //private readonly List<bool> _insideTumorFlags = new List<bool>();
 //        private List<double> _distances = new List<double>();
 //        private List<double> _doseValues = new List<double>();
 //        private List<bool> _insideTumorFlags = new List<bool>();
@@ -102,6 +208,14 @@
 //                // Initialize commands
 //                ComputeCommand = new DelegateCommand(ExecuteComputeDose, () => CanCompute);
 //                SaveCsvCommand = new DelegateCommand(ExecuteSaveCsv, CanExecuteSaveCsv);
+//                ShowPlotCommand = new DelegateCommand(ExecuteShowPlot, CanExecuteShowPlot);
+
+//                // Set default evaluation method to 1D CAX
+//                Is1DCAXSelected = true;
+
+//                // Set initial visibility states
+//                bTextVis = true;   // Show text log by default
+//                bPlotVis = false;  // Hide plot by default
 
 //                OutputLog += "Getting ESAPI context...\n";
 
@@ -172,6 +286,48 @@
 //                catch { /* Ignore if OutputLog couldn't be used */ }
 
 //                MessageBox.Show(errorMessage, "Initialization Error", MessageBoxButton.OK, MessageBoxImage.Error);
+//            }
+//        }
+
+//        private void PlotCanvas_SizeChanged(object sender, SizeChangedEventArgs e)
+//        {
+//            // Redraw plot when canvas size changes if we're in plot view and have data
+//            if (bPlotVis && _hasPlotData)
+//            {
+//                // Use a small delay to ensure the canvas is properly resized
+//                System.Windows.Application.Current.Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() =>
+//                {
+//                    RefreshPlot();
+//                }));
+//            }
+//        }
+
+//        private void PlotCanvas_Loaded(object sender, RoutedEventArgs e)
+//        {
+//            // Initial plot draw when canvas is loaded
+//            if (bPlotVis && _hasPlotData)
+//            {
+//                RefreshPlot();
+//            }
+//        }
+
+//        private void RefreshPlot()
+//        {
+//            if (PlotCanvas == null || !_hasPlotData) return;
+
+//            try
+//            {
+//                string tumorId = SelectedTumorId ?? "Unknown Tumor";
+//                string beamId = SelectedBeamId ?? "Unknown Beam";
+
+//                PlotCanvas.Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() =>
+//                {
+//                    DrawEmbeddedPlot(PlotCanvas, _distances, _doseValues, _insideTumorFlags, _entryDist, _exitDist, tumorId, beamId);
+//                }));
+//            }
+//            catch (Exception ex)
+//            {
+//                OutputLog += $"Error refreshing plot: {ex.Message}\n";
 //            }
 //        }
 
@@ -281,6 +437,7 @@
 //                _distances = new List<double>();
 //                _doseValues = new List<double>();
 //                _insideTumorFlags = new List<bool>();
+//                _hasPlotData = false;
 
 //                OutputLog += "Starting dose computation...\n";
 
@@ -345,7 +502,34 @@
 //                        OutputLog += "Calculating beam direction...\n";
 //                        var isocenter = beam.IsocenterPosition;
 //                        var cp0 = beam.ControlPoints.First();
-//                        var direction = ComputeBeamUnitVector(cp0.GantryAngle, cp0.PatientSupportAngle);
+
+//                        // Calculate the beam direction using gantry and couch angles
+//                        double gantryAngle = cp0.GantryAngle;
+//                        double couchAngle = cp0.PatientSupportAngle;
+
+//                        // Convert angles to radians
+//                        double gantryRad = gantryAngle * Math.PI / 180.0;
+//                        double couchRad = couchAngle * Math.PI / 180.0;
+
+//                        // Calculate direction vector from gantry and couch angles
+//                        VVector dVec = new VVector(
+//                            Math.Sin(gantryRad),
+//                            -Math.Cos(gantryRad),
+//                            0
+//                        );
+
+//                        // Apply couch rotation if needed
+//                        if (Math.Abs(couchAngle) > 0.1)
+//                        {
+//                            double x = dVec.x;
+//                            double z = dVec.z;
+//                            dVec.x = x * Math.Cos(couchRad) + z * Math.Sin(couchRad);
+//                            dVec.z = -x * Math.Sin(couchRad) + z * Math.Cos(couchRad);
+//                        }
+
+//                        // Normalize to unit vector
+//                        double length = Math.Sqrt(dVec.x * dVec.x + dVec.y * dVec.y + dVec.z * dVec.z);
+//                        VVector direction = new VVector(dVec.x / length, dVec.y / length, dVec.z / length);
 
 //                        // Find entry/exit by scanning
 //                        OutputLog += "Finding beam entry and exit points...\n";
@@ -435,6 +619,7 @@
 //                            _distances = new List<double>(tempDistances);
 //                            _doseValues = new List<double>(tempDoseValues);
 //                            _insideTumorFlags = new List<bool>(tempInsideFlags);
+//                            _hasPlotData = true;
 //                        }
 
 //                        if (_distances.Count == 0)
@@ -477,8 +662,9 @@
 //                    }
 //                });
 
-//                // Update the 'Save CSV' command
+//                // Update the commands that depend on data availability
 //                SaveCsvCommand.RaiseCanExecuteChanged();
+//                ShowPlotCommand.RaiseCanExecuteChanged();
 //            }
 //            catch (Exception ex)
 //            {
@@ -499,6 +685,22 @@
 //            catch
 //            {
 //                // If there's any error accessing the collection, assume we can't save
+//                return false;
+//            }
+//        }
+
+//        private bool CanExecuteShowPlot()
+//        {
+//            try
+//            {
+//                if (_distances == null || _doseValues == null || _insideTumorFlags == null)
+//                    return false;
+
+//                return _distances.Count > 0 && _doseValues.Count > 0 && _insideTumorFlags.Count > 0;
+//            }
+//            catch
+//            {
+//                // If there's any error accessing the collections, assume we can't plot
 //                return false;
 //            }
 //        }
@@ -553,7 +755,7 @@
 //                        planId, beamId, tumorId, DateTime.Now);
 
 //                    string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-//                    string filePath = Path.Combine(desktopPath, fileName);
+//                    string filePath = System.IO.Path.Combine(desktopPath, fileName);
 
 //                    // Write content all at once
 //                    File.WriteAllLines(filePath, lines);
@@ -572,7 +774,7 @@
 //                            planId, beamId, tumorId, DateTime.Now);
 
 //                        string docPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-//                        string filePath = Path.Combine(docPath, fileName);
+//                        string filePath = System.IO.Path.Combine(docPath, fileName);
 
 //                        // Write content all at once
 //                        File.WriteAllLines(filePath, lines);
@@ -603,34 +805,786 @@
 //            }
 //        }
 
-//        private VVector ComputeBeamUnitVector(double gantryAngleDeg, double couchAngleDeg)
+//        private void ExecuteShowPlot()
 //        {
-//            double gantryRad = gantryAngleDeg * Math.PI / 180.0;
-//            double couchRad = couchAngleDeg * Math.PI / 180.0;
-
-//            // Basic rotation ignoring couch first
-//            VVector dVec = new VVector(
-//                Math.Sin(gantryRad),
-//                -Math.Cos(gantryRad),
-//                0
-//            );
-
-//            // Apply couch rotation (if needed)
-//            if (Math.Abs(couchAngleDeg) > 0.1)
+//            try
 //            {
-//                double x = dVec.x;
-//                double z = dVec.z;
-//                dVec.x = x * Math.Cos(couchRad) + z * Math.Sin(couchRad);
-//                dVec.z = -x * Math.Sin(couchRad) + z * Math.Cos(couchRad);
-//            }
+//                OutputLog += "Creating embedded plot...\n";
 
-//            // Normalize
-//            double length = Math.Sqrt(dVec.x * dVec.x + dVec.y * dVec.y + dVec.z * dVec.z);
-//            return new VVector(dVec.x / length, dVec.y / length, dVec.z / length);
+//                if (!CanExecuteShowPlot())
+//                {
+//                    MessageBox.Show("No dose data available to plot. Please compute dose first.",
+//                        "No Data", MessageBoxButton.OK, MessageBoxImage.Information);
+//                    return;
+//                }
+
+//                OutputLog += "Switching to plot view...\n";
+//                // Switch to plot view by setting the radio button states
+//                bTextVis = false;
+//                bPlotVis = true;
+
+//                // Check which evaluation method is selected
+//                if (Is1DCAXSelected)
+//                {
+//                    OutputLog += "Using 1D CAX evaluation method for embedded plot...\n";
+
+//                    // Get the structure and beam IDs for the plot title
+//                    string tumorId = SelectedTumorId ?? "Unknown Tumor";
+//                    string beamId = SelectedBeamId ?? "Unknown Beam";
+
+//                    // Show the 1D CAX dose plot in embedded canvas
+//                    ShowEmbeddedDosePlot(_distances, _doseValues, _insideTumorFlags, _entryDist, _exitDist, tumorId, beamId);
+
+//                    OutputLog += "1D CAX embedded plot creation completed.\n";
+//                }
+//                else if (IsIsocenterMethodSelected)
+//                {
+//                    OutputLog += "Using 2D Isocenter Planar evaluation method for plot...\n";
+//                    // TODO: Implement 2D Isocenter plotting logic
+//                    MessageBox.Show("2D Isocenter Planar plotting not yet implemented.",
+//                        "Feature Not Available", MessageBoxButton.OK, MessageBoxImage.Information);
+//                    // Switch back to text view since plot isn't implemented
+//                    bTextVis = true;
+//                    bPlotVis = false;
+//                }
+//                else if (Is2DPlanarSelected)
+//                {
+//                    OutputLog += "Using 2D Normal Multiplanar P/V Interpolation evaluation method for plot...\n";
+//                    // TODO: Implement 2D Multiplanar plotting logic
+//                    MessageBox.Show("2D Normal Multiplanar P/V Interpolation plotting not yet implemented.",
+//                        "Feature Not Available", MessageBoxButton.OK, MessageBoxImage.Information);
+//                    // Switch back to text view since plot isn't implemented
+//                    bTextVis = true;
+//                    bPlotVis = false;
+//                }
+//                else if (Is3DEvaluationSelected)
+//                {
+//                    OutputLog += "Using 3D Dose P/V Interpolation evaluation method for plot...\n";
+//                    // TODO: Implement 3D plotting logic
+//                    MessageBox.Show("3D Dose P/V Interpolation plotting not yet implemented.",
+//                        "Feature Not Available", MessageBoxButton.OK, MessageBoxImage.Information);
+//                    // Switch back to text view since plot isn't implemented
+//                    bTextVis = true;
+//                    bPlotVis = false;
+//                }
+//                else
+//                {
+//                    OutputLog += "No evaluation method selected. Defaulting to 1D CAX...\n";
+
+//                    // Default to 1D CAX if nothing is selected
+//                    string tumorId = SelectedTumorId ?? "Unknown Tumor";
+//                    string beamId = SelectedBeamId ?? "Unknown Beam";
+//                    ShowEmbeddedDosePlot(_distances, _doseValues, _insideTumorFlags, _entryDist, _exitDist, tumorId, beamId);
+
+//                    OutputLog += "Default 1D CAX embedded plot creation completed.\n";
+//                }
+//            }
+//            catch (Exception ex)
+//            {
+//                OutputLog += $"Error creating embedded plot: {ex.Message}\n";
+//                MessageBox.Show($"Error creating plot: {ex.Message}", "Plot Error", MessageBoxButton.OK, MessageBoxImage.Error);
+//                // Switch back to text view on error
+//                bTextVis = true;
+//                bPlotVis = false;
+//            }
+//        }
+
+//        /// <summary>
+//        /// Creates an embedded plot of the dose along the central axis within the existing Canvas
+//        /// </summary>
+//        private void ShowEmbeddedDosePlot(List<double> distances, List<double> doseValues, List<bool> insideTumorFlags,
+//                                          double entryDist, double exitDist, string tumorId, string beamId)
+//        {
+//            try
+//            {
+//                OutputLog += "Starting ShowEmbeddedDosePlot...\n";
+
+//                if (PlotCanvas == null)
+//                {
+//                    OutputLog += "ERROR: PlotCanvas is null! Canvas reference not set from View.\n";
+//                    return;
+//                }
+
+//                // Use a delayed approach to ensure canvas is properly sized
+//                PlotCanvas.Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() =>
+//                {
+//                    OutputLog += $"PlotCanvas found! ActualWidth: {PlotCanvas.ActualWidth}, ActualHeight: {PlotCanvas.ActualHeight}\n";
+//                    OutputLog += $"IsVisible: {PlotCanvas.IsVisible}, Visibility: {PlotCanvas.Visibility}\n";
+
+//                    // Clear any existing plot
+//                    PlotCanvas.Children.Clear();
+//                    OutputLog += "Canvas cleared...\n";
+
+//                    try
+//                    {
+//                        OutputLog += "About to call DrawEmbeddedPlot...\n";
+//                        DrawEmbeddedPlot(PlotCanvas, distances, doseValues, insideTumorFlags, entryDist, exitDist, tumorId, beamId);
+//                        OutputLog += $"DrawEmbeddedPlot completed. Canvas now has {PlotCanvas.Children.Count} children.\n";
+//                    }
+//                    catch (Exception ex)
+//                    {
+//                        OutputLog += $"Error in DrawEmbeddedPlot: {ex.Message}\n";
+//                    }
+//                }));
+//            }
+//            catch (Exception ex)
+//            {
+//                OutputLog += $"Error in ShowEmbeddedDosePlot: {ex.Message}\n";
+//            }
+//        }
+
+//        /// <summary>
+//        /// Actually draws the plot on the provided canvas with improved sizing
+//        /// </summary>
+//        private void DrawEmbeddedPlot(Canvas plotCanvas, List<double> distances, List<double> doseValues,
+//                                     List<bool> insideTumorFlags, double entryDist, double exitDist,
+//                                     string tumorId, string beamId)
+//        {
+//            try
+//            {
+//                // Force canvas to measure and arrange itself to get proper dimensions
+//                plotCanvas.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+//                plotCanvas.Arrange(new Rect(plotCanvas.DesiredSize));
+
+//                double canvasWidth = plotCanvas.ActualWidth;
+//                double canvasHeight = plotCanvas.ActualHeight;
+
+//                OutputLog += $"Canvas dimensions: {canvasWidth} x {canvasHeight}\n";
+
+//                // Use more reasonable defaults if canvas hasn't been sized yet
+//                if (canvasWidth <= 0 || double.IsNaN(canvasWidth))
+//                {
+//                    canvasWidth = 600; // Reduced default width
+//                    OutputLog += $"Using default width: {canvasWidth}\n";
+//                }
+//                if (canvasHeight <= 0 || double.IsNaN(canvasHeight))
+//                {
+//                    canvasHeight = 300; // Reduced default height  
+//                    OutputLog += $"Using default height: {canvasHeight}\n";
+//                }
+
+//                OutputLog += $"Using dimensions: {canvasWidth} x {canvasHeight}\n";
+
+//                // Use proportional margins that work better with smaller canvases
+//                double leftMargin = Math.Max(50, canvasWidth * 0.08);
+//                double rightMargin = Math.Max(20, canvasWidth * 0.03);
+//                double topMargin = Math.Max(30, canvasHeight * 0.08);
+//                double bottomMargin = Math.Max(50, canvasHeight * 0.12);
+
+//                double plotWidth = canvasWidth - leftMargin - rightMargin;
+//                double plotHeight = canvasHeight - topMargin - bottomMargin;
+
+//                // Ensure we have positive plot dimensions
+//                if (plotWidth <= 0 || plotHeight <= 0)
+//                {
+//                    OutputLog += $"Invalid plot dimensions: {plotWidth} x {plotHeight}. Canvas too small.\n";
+//                    return;
+//                }
+
+//                OutputLog += $"Plot area: {plotWidth} x {plotHeight}, margins: L{leftMargin} R{rightMargin} T{topMargin} B{bottomMargin}\n";
+
+//                // Find min and max values for scaling
+//                double minDist = distances.Min();
+//                double maxDist = distances.Max();
+//                double maxDose = doseValues.Max() * 1.1; // Add 10% for margin
+
+//                OutputLog += $"Data ranges: Distance {minDist:F1} to {maxDist:F1}, Dose 0 to {maxDose:F3}\n";
+
+//                // Add title with responsive font size
+//                double titleFontSize = Math.Max(10, Math.Min(16, canvasHeight * 0.04));
+//                TextBlock title = new TextBlock
+//                {
+//                    Text = $"Central Axis Dose Plot - {tumorId} - {beamId}",
+//                    FontSize = titleFontSize,
+//                    FontWeight = FontWeights.Bold,
+//                    HorizontalAlignment = HorizontalAlignment.Center,
+//                    TextWrapping = TextWrapping.Wrap
+//                };
+//                Canvas.SetLeft(title, canvasWidth / 2 - 150);
+//                Canvas.SetTop(title, 5);
+//                plotCanvas.Children.Add(title);
+
+//                // Create horizontal and vertical axes
+//                Line horizontalAxis = new Line
+//                {
+//                    X1 = leftMargin,
+//                    Y1 = canvasHeight - bottomMargin,
+//                    X2 = canvasWidth - rightMargin,
+//                    Y2 = canvasHeight - bottomMargin,
+//                    Stroke = Brushes.Black,
+//                    StrokeThickness = 1
+//                };
+
+//                Line verticalAxis = new Line
+//                {
+//                    X1 = leftMargin,
+//                    Y1 = topMargin,
+//                    X2 = leftMargin,
+//                    Y2 = canvasHeight - bottomMargin,
+//                    Stroke = Brushes.Black,
+//                    StrokeThickness = 1
+//                };
+
+//                plotCanvas.Children.Add(horizontalAxis);
+//                plotCanvas.Children.Add(verticalAxis);
+
+//                // Add axis labels with responsive font size
+//                double labelFontSize = Math.Max(8, Math.Min(12, canvasHeight * 0.03));
+
+//                TextBlock xAxisLabel = new TextBlock
+//                {
+//                    Text = "Distance from Isocenter (mm)",
+//                    FontSize = labelFontSize,
+//                    HorizontalAlignment = HorizontalAlignment.Center
+//                };
+//                Canvas.SetLeft(xAxisLabel, canvasWidth / 2 - 80);
+//                Canvas.SetTop(xAxisLabel, canvasHeight - 15);
+//                plotCanvas.Children.Add(xAxisLabel);
+
+//                TextBlock yAxisLabel = new TextBlock
+//                {
+//                    Text = "Dose (Gy)",
+//                    FontSize = labelFontSize,
+//                    HorizontalAlignment = HorizontalAlignment.Center,
+//                    LayoutTransform = new RotateTransform(-90)
+//                };
+//                Canvas.SetLeft(yAxisLabel, 15);
+//                Canvas.SetTop(yAxisLabel, canvasHeight / 2);
+//                plotCanvas.Children.Add(yAxisLabel);
+
+//                // Plot the data points
+//                Polyline doseLine = new Polyline
+//                {
+//                    Stroke = Brushes.Blue,
+//                    StrokeThickness = Math.Max(1, canvasWidth / 400) // Responsive line thickness
+//                };
+
+//                PointCollection points = new PointCollection();
+//                int validPointCount = 0;
+
+//                for (int i = 0; i < distances.Count; i++)
+//                {
+//                    // Convert data to canvas coordinates
+//                    double x = leftMargin + (distances[i] - minDist) / (maxDist - minDist) * plotWidth;
+//                    double y = (canvasHeight - bottomMargin) - (doseValues[i] / maxDose) * plotHeight;
+
+//                    // Check for valid coordinates
+//                    if (!double.IsNaN(x) && !double.IsNaN(y) && !double.IsInfinity(x) && !double.IsInfinity(y))
+//                    {
+//                        points.Add(new Point(x, y));
+//                        validPointCount++;
+
+//                        // If inside tumor, add a red dot with responsive size
+//                        if (insideTumorFlags[i])
+//                        {
+//                            double dotSize = Math.Max(2, Math.Min(6, canvasWidth / 150));
+//                            Ellipse dot = new Ellipse
+//                            {
+//                                Width = dotSize,
+//                                Height = dotSize,
+//                                Fill = Brushes.Red
+//                            };
+//                            Canvas.SetLeft(dot, x - dotSize / 2);
+//                            Canvas.SetTop(dot, y - dotSize / 2);
+//                            plotCanvas.Children.Add(dot);
+//                        }
+//                    }
+//                }
+
+//                OutputLog += $"Added {validPointCount} valid points to plot line.\n";
+
+//                doseLine.Points = points;
+//                plotCanvas.Children.Add(doseLine);
+
+//                // Add tumor boundary markers
+//                double entryX = leftMargin + (entryDist - minDist) / (maxDist - minDist) * plotWidth;
+//                double exitX = leftMargin + (exitDist - minDist) / (maxDist - minDist) * plotWidth;
+
+//                double boundaryLabelFontSize = Math.Max(7, Math.Min(10, canvasHeight * 0.025));
+
+//                // Entry line
+//                if (!double.IsNaN(entryX) && !double.IsInfinity(entryX))
+//                {
+//                    Line entryLine = new Line
+//                    {
+//                        X1 = entryX,
+//                        Y1 = topMargin,
+//                        X2 = entryX,
+//                        Y2 = canvasHeight - bottomMargin,
+//                        Stroke = Brushes.Green,
+//                        StrokeThickness = 1,
+//                        StrokeDashArray = new DoubleCollection { 4, 2 }
+//                    };
+//                    plotCanvas.Children.Add(entryLine);
+
+//                    TextBlock entryLabel = new TextBlock
+//                    {
+//                        Text = "Entry",
+//                        Foreground = Brushes.Green,
+//                        FontSize = boundaryLabelFontSize
+//                    };
+//                    Canvas.SetLeft(entryLabel, entryX - 15);
+//                    Canvas.SetTop(entryLabel, topMargin + 5);
+//                    plotCanvas.Children.Add(entryLabel);
+//                }
+
+//                // Exit line
+//                if (!double.IsNaN(exitX) && !double.IsInfinity(exitX))
+//                {
+//                    Line exitLine = new Line
+//                    {
+//                        X1 = exitX,
+//                        Y1 = topMargin,
+//                        X2 = exitX,
+//                        Y2 = canvasHeight - bottomMargin,
+//                        Stroke = Brushes.Green,
+//                        StrokeThickness = 1,
+//                        StrokeDashArray = new DoubleCollection { 4, 2 }
+//                    };
+//                    plotCanvas.Children.Add(exitLine);
+
+//                    TextBlock exitLabel = new TextBlock
+//                    {
+//                        Text = "Exit",
+//                        Foreground = Brushes.Green,
+//                        FontSize = boundaryLabelFontSize
+//                    };
+//                    Canvas.SetLeft(exitLabel, exitX - 10);
+//                    Canvas.SetTop(exitLabel, topMargin + 5);
+//                    plotCanvas.Children.Add(exitLabel);
+//                }
+
+//                // Add axis ticks and values with responsive sizing
+//                double tickFontSize = Math.Max(6, Math.Min(9, canvasHeight * 0.02));
+
+//                // X-axis ticks - adjust number based on width
+//                int numXTicks = Math.Max(4, Math.Min(10, (int)(plotWidth / 60)));
+//                double xTickStep = (maxDist - minDist) / numXTicks;
+
+//                for (int i = 0; i <= numXTicks; i++)
+//                {
+//                    double tickValue = minDist + i * xTickStep;
+//                    double tickX = leftMargin + (tickValue - minDist) / (maxDist - minDist) * plotWidth;
+
+//                    Line tick = new Line
+//                    {
+//                        X1 = tickX,
+//                        Y1 = canvasHeight - bottomMargin,
+//                        X2 = tickX,
+//                        Y2 = canvasHeight - bottomMargin + 5,
+//                        Stroke = Brushes.Black,
+//                        StrokeThickness = 1
+//                    };
+
+//                    TextBlock tickLabel = new TextBlock
+//                    {
+//                        Text = string.Format("{0:F0}", tickValue),
+//                        FontSize = tickFontSize
+//                    };
+
+//                    Canvas.SetLeft(tickLabel, tickX - 15);
+//                    Canvas.SetTop(tickLabel, canvasHeight - bottomMargin + 8);
+
+//                    plotCanvas.Children.Add(tick);
+//                    plotCanvas.Children.Add(tickLabel);
+//                }
+
+//                // Y-axis ticks - adjust number based on height
+//                int numYTicks = Math.Max(3, Math.Min(7, (int)(plotHeight / 40)));
+//                double yTickStep = maxDose / numYTicks;
+
+//                for (int i = 0; i <= numYTicks; i++)
+//                {
+//                    double tickValue = i * yTickStep;
+//                    double tickY = (canvasHeight - bottomMargin) - (tickValue / maxDose) * plotHeight;
+
+//                    Line tick = new Line
+//                    {
+//                        X1 = leftMargin - 5,
+//                        Y1 = tickY,
+//                        X2 = leftMargin,
+//                        Y2 = tickY,
+//                        Stroke = Brushes.Black,
+//                        StrokeThickness = 1
+//                    };
+
+//                    TextBlock tickLabel = new TextBlock
+//                    {
+//                        Text = string.Format("{0:F1}", tickValue),
+//                        FontSize = tickFontSize
+//                    };
+
+//                    Canvas.SetLeft(tickLabel, leftMargin - 40);
+//                    Canvas.SetTop(tickLabel, tickY - 8);
+
+//                    plotCanvas.Children.Add(tick);
+//                    plotCanvas.Children.Add(tickLabel);
+//                }
+
+//                OutputLog += $"Embedded plot drawn successfully. Total canvas children: {plotCanvas.Children.Count}\n";
+//            }
+//            catch (Exception ex)
+//            {
+//                OutputLog += $"Error drawing plot: {ex.Message}\n";
+//                OutputLog += $"Stack trace: {ex.StackTrace}\n";
+//            }
+//        }
+
+//        /// <summary>
+//        /// Creates and displays a simple plot of the dose along the central axis (original popup window version)
+//        /// </summary>
+//        private void ShowDosePlot(List<double> distances, List<double> doseValues, List<bool> insideTumorFlags,
+//                                 double entryDist, double exitDist, string tumorId, string beamId)
+//        {
+//            try
+//            {
+//                // Create the plot window
+//                System.Windows.Window plotWindow = new System.Windows.Window
+//                {
+//                    Title = string.Format("Central Axis Dose Plot - {0} - {1}", tumorId, beamId),
+//                    Width = 800,
+//                    Height = 600,
+//                    WindowStartupLocation = System.Windows.WindowStartupLocation.CenterScreen
+//                };
+
+//                // Create a grid to hold the plot components
+//                System.Windows.Controls.Grid mainGrid = new System.Windows.Controls.Grid();
+//                plotWindow.Content = mainGrid;
+
+//                // Add row definitions for the plot and legend
+//                mainGrid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = new System.Windows.GridLength(1, System.Windows.GridUnitType.Star) });
+//                mainGrid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = new System.Windows.GridLength(40, System.Windows.GridUnitType.Pixel) });
+
+//                // Create a canvas for the plot
+//                System.Windows.Controls.Canvas plotCanvas = new System.Windows.Controls.Canvas
+//                {
+//                    Background = System.Windows.Media.Brushes.White
+//                };
+//                System.Windows.Controls.Grid.SetRow(plotCanvas, 0);
+//                mainGrid.Children.Add(plotCanvas);
+
+//                // Create a panel for the legend
+//                System.Windows.Controls.StackPanel legendPanel = new System.Windows.Controls.StackPanel
+//                {
+//                    Orientation = System.Windows.Controls.Orientation.Horizontal,
+//                    HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+//                    Margin = new System.Windows.Thickness(0, 10, 0, 10)
+//                };
+//                System.Windows.Controls.Grid.SetRow(legendPanel, 1);
+//                mainGrid.Children.Add(legendPanel);
+
+//                // Use fixed margins for the plot area
+//                double leftMargin = 60;
+//                double rightMargin = 20;
+//                double topMargin = 30;
+//                double bottomMargin = 50;
+
+//                // Find min and max values for scaling
+//                double minDist = distances.Min();
+//                double maxDist = distances.Max();
+//                double maxDose = doseValues.Max() * 1.1; // Add 10% for margin
+
+//                // Wait for the canvas to be properly sized
+//                plotWindow.Loaded += (sender, e) =>
+//                {
+//                    try
+//                    {
+//                        // Calculate plot dimensions
+//                        double plotWidth = plotCanvas.ActualWidth - leftMargin - rightMargin;
+//                        double plotHeight = plotCanvas.ActualHeight - topMargin - bottomMargin;
+
+//                        // Create horizontal and vertical axes
+//                        System.Windows.Shapes.Line horizontalAxis = new System.Windows.Shapes.Line
+//                        {
+//                            X1 = leftMargin,
+//                            Y1 = plotCanvas.ActualHeight - bottomMargin,
+//                            X2 = plotCanvas.ActualWidth - rightMargin,
+//                            Y2 = plotCanvas.ActualHeight - bottomMargin,
+//                            Stroke = System.Windows.Media.Brushes.Black,
+//                            StrokeThickness = 1
+//                        };
+
+//                        System.Windows.Shapes.Line verticalAxis = new System.Windows.Shapes.Line
+//                        {
+//                            X1 = leftMargin,
+//                            Y1 = topMargin,
+//                            X2 = leftMargin,
+//                            Y2 = plotCanvas.ActualHeight - bottomMargin,
+//                            Stroke = System.Windows.Media.Brushes.Black,
+//                            StrokeThickness = 1
+//                        };
+
+//                        plotCanvas.Children.Add(horizontalAxis);
+//                        plotCanvas.Children.Add(verticalAxis);
+
+//                        // Add axis labels
+//                        System.Windows.Controls.TextBlock xAxisLabel = new System.Windows.Controls.TextBlock
+//                        {
+//                            Text = "Distance from Isocenter (mm)",
+//                            HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+//                            VerticalAlignment = System.Windows.VerticalAlignment.Bottom
+//                        };
+//                        System.Windows.Controls.Canvas.SetLeft(xAxisLabel, plotCanvas.ActualWidth / 2 - 80);
+//                        System.Windows.Controls.Canvas.SetTop(xAxisLabel, plotCanvas.ActualHeight - 20);
+//                        plotCanvas.Children.Add(xAxisLabel);
+
+//                        System.Windows.Controls.TextBlock yAxisLabel = new System.Windows.Controls.TextBlock
+//                        {
+//                            Text = "Dose (Gy)",
+//                            HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+//                            VerticalAlignment = System.Windows.VerticalAlignment.Center,
+//                            LayoutTransform = new System.Windows.Media.RotateTransform(-90)
+//                        };
+//                        System.Windows.Controls.Canvas.SetLeft(yAxisLabel, 5);
+//                        System.Windows.Controls.Canvas.SetTop(yAxisLabel, plotCanvas.ActualHeight / 2 - 20);
+//                        plotCanvas.Children.Add(yAxisLabel);
+
+//                        // Plot the data points
+//                        System.Windows.Shapes.Polyline doseLine = new System.Windows.Shapes.Polyline
+//                        {
+//                            Stroke = System.Windows.Media.Brushes.Blue,
+//                            StrokeThickness = 2
+//                        };
+
+//                        System.Windows.Media.PointCollection points = new System.Windows.Media.PointCollection();
+//                        bool hasValidPoints = false;
+
+//                        for (int i = 0; i < distances.Count; i++)
+//                        {
+//                            // Convert data to canvas coordinates
+//                            double x = leftMargin + (distances[i] - minDist) / (maxDist - minDist) * plotWidth;
+//                            double y = (plotCanvas.ActualHeight - bottomMargin) - (doseValues[i] / maxDose) * plotHeight;
+
+//                            // Check for valid coordinates before adding the point
+//                            if (!double.IsNaN(x) && !double.IsNaN(y) && !double.IsInfinity(x) && !double.IsInfinity(y))
+//                            {
+//                                points.Add(new System.Windows.Point(x, y));
+//                                hasValidPoints = true;
+
+//                                // If inside tumor, add a red dot
+//                                if (insideTumorFlags[i])
+//                                {
+//                                    System.Windows.Shapes.Ellipse dot = new System.Windows.Shapes.Ellipse
+//                                    {
+//                                        Width = 4,
+//                                        Height = 4,
+//                                        Fill = System.Windows.Media.Brushes.Red
+//                                    };
+//                                    System.Windows.Controls.Canvas.SetLeft(dot, x - 2);
+//                                    System.Windows.Controls.Canvas.SetTop(dot, y - 2);
+//                                    plotCanvas.Children.Add(dot);
+//                                }
+//                            }
+//                        }
+
+//                        if (hasValidPoints)
+//                        {
+//                            doseLine.Points = points;
+//                            plotCanvas.Children.Add(doseLine);
+
+//                            // Add tumor boundary markers
+//                            double entryX = leftMargin + (entryDist - minDist) / (maxDist - minDist) * plotWidth;
+//                            double exitX = leftMargin + (exitDist - minDist) / (maxDist - minDist) * plotWidth;
+
+//                            // Verify boundary coordinates are valid
+//                            if (!double.IsNaN(entryX) && !double.IsInfinity(entryX))
+//                            {
+//                                System.Windows.Shapes.Line entryLine = new System.Windows.Shapes.Line
+//                                {
+//                                    X1 = entryX,
+//                                    Y1 = topMargin,
+//                                    X2 = entryX,
+//                                    Y2 = plotCanvas.ActualHeight - bottomMargin,
+//                                    Stroke = System.Windows.Media.Brushes.Green,
+//                                    StrokeThickness = 1,
+//                                    StrokeDashArray = new System.Windows.Media.DoubleCollection { 4, 2 }
+//                                };
+//                                plotCanvas.Children.Add(entryLine);
+
+//                                System.Windows.Controls.TextBlock entryLabel = new System.Windows.Controls.TextBlock
+//                                {
+//                                    Text = "Entry",
+//                                    Foreground = System.Windows.Media.Brushes.Green
+//                                };
+//                                System.Windows.Controls.Canvas.SetLeft(entryLabel, entryX - 15);
+//                                System.Windows.Controls.Canvas.SetTop(entryLabel, topMargin);
+//                                plotCanvas.Children.Add(entryLabel);
+//                            }
+
+//                            if (!double.IsNaN(exitX) && !double.IsInfinity(exitX))
+//                            {
+//                                System.Windows.Shapes.Line exitLine = new System.Windows.Shapes.Line
+//                                {
+//                                    X1 = exitX,
+//                                    Y1 = topMargin,
+//                                    X2 = exitX,
+//                                    Y2 = plotCanvas.ActualHeight - bottomMargin,
+//                                    Stroke = System.Windows.Media.Brushes.Green,
+//                                    StrokeThickness = 1,
+//                                    StrokeDashArray = new System.Windows.Media.DoubleCollection { 4, 2 }
+//                                };
+//                                plotCanvas.Children.Add(exitLine);
+
+//                                System.Windows.Controls.TextBlock exitLabel = new System.Windows.Controls.TextBlock
+//                                {
+//                                    Text = "Exit",
+//                                    Foreground = System.Windows.Media.Brushes.Green
+//                                };
+//                                System.Windows.Controls.Canvas.SetLeft(exitLabel, exitX - 10);
+//                                System.Windows.Controls.Canvas.SetTop(exitLabel, topMargin);
+//                                plotCanvas.Children.Add(exitLabel);
+//                            }
+//                        }
+//                        else
+//                        {
+//                            MessageBox.Show("Could not plot the data: No valid coordinates found.");
+//                            return;
+//                        }
+
+//                        // Add axis ticks and values
+//                        // X-axis
+//                        int numXTicks = 10;
+//                        double xTickStep = (maxDist - minDist) / numXTicks;
+
+//                        for (int i = 0; i <= numXTicks; i++)
+//                        {
+//                            double tickValue = minDist + i * xTickStep;
+//                            double tickX = leftMargin + (tickValue - minDist) / (maxDist - minDist) * plotWidth;
+
+//                            System.Windows.Shapes.Line tick = new System.Windows.Shapes.Line
+//                            {
+//                                X1 = tickX,
+//                                Y1 = plotCanvas.ActualHeight - bottomMargin,
+//                                X2 = tickX,
+//                                Y2 = plotCanvas.ActualHeight - bottomMargin + 5,
+//                                Stroke = System.Windows.Media.Brushes.Black,
+//                                StrokeThickness = 1
+//                            };
+
+//                            System.Windows.Controls.TextBlock tickLabel = new System.Windows.Controls.TextBlock
+//                            {
+//                                Text = string.Format("{0:F0}", tickValue),
+//                                FontSize = 10
+//                            };
+
+//                            System.Windows.Controls.Canvas.SetLeft(tickLabel, tickX - 10);
+//                            System.Windows.Controls.Canvas.SetTop(tickLabel, plotCanvas.ActualHeight - bottomMargin + 8);
+
+//                            plotCanvas.Children.Add(tick);
+//                            plotCanvas.Children.Add(tickLabel);
+//                        }
+
+//                        // Y-axis
+//                        int numYTicks = 5;
+//                        double yTickStep = maxDose / numYTicks;
+
+//                        for (int i = 0; i <= numYTicks; i++)
+//                        {
+//                            double tickValue = i * yTickStep;
+//                            double tickY = (plotCanvas.ActualHeight - bottomMargin) - (tickValue / maxDose) * plotHeight;
+
+//                            System.Windows.Shapes.Line tick = new System.Windows.Shapes.Line
+//                            {
+//                                X1 = leftMargin - 5,
+//                                Y1 = tickY,
+//                                X2 = leftMargin,
+//                                Y2 = tickY,
+//                                Stroke = System.Windows.Media.Brushes.Black,
+//                                StrokeThickness = 1
+//                            };
+
+//                            System.Windows.Controls.TextBlock tickLabel = new System.Windows.Controls.TextBlock
+//                            {
+//                                Text = string.Format("{0:F1}", tickValue),
+//                                FontSize = 10
+//                            };
+
+//                            System.Windows.Controls.Canvas.SetLeft(tickLabel, leftMargin - 30);
+//                            System.Windows.Controls.Canvas.SetTop(tickLabel, tickY - 7);
+
+//                            plotCanvas.Children.Add(tick);
+//                            plotCanvas.Children.Add(tickLabel);
+//                        }
+//                    }
+//                    catch (Exception ex)
+//                    {
+//                        MessageBox.Show(
+//                            string.Format("Error rendering plot: {0}", ex.Message),
+//                            "Plot Rendering Error",
+//                            MessageBoxButton.OK,
+//                            MessageBoxImage.Error
+//                        );
+//                    }
+//                };
+
+//                // Add legend items
+//                // Dose line
+//                System.Windows.Shapes.Rectangle doseLineItem = new System.Windows.Shapes.Rectangle
+//                {
+//                    Width = 20,
+//                    Height = 2,
+//                    Fill = System.Windows.Media.Brushes.Blue,
+//                    Margin = new System.Windows.Thickness(5)
+//                };
+//                System.Windows.Controls.TextBlock doseLineLabel = new System.Windows.Controls.TextBlock
+//                {
+//                    Text = "Dose",
+//                    VerticalAlignment = System.Windows.VerticalAlignment.Center,
+//                    Margin = new System.Windows.Thickness(5, 0, 15, 0)
+//                };
+
+//                // Inside tumor point
+//                System.Windows.Shapes.Ellipse insideTumorItem = new System.Windows.Shapes.Ellipse
+//                {
+//                    Width = 6,
+//                    Height = 6,
+//                    Fill = System.Windows.Media.Brushes.Red,
+//                    Margin = new System.Windows.Thickness(5)
+//                };
+//                System.Windows.Controls.TextBlock insideTumorLabel = new System.Windows.Controls.TextBlock
+//                {
+//                    Text = "Inside Tumor",
+//                    VerticalAlignment = System.Windows.VerticalAlignment.Center,
+//                    Margin = new System.Windows.Thickness(5, 0, 15, 0)
+//                };
+
+//                // Tumor boundaries
+//                System.Windows.Shapes.Rectangle boundaryItem = new System.Windows.Shapes.Rectangle
+//                {
+//                    Width = 20,
+//                    Height = 2,
+//                    Fill = System.Windows.Media.Brushes.Green,
+//                    Margin = new System.Windows.Thickness(5)
+//                };
+//                System.Windows.Controls.TextBlock boundaryLabel = new System.Windows.Controls.TextBlock
+//                {
+//                    Text = "Tumor Boundaries",
+//                    VerticalAlignment = System.Windows.VerticalAlignment.Center,
+//                    Margin = new System.Windows.Thickness(5, 0, 5, 0)
+//                };
+
+//                // Add items to legend
+//                legendPanel.Children.Add(doseLineItem);
+//                legendPanel.Children.Add(doseLineLabel);
+//                legendPanel.Children.Add(insideTumorItem);
+//                legendPanel.Children.Add(insideTumorLabel);
+//                legendPanel.Children.Add(boundaryLabel);
+
+//                // Show the plot window
+//                plotWindow.ShowDialog();
+//            }
+//            catch (Exception ex)
+//            {
+//                MessageBox.Show(
+//                    string.Format("Error creating plot: {0}", ex.Message),
+//                    "Plot Error",
+//                    MessageBoxButton.OK,
+//                    MessageBoxImage.Error
+//                );
+//            }
 //        }
 //    }
 //}
-
 
 using Prism.Commands;
 using Prism.Mvvm;
@@ -646,6 +1600,7 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 using VMS.TPS.Common.Model.API;
 using VMS.TPS.Common.Model.Types;
 
@@ -681,6 +1636,42 @@ namespace MAAS_SFRThelper.ViewModels
             set { SetProperty(ref _outputLog, value); }
         }
 
+        //Is1DCAXSelected
+        private bool _is1DCAXSelected;
+
+        public bool Is1DCAXSelected
+        {
+            get { return _is1DCAXSelected; }
+            set { SetProperty(ref _is1DCAXSelected, value); }
+        }
+
+        //IsIsocenterMethodSelected
+        private bool _isIsocenterMethodSelected;
+
+        public bool IsIsocenterMethodSelected
+        {
+            get { return _isIsocenterMethodSelected; }
+            set { SetProperty(ref _isIsocenterMethodSelected, value); }
+        }
+
+        //Is2DPlanarSelected
+        private bool _is2DPlanarSelected;
+
+        public bool Is2DPlanarSelected
+        {
+            get { return _is2DPlanarSelected; }
+            set { SetProperty(ref _is2DPlanarSelected, value); }
+        }
+
+        //Is3DEvaluationSelected
+        private bool _is3dEvaluationSelected;
+
+        public bool Is3DEvaluationSelected
+        {
+            get { return _is3dEvaluationSelected; }
+            set { SetProperty(ref _is3dEvaluationSelected, value); }
+        }
+
         // Compute status
         private bool _canCompute;
         public bool CanCompute
@@ -695,10 +1686,101 @@ namespace MAAS_SFRThelper.ViewModels
             }
         }
 
+        // Canvas reference (will be set from the View)
+        private Canvas _plotCanvas;
+        public Canvas PlotCanvas
+        {
+            get { return _plotCanvas; }
+            set
+            {
+                if (SetProperty(ref _plotCanvas, value))
+                {
+                    // Subscribe to size changed events for redrawing
+                    if (_plotCanvas != null)
+                    {
+                        _plotCanvas.SizeChanged += PlotCanvas_SizeChanged;
+                        _plotCanvas.Loaded += PlotCanvas_Loaded;
+                    }
+                }
+            }
+        }
+
+        // Flag to track if we have data to plot
+        private bool _hasPlotData = false;
+
+        // Visibility controls with mutual exclusivity
+        private bool _bTextVis = true;  // Start with text visible
+        public bool bTextVis
+        {
+            get { return _bTextVis; }
+            set
+            {
+                if (SetProperty(ref _bTextVis, value))
+                {
+                    OutputLog += $"bTextVis changed to: {value}\n";
+                    // If text view is being turned on, turn off plot view
+                    if (value && _bPlotVis)
+                    {
+                        _bPlotVis = false;
+                        OutputLog += "bPlotVis set to false (mutual exclusivity)\n";
+                        RaisePropertyChanged(nameof(bPlotVis));
+                    }
+                }
+            }
+        }
+
+        private bool _bPlotVis = false;  // Start with plot hidden
+        public bool bPlotVis
+        {
+            get { return _bPlotVis; }
+            set
+            {
+                if (SetProperty(ref _bPlotVis, value))
+                {
+                    OutputLog += $"bPlotVis changed to: {value}\n";
+                    // If plot view is being turned on, turn off text view
+                    if (value && _bTextVis)
+                    {
+                        _bTextVis = false;
+                        OutputLog += "bTextVis set to false (mutual exclusivity)\n";
+                        RaisePropertyChanged(nameof(bTextVis));
+                    }
+
+                    // Redraw plot when switching to plot view
+                    if (value && _hasPlotData)
+                    {
+                        RefreshPlot();
+                    }
+
+                    // Update RefreshPlotCommand availability
+                    RefreshPlotCommand?.RaiseCanExecuteChanged();
+                }
+            }
+        }
+
         // Commands
         public DelegateCommand ComputeCommand { get; private set; }
         public DelegateCommand SaveCsvCommand { get; private set; }
         public DelegateCommand ShowPlotCommand { get; private set; }
+        private DelegateCommand _refreshPlotCommand;
+        public DelegateCommand RefreshPlotCommand
+        {
+            get
+            {
+                if (_refreshPlotCommand == null)
+                {
+                    _refreshPlotCommand = new DelegateCommand(() =>
+                    {
+                        if (_hasPlotData && bPlotVis)
+                        {
+                            OutputLog += "Manual plot refresh triggered.\n";
+                            RefreshPlot();
+                        }
+                    }, () => _hasPlotData && bPlotVis);
+                }
+                return _refreshPlotCommand;
+            }
+        }
 
         // Internal fields for the dose sampling
         private List<double> _distances = new List<double>();
@@ -737,6 +1819,13 @@ namespace MAAS_SFRThelper.ViewModels
                 ComputeCommand = new DelegateCommand(ExecuteComputeDose, () => CanCompute);
                 SaveCsvCommand = new DelegateCommand(ExecuteSaveCsv, CanExecuteSaveCsv);
                 ShowPlotCommand = new DelegateCommand(ExecuteShowPlot, CanExecuteShowPlot);
+
+                // Set default evaluation method to 1D CAX
+                Is1DCAXSelected = true;
+
+                // Set initial visibility states
+                bTextVis = true;   // Show text log by default
+                bPlotVis = false;  // Hide plot by default
 
                 OutputLog += "Getting ESAPI context...\n";
 
@@ -807,6 +1896,55 @@ namespace MAAS_SFRThelper.ViewModels
                 catch { /* Ignore if OutputLog couldn't be used */ }
 
                 MessageBox.Show(errorMessage, "Initialization Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void PlotCanvas_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            // Redraw plot when canvas size changes if we're in plot view and have data
+            if (bPlotVis && _hasPlotData)
+            {
+                // Use a small delay to ensure the canvas is properly resized
+                System.Windows.Application.Current.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+                {
+                    RefreshPlot();
+                }));
+            }
+        }
+
+        private void PlotCanvas_Loaded(object sender, RoutedEventArgs e)
+        {
+            // Initial plot draw when canvas is loaded
+            if (bPlotVis && _hasPlotData)
+            {
+                RefreshPlot();
+            }
+        }
+
+        private void RefreshPlot()
+        {
+            if (PlotCanvas == null || !_hasPlotData) return;
+
+            try
+            {
+                string tumorId = SelectedTumorId ?? "Unknown Tumor";
+                string beamId = SelectedBeamId ?? "Unknown Beam";
+
+                // Clear existing plot first
+                PlotCanvas.Children.Clear();
+
+                // Force layout update
+                PlotCanvas.UpdateLayout();
+
+                // Use Loaded priority for more reliable rendering
+                PlotCanvas.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+                {
+                    DrawEmbeddedPlot(PlotCanvas, _distances, _doseValues, _insideTumorFlags, _entryDist, _exitDist, tumorId, beamId);
+                }));
+            }
+            catch (Exception ex)
+            {
+                OutputLog += $"Error refreshing plot: {ex.Message}\n";
             }
         }
 
@@ -916,6 +2054,7 @@ namespace MAAS_SFRThelper.ViewModels
                 _distances = new List<double>();
                 _doseValues = new List<double>();
                 _insideTumorFlags = new List<bool>();
+                _hasPlotData = false;
 
                 OutputLog += "Starting dose computation...\n";
 
@@ -1097,6 +2236,7 @@ namespace MAAS_SFRThelper.ViewModels
                             _distances = new List<double>(tempDistances);
                             _doseValues = new List<double>(tempDoseValues);
                             _insideTumorFlags = new List<bool>(tempInsideFlags);
+                            _hasPlotData = true;
                         }
 
                         if (_distances.Count == 0)
@@ -1142,6 +2282,7 @@ namespace MAAS_SFRThelper.ViewModels
                 // Update the commands that depend on data availability
                 SaveCsvCommand.RaiseCanExecuteChanged();
                 ShowPlotCommand.RaiseCanExecuteChanged();
+                RefreshPlotCommand?.RaiseCanExecuteChanged();
             }
             catch (Exception ex)
             {
@@ -1150,7 +2291,7 @@ namespace MAAS_SFRThelper.ViewModels
             }
         }
 
-        private bool CanExecuteSaveCsv()
+        public bool CanExecuteSaveCsv()
         {
             try
             {
@@ -1166,7 +2307,7 @@ namespace MAAS_SFRThelper.ViewModels
             }
         }
 
-        private bool CanExecuteShowPlot()
+        public bool CanExecuteShowPlot()
         {
             try
             {
@@ -1286,7 +2427,7 @@ namespace MAAS_SFRThelper.ViewModels
         {
             try
             {
-                OutputLog += "Creating plot window...\n";
+                OutputLog += "Creating embedded plot...\n";
 
                 if (!CanExecuteShowPlot())
                 {
@@ -1295,24 +2436,427 @@ namespace MAAS_SFRThelper.ViewModels
                     return;
                 }
 
-                // Get the structure and beam IDs for the plot title
-                string tumorId = SelectedTumorId ?? "Unknown Tumor";
-                string beamId = SelectedBeamId ?? "Unknown Beam";
+                OutputLog += "Switching to plot view...\n";
+                // Switch to plot view by setting the radio button states
+                bTextVis = false;
+                bPlotVis = true;
 
-                // Show the dose plot
-                ShowDosePlot(_distances, _doseValues, _insideTumorFlags, _entryDist, _exitDist, tumorId, beamId);
+                // Check which evaluation method is selected
+                if (Is1DCAXSelected)
+                {
+                    OutputLog += "Using 1D CAX evaluation method for embedded plot...\n";
 
-                OutputLog += "Plot window created successfully.\n";
+                    // Get the structure and beam IDs for the plot title
+                    string tumorId = SelectedTumorId ?? "Unknown Tumor";
+                    string beamId = SelectedBeamId ?? "Unknown Beam";
+
+                    // Show the 1D CAX dose plot in embedded canvas
+                    ShowEmbeddedDosePlot(_distances, _doseValues, _insideTumorFlags, _entryDist, _exitDist, tumorId, beamId);
+
+                    OutputLog += "1D CAX embedded plot creation completed.\n";
+                }
+                else if (IsIsocenterMethodSelected)
+                {
+                    OutputLog += "Using 2D Isocenter Planar evaluation method for plot...\n";
+                    // TODO: Implement 2D Isocenter plotting logic
+                    MessageBox.Show("2D Isocenter Planar plotting not yet implemented.",
+                        "Feature Not Available", MessageBoxButton.OK, MessageBoxImage.Information);
+                    // Switch back to text view since plot isn't implemented
+                    bTextVis = true;
+                    bPlotVis = false;
+                }
+                else if (Is2DPlanarSelected)
+                {
+                    OutputLog += "Using 2D Normal Multiplanar P/V Interpolation evaluation method for plot...\n";
+                    // TODO: Implement 2D Multiplanar plotting logic
+                    MessageBox.Show("2D Normal Multiplanar P/V Interpolation plotting not yet implemented.",
+                        "Feature Not Available", MessageBoxButton.OK, MessageBoxImage.Information);
+                    // Switch back to text view since plot isn't implemented
+                    bTextVis = true;
+                    bPlotVis = false;
+                }
+                else if (Is3DEvaluationSelected)
+                {
+                    OutputLog += "Using 3D Dose P/V Interpolation evaluation method for plot...\n";
+                    // TODO: Implement 3D plotting logic
+                    MessageBox.Show("3D Dose P/V Interpolation plotting not yet implemented.",
+                        "Feature Not Available", MessageBoxButton.OK, MessageBoxImage.Information);
+                    // Switch back to text view since plot isn't implemented
+                    bTextVis = true;
+                    bPlotVis = false;
+                }
+                else
+                {
+                    OutputLog += "No evaluation method selected. Defaulting to 1D CAX...\n";
+
+                    // Default to 1D CAX if nothing is selected
+                    string tumorId = SelectedTumorId ?? "Unknown Tumor";
+                    string beamId = SelectedBeamId ?? "Unknown Beam";
+                    ShowEmbeddedDosePlot(_distances, _doseValues, _insideTumorFlags, _entryDist, _exitDist, tumorId, beamId);
+
+                    OutputLog += "Default 1D CAX embedded plot creation completed.\n";
+                }
             }
             catch (Exception ex)
             {
-                OutputLog += $"Error creating plot window: {ex.Message}\n";
+                OutputLog += $"Error creating embedded plot: {ex.Message}\n";
                 MessageBox.Show($"Error creating plot: {ex.Message}", "Plot Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                // Switch back to text view on error
+                bTextVis = true;
+                bPlotVis = false;
             }
         }
 
         /// <summary>
-        /// Creates and displays a simple plot of the dose along the central axis
+        /// Creates an embedded plot of the dose along the central axis within the existing Canvas
+        /// </summary>
+        private void ShowEmbeddedDosePlot(List<double> distances, List<double> doseValues, List<bool> insideTumorFlags,
+                                          double entryDist, double exitDist, string tumorId, string beamId)
+        {
+            try
+            {
+                OutputLog += "Starting ShowEmbeddedDosePlot...\n";
+
+                if (PlotCanvas == null)
+                {
+                    OutputLog += "ERROR: PlotCanvas is null! Canvas reference not set from View.\n";
+                    return;
+                }
+
+                // Clear canvas immediately
+                PlotCanvas.Children.Clear();
+
+                // Force a layout update to ensure canvas has proper dimensions
+                PlotCanvas.UpdateLayout();
+
+                // Use Loaded priority instead of ApplicationIdle for more reliable timing
+                PlotCanvas.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+                {
+                    // Double-check canvas dimensions
+                    if (PlotCanvas.ActualWidth <= 0 || PlotCanvas.ActualHeight <= 0)
+                    {
+                        OutputLog += "Canvas has invalid dimensions. Forcing layout update.\n";
+                        PlotCanvas.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                        PlotCanvas.Arrange(new Rect(0, 0, PlotCanvas.DesiredSize.Width, PlotCanvas.DesiredSize.Height));
+                        PlotCanvas.UpdateLayout();
+                    }
+
+                    OutputLog += $"PlotCanvas dimensions: {PlotCanvas.ActualWidth} x {PlotCanvas.ActualHeight}\n";
+
+                    DrawEmbeddedPlot(PlotCanvas, distances, doseValues, insideTumorFlags, entryDist, exitDist, tumorId, beamId);
+                    OutputLog += $"DrawEmbeddedPlot completed. Canvas now has {PlotCanvas.Children.Count} children.\n";
+                }));
+            }
+            catch (Exception ex)
+            {
+                OutputLog += $"Error in ShowEmbeddedDosePlot: {ex.Message}\n";
+            }
+        }
+
+        /// <summary>
+        /// Actually draws the plot on the provided canvas with improved sizing
+        /// </summary>
+        private void DrawEmbeddedPlot(Canvas plotCanvas, List<double> distances, List<double> doseValues,
+                                     List<bool> insideTumorFlags, double entryDist, double exitDist,
+                                     string tumorId, string beamId)
+        {
+            try
+            {
+                // Get actual dimensions
+                double canvasWidth = plotCanvas.ActualWidth;
+                double canvasHeight = plotCanvas.ActualHeight;
+
+                OutputLog += $"DrawEmbeddedPlot - Canvas dimensions: {canvasWidth} x {canvasHeight}\n";
+
+                // Check if canvas has valid dimensions
+                if (canvasWidth <= 0 || canvasHeight <= 0 || double.IsNaN(canvasWidth) || double.IsNaN(canvasHeight))
+                {
+                    OutputLog += "Canvas has invalid dimensions. Cannot draw plot.\n";
+
+                    // Try one more time to get dimensions
+                    plotCanvas.UpdateLayout();
+                    canvasWidth = plotCanvas.ActualWidth;
+                    canvasHeight = plotCanvas.ActualHeight;
+
+                    if (canvasWidth <= 0 || canvasHeight <= 0)
+                    {
+                        OutputLog += "Canvas still has invalid dimensions after UpdateLayout.\n";
+                        return;
+                    }
+                }
+
+                // Clear any existing content
+                plotCanvas.Children.Clear();
+
+                OutputLog += $"Using dimensions: {canvasWidth} x {canvasHeight}\n";
+
+                // Use proportional margins that work better with smaller canvases
+                double leftMargin = Math.Max(50, canvasWidth * 0.08);
+                double rightMargin = Math.Max(20, canvasWidth * 0.03);
+                double topMargin = Math.Max(30, canvasHeight * 0.08);
+                double bottomMargin = Math.Max(50, canvasHeight * 0.12);
+
+                double plotWidth = canvasWidth - leftMargin - rightMargin;
+                double plotHeight = canvasHeight - topMargin - bottomMargin;
+
+                // Ensure we have positive plot dimensions
+                if (plotWidth <= 0 || plotHeight <= 0)
+                {
+                    OutputLog += $"Invalid plot dimensions: {plotWidth} x {plotHeight}. Canvas too small.\n";
+                    return;
+                }
+
+                OutputLog += $"Plot area: {plotWidth} x {plotHeight}, margins: L{leftMargin} R{rightMargin} T{topMargin} B{bottomMargin}\n";
+
+                // Find min and max values for scaling
+                double minDist = distances.Min();
+                double maxDist = distances.Max();
+                double maxDose = doseValues.Max() * 1.1; // Add 10% for margin
+
+                OutputLog += $"Data ranges: Distance {minDist:F1} to {maxDist:F1}, Dose 0 to {maxDose:F3}\n";
+
+                // Add title with responsive font size
+                double titleFontSize = Math.Max(10, Math.Min(16, canvasHeight * 0.04));
+                TextBlock title = new TextBlock
+                {
+                    Text = $"Central Axis Dose Plot - {tumorId} - {beamId}",
+                    FontSize = titleFontSize,
+                    FontWeight = FontWeights.Bold,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    TextWrapping = TextWrapping.Wrap
+                };
+                Canvas.SetLeft(title, canvasWidth / 2 - 150);
+                Canvas.SetTop(title, 5);
+                plotCanvas.Children.Add(title);
+
+                // Create horizontal and vertical axes
+                Line horizontalAxis = new Line
+                {
+                    X1 = leftMargin,
+                    Y1 = canvasHeight - bottomMargin,
+                    X2 = canvasWidth - rightMargin,
+                    Y2 = canvasHeight - bottomMargin,
+                    Stroke = Brushes.Black,
+                    StrokeThickness = 1
+                };
+
+                Line verticalAxis = new Line
+                {
+                    X1 = leftMargin,
+                    Y1 = topMargin,
+                    X2 = leftMargin,
+                    Y2 = canvasHeight - bottomMargin,
+                    Stroke = Brushes.Black,
+                    StrokeThickness = 1
+                };
+
+                plotCanvas.Children.Add(horizontalAxis);
+                plotCanvas.Children.Add(verticalAxis);
+
+                // Add axis labels with responsive font size
+                double labelFontSize = Math.Max(8, Math.Min(12, canvasHeight * 0.03));
+
+                TextBlock xAxisLabel = new TextBlock
+                {
+                    Text = "Distance from Isocenter (mm)",
+                    FontSize = labelFontSize,
+                    HorizontalAlignment = HorizontalAlignment.Center
+                };
+                Canvas.SetLeft(xAxisLabel, canvasWidth / 2 - 80);
+                Canvas.SetTop(xAxisLabel, canvasHeight - 15);
+                plotCanvas.Children.Add(xAxisLabel);
+
+                TextBlock yAxisLabel = new TextBlock
+                {
+                    Text = "Dose (Gy)",
+                    FontSize = labelFontSize,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    LayoutTransform = new RotateTransform(-90)
+                };
+                Canvas.SetLeft(yAxisLabel, 15);
+                Canvas.SetTop(yAxisLabel, canvasHeight / 2);
+                plotCanvas.Children.Add(yAxisLabel);
+
+                // Plot the data points
+                Polyline doseLine = new Polyline
+                {
+                    Stroke = Brushes.Blue,
+                    StrokeThickness = Math.Max(1, canvasWidth / 400) // Responsive line thickness
+                };
+
+                PointCollection points = new PointCollection();
+                int validPointCount = 0;
+
+                for (int i = 0; i < distances.Count; i++)
+                {
+                    // Convert data to canvas coordinates
+                    double x = leftMargin + (distances[i] - minDist) / (maxDist - minDist) * plotWidth;
+                    double y = (canvasHeight - bottomMargin) - (doseValues[i] / maxDose) * plotHeight;
+
+                    // Check for valid coordinates
+                    if (!double.IsNaN(x) && !double.IsNaN(y) && !double.IsInfinity(x) && !double.IsInfinity(y))
+                    {
+                        points.Add(new Point(x, y));
+                        validPointCount++;
+
+                        // If inside tumor, add a red dot with responsive size
+                        if (insideTumorFlags[i])
+                        {
+                            double dotSize = Math.Max(2, Math.Min(6, canvasWidth / 150));
+                            Ellipse dot = new Ellipse
+                            {
+                                Width = dotSize,
+                                Height = dotSize,
+                                Fill = Brushes.Red
+                            };
+                            Canvas.SetLeft(dot, x - dotSize / 2);
+                            Canvas.SetTop(dot, y - dotSize / 2);
+                            plotCanvas.Children.Add(dot);
+                        }
+                    }
+                }
+
+                OutputLog += $"Added {validPointCount} valid points to plot line.\n";
+
+                doseLine.Points = points;
+                plotCanvas.Children.Add(doseLine);
+
+                // Add tumor boundary markers
+                double entryX = leftMargin + (entryDist - minDist) / (maxDist - minDist) * plotWidth;
+                double exitX = leftMargin + (exitDist - minDist) / (maxDist - minDist) * plotWidth;
+
+                double boundaryLabelFontSize = Math.Max(7, Math.Min(10, canvasHeight * 0.025));
+
+                // Entry line
+                if (!double.IsNaN(entryX) && !double.IsInfinity(entryX))
+                {
+                    Line entryLine = new Line
+                    {
+                        X1 = entryX,
+                        Y1 = topMargin,
+                        X2 = entryX,
+                        Y2 = canvasHeight - bottomMargin,
+                        Stroke = Brushes.Green,
+                        StrokeThickness = 1,
+                        StrokeDashArray = new DoubleCollection { 4, 2 }
+                    };
+                    plotCanvas.Children.Add(entryLine);
+
+                    TextBlock entryLabel = new TextBlock
+                    {
+                        Text = "Entry",
+                        Foreground = Brushes.Green,
+                        FontSize = boundaryLabelFontSize
+                    };
+                    Canvas.SetLeft(entryLabel, entryX - 15);
+                    Canvas.SetTop(entryLabel, topMargin + 5);
+                    plotCanvas.Children.Add(entryLabel);
+                }
+
+                // Exit line
+                if (!double.IsNaN(exitX) && !double.IsInfinity(exitX))
+                {
+                    Line exitLine = new Line
+                    {
+                        X1 = exitX,
+                        Y1 = topMargin,
+                        X2 = exitX,
+                        Y2 = canvasHeight - bottomMargin,
+                        Stroke = Brushes.Green,
+                        StrokeThickness = 1,
+                        StrokeDashArray = new DoubleCollection { 4, 2 }
+                    };
+                    plotCanvas.Children.Add(exitLine);
+
+                    TextBlock exitLabel = new TextBlock
+                    {
+                        Text = "Exit",
+                        Foreground = Brushes.Green,
+                        FontSize = boundaryLabelFontSize
+                    };
+                    Canvas.SetLeft(exitLabel, exitX - 10);
+                    Canvas.SetTop(exitLabel, topMargin + 5);
+                    plotCanvas.Children.Add(exitLabel);
+                }
+
+                // Add axis ticks and values with responsive sizing
+                double tickFontSize = Math.Max(6, Math.Min(9, canvasHeight * 0.02));
+
+                // X-axis ticks - adjust number based on width
+                int numXTicks = Math.Max(4, Math.Min(10, (int)(plotWidth / 60)));
+                double xTickStep = (maxDist - minDist) / numXTicks;
+
+                for (int i = 0; i <= numXTicks; i++)
+                {
+                    double tickValue = minDist + i * xTickStep;
+                    double tickX = leftMargin + (tickValue - minDist) / (maxDist - minDist) * plotWidth;
+
+                    Line tick = new Line
+                    {
+                        X1 = tickX,
+                        Y1 = canvasHeight - bottomMargin,
+                        X2 = tickX,
+                        Y2 = canvasHeight - bottomMargin + 5,
+                        Stroke = Brushes.Black,
+                        StrokeThickness = 1
+                    };
+
+                    TextBlock tickLabel = new TextBlock
+                    {
+                        Text = string.Format("{0:F0}", tickValue),
+                        FontSize = tickFontSize
+                    };
+
+                    Canvas.SetLeft(tickLabel, tickX - 15);
+                    Canvas.SetTop(tickLabel, canvasHeight - bottomMargin + 8);
+
+                    plotCanvas.Children.Add(tick);
+                    plotCanvas.Children.Add(tickLabel);
+                }
+
+                // Y-axis ticks - adjust number based on height
+                int numYTicks = Math.Max(3, Math.Min(7, (int)(plotHeight / 40)));
+                double yTickStep = maxDose / numYTicks;
+
+                for (int i = 0; i <= numYTicks; i++)
+                {
+                    double tickValue = i * yTickStep;
+                    double tickY = (canvasHeight - bottomMargin) - (tickValue / maxDose) * plotHeight;
+
+                    Line tick = new Line
+                    {
+                        X1 = leftMargin - 5,
+                        Y1 = tickY,
+                        X2 = leftMargin,
+                        Y2 = tickY,
+                        Stroke = Brushes.Black,
+                        StrokeThickness = 1
+                    };
+
+                    TextBlock tickLabel = new TextBlock
+                    {
+                        Text = string.Format("{0:F1}", tickValue),
+                        FontSize = tickFontSize
+                    };
+
+                    Canvas.SetLeft(tickLabel, leftMargin - 40);
+                    Canvas.SetTop(tickLabel, tickY - 8);
+
+                    plotCanvas.Children.Add(tick);
+                    plotCanvas.Children.Add(tickLabel);
+                }
+
+                OutputLog += $"Embedded plot drawn successfully. Total canvas children: {plotCanvas.Children.Count}\n";
+            }
+            catch (Exception ex)
+            {
+                OutputLog += $"Error drawing plot: {ex.Message}\n";
+                OutputLog += $"Stack trace: {ex.StackTrace}\n";
+            }
+        }
+
+        /// <summary>
+        /// Creates and displays a simple plot of the dose along the central axis (original popup window version)
         /// </summary>
         private void ShowDosePlot(List<double> distances, List<double> doseValues, List<bool> insideTumorFlags,
                                  double entryDist, double exitDist, string tumorId, string beamId)
@@ -1649,7 +3193,6 @@ namespace MAAS_SFRThelper.ViewModels
                 legendPanel.Children.Add(doseLineLabel);
                 legendPanel.Children.Add(insideTumorItem);
                 legendPanel.Children.Add(insideTumorLabel);
-                legendPanel.Children.Add(boundaryItem);
                 legendPanel.Children.Add(boundaryLabel);
 
                 // Show the plot window

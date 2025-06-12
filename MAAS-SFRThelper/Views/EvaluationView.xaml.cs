@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MAAS_SFRThelper.ViewModels;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,6 +13,8 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using System.Windows.Controls;
+using MAAS_SFRThelper.ViewModels;
 
 namespace MAAS_SFRThelper.Views
 {
@@ -20,7 +23,16 @@ namespace MAAS_SFRThelper.Views
         public EvaluationView()
         {
             InitializeComponent();
+            // Pass the Canvas reference to the ViewModel after loading
+            this.Loaded += (s, e) =>
+            {
+                if (DataContext is EvaluationViewModel vm)
+                {
+                    vm.PlotCanvas = PlotCanvas;
+                }
+            };
         }
     }
+   
 }
 

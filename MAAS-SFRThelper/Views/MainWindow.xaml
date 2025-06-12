@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:MAAS_SFRThelper.Views"
         mc:Ignorable="d"
-        Title="{Binding WindowTitle}" Height="635" Width="635">
+        Title="{Binding WindowTitle}" Height="635" Width="725">
     <DockPanel LastChildFill="False">
         <Grid DockPanel.Dock="Top">
             <Grid.RowDefinitions>
