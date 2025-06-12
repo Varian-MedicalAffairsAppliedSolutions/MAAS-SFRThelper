@@ -115,7 +115,7 @@ namespace MAAS_SFRThelper.ViewModels
             set
             {
                 SetProperty(ref isHex, value);
-                
+
             }
         }
 
@@ -127,7 +127,7 @@ namespace MAAS_SFRThelper.ViewModels
             set
             {
                 SetProperty(ref isRect, value);
-                                
+
             }
         }
 
@@ -141,14 +141,14 @@ namespace MAAS_SFRThelper.ViewModels
                 if (IsCVT3D)
                 {
                     LSFVisibility = false;
-                    
+
                 }
                 else
                 {
                     LSFVisibility = true;
                     // nullVoidsEnabled = true;
                 }
-               
+
             }
         }
         private bool _LSFVisibility;
@@ -226,7 +226,7 @@ namespace MAAS_SFRThelper.ViewModels
 
         // private List<Spacing> validSpacings;
         public ObservableCollection<Spacing> ValidSpacings { get; set; }
-        
+
 
         private Spacing spacingSelected;
         public Spacing SpacingSelected
@@ -387,11 +387,19 @@ namespace MAAS_SFRThelper.ViewModels
             }
         }
 
+        private static double SliceSign(VVector row, VVector col)
+        {
+            return Math.Sign(row.x * col.y - row.y * col.x);   // ±1
+        }
+
+
         private void BuildSphere(Structure parentStruct, VVector center, float r, VMS.TPS.Common.Model.API.Image image)
         {
+            double sliceSign = SliceSign(image.XDirection, image.YDirection);
+
             for (int z = 0; z < image.ZSize; ++z)
             {
-                double zCoord = z * (image.ZRes) + image.Origin.z;
+                double zCoord = sliceSign * z * (image.ZRes) + image.Origin.z;
 
                 // For each slice find in plane radius
                 var z_diff = Math.Abs(zCoord - center.z);
@@ -648,7 +656,7 @@ namespace MAAS_SFRThelper.ViewModels
                 var basePos = (f.X * a1) + (f.Y * a2void) + (f.Z * a3);
                 // Add slight offset to position voids correctly
                 // The offset in X and Y should also be scaled
-                return basePos + new Vec3(ipA * 0.25 * LateralScalingFactor, ipA * 0.0, 0.0); 
+                return basePos + new Vec3(ipA * 0.25 * LateralScalingFactor, ipA * 0.0, 0.0);
             };
 
             var atoms = new List<Vec3>();
@@ -1095,13 +1103,13 @@ namespace MAAS_SFRThelper.ViewModels
                             coreVoid = structureSet.AddStructure("CONTROL", "coreVoid");
                             coreVoid.ConvertToHighResolution();
                         }
-                        
+
 
                         if (isRect)
                         {
-                            
+
                             int voidCount = 0;
-                            
+
 
                             foreach (VVector ctr in grid.Where(g => g.SeedType == SeedTypeEnum.Void).Select(g => g.Position))
                             {
@@ -1126,7 +1134,7 @@ namespace MAAS_SFRThelper.ViewModels
                                         BuildSphere(currentCore, ctr, coreRadius, sc.Image);
                                         currentCore.SegmentVolume = currentCore.SegmentVolume.And(target);
                                         coreVoid.SegmentVolume = coreVoid.Or(currentCore.SegmentVolume);
-                                        
+
                                     }
 
                                 }
@@ -1177,14 +1185,14 @@ namespace MAAS_SFRThelper.ViewModels
                                 }
                             }
 
-                            
+
                             Output += "\n Voids have been created";
                             // voidStructureL3.SegmentVolume = target.Margin(-1 * spacingSelected.Value / 2).Sub(structMain.Margin(1.2 * voidFactor));
 
 
                         }
 
-                       
+
                         if (isCVT3D)
                         {
                             //var gridhex = BuildHexGrid(10.0, bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract, ptvRetractVoid);
@@ -1204,7 +1212,7 @@ namespace MAAS_SFRThelper.ViewModels
                             }
 
                             List<Point3D> gridcvtSph = new List<Point3D>();
-                            
+
                             foreach (VVector pos in grid.Where(r => r.SeedType == SeedTypeEnum.Sphere).Select(r => r.Position))
                             {
                                 gridcvtSph.Add(new Point3D(pos.x, pos.y, pos.z));
@@ -1214,7 +1222,7 @@ namespace MAAS_SFRThelper.ViewModels
                                 //}
 
                             }
-                        
+
                             // var cvt = new CVT3D(ptvRetractVoid.MeshGeometry, new CVTSettings(gridhexVoid, gridhexVoid.Count()));
                             var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(
                                                                             gridcvtSph,
@@ -1280,12 +1288,12 @@ namespace MAAS_SFRThelper.ViewModels
                             //string structName = "Voids";
                             int voidCount = 0;
 
-                        var cvtSphereBox = new Rect3D(sphereBox.X + SpacingSelected.Value / 4,
-                            sphereBox.Y + SpacingSelected.Value / 4,
-                            sphereBox.Z + SpacingSelected.Value / 4,
-                            sphereBox.SizeX - SpacingSelected.Value / 2,
-                            sphereBox.SizeY - SpacingSelected.Value / 2,
-                            sphereBox.SizeZ - SpacingSelected.Value / 2 );
+                            var cvtSphereBox = new Rect3D(sphereBox.X + SpacingSelected.Value / 4,
+                                sphereBox.Y + SpacingSelected.Value / 4,
+                                sphereBox.Z + SpacingSelected.Value / 4,
+                                sphereBox.SizeX - SpacingSelected.Value / 2,
+                                sphereBox.SizeY - SpacingSelected.Value / 2,
+                                sphereBox.SizeZ - SpacingSelected.Value / 2);
                             foreach (VVector ctr in grid.Where(g => g.SeedType == SeedTypeEnum.Void).Select(g => g.Position))
                             {
                                 if (isPointInsideBBox(cvtSphereBox, ctr))
@@ -1317,9 +1325,9 @@ namespace MAAS_SFRThelper.ViewModels
                                 }
 
                             }
-                            
+
                             Output += "\nVoidCVT has been created";
-                            
+
                         }
 
 
