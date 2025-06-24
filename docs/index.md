@@ -32,6 +32,5 @@ Assignment. You may not assign any of Your rights or obligations under this Agre
 Governing Law. This Agreement will be governed and construed under the laws of the State of California and the United States of America without regard to conflicts of law provisions. The parties agree to the exclusive jurisdiction of the state and federal courts located in Santa Clara County, California with respect to any disputes under or relating to this Agreement.
 
 Entire Agreement. This Agreement is the entire agreement of the parties as to the subject matter and supersedes all prior written and oral agreements and understandings relating to same. The Agreement may only be modified or amended in a writing signed by the parties that makes specific reference to the Agreement and the provision the parties intend to modify or amend.
-
-
+<br>
 <iframe id="JotFormIFrame-250925097392161" title="Varian Limited Use Software License Agreement (SFRThelper)" onload="window.parent.scrollTo(0,0)" allowtransparency="true" allow="geolocation; microphone; camera; fullscreen" src="https://form.jotform.com/250925097392161" frameborder="0" style="min-width:100%;max-width:100%;height:539px;border:none;" scrolling="no" > </iframe> <script src='https://cdn.jotfor.ms/s/umd/latest/for-form-embed-handler.js'></script> <script>window.jotformEmbedHandler("iframe[id='JotFormIFrame-250925097392161']", "https://form.jotform.com/")</script>
