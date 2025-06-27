@@ -61,7 +61,13 @@
                          SelectedItem="{Binding SelectedTumorId}"
                          Margin="0,0,0,10"/>
             </StackPanel>
-
+            <!-- PTV ALL [composite] Selection -->
+            <StackPanel Grid.Column="0" Margin="0,50,10,0">
+                <TextBlock Text="Select PTV ALL:" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                <ComboBox ItemsSource="{Binding PotentialTargets}"
+                SelectedItem="{Binding PtvAllId}"
+                 Margin="0,0,0,10"/>
+            </StackPanel>
             <!-- Beam Selection - fades out when 3D Evaluation is selected -->
             <StackPanel Grid.Column="1" Margin="10,0,0,0">
                 <TextBlock Text="Select Treatment Beam:" FontWeight="SemiBold" Margin="0,0,0,5"/>
@@ -88,10 +94,19 @@
             <Grid>
                 <ScrollViewer VerticalScrollBarVisibility="Auto"
                              Visibility="{Binding bTextVis, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TabControl Height="338">
+                        <TabItem Header="Output Log">
                     <TextBox Text="{Binding OutputLog}" IsReadOnly="True"
                             FontFamily="Consolas" Padding="10"
                             VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
                             AcceptsReturn="True" TextWrapping="Wrap"/>
+                        </TabItem>
+                        
+                        <TabItem Header="Dosimetrics">
+                            <DataGrid x:Name="DataGridEval" ItemsSource="{Binding AllMetrics}"></DataGrid>
+                        </TabItem>
+                    </TabControl>
+
                 </ScrollViewer>
 
                 <!-- Updated Canvas with minimum size constraints -->
@@ -99,7 +114,7 @@
                         Background="White"
                         MinWidth="600"
                         MinHeight="300"
-                        Visibility="{Binding bPlotVis, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        Visibility="{Binding bPlotVis, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="150,112,0,-31"/>
             </Grid>
         </Border>
 
