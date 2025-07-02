@@ -1,162 +1,193 @@
 ﻿<UserControl x:Class="MAAS_SFRThelper.Views.EvaluationView"
-             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:local="clr-namespace:MAAS_SFRThelper.Views"
-             xmlns:viewmodels="clr-namespace:MAAS_SFRThelper.ViewModels"
-             xmlns:system="clr-namespace:System;assembly=mscorlib"
-             
-             mc:Ignorable="d"
-             d:DesignHeight="600" d:DesignWidth="800" Background="GhostWhite">
+			 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+			 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+			 xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+			 xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+			 xmlns:local="clr-namespace:MAAS_SFRThelper.Views"
+			 xmlns:viewmodels="clr-namespace:MAAS_SFRThelper.ViewModels"
+			 xmlns:system="clr-namespace:System;assembly=mscorlib"
+			 
+			 mc:Ignorable="d"
+			 d:DesignHeight="600" d:DesignWidth="800" Background="GhostWhite">
 
-    <UserControl.Resources>
-        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
-        <!-- Style for more interactive radio buttons -->
-    </UserControl.Resources>
+	<!--<UserControl.Resources>
+		<BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>        
+	</UserControl.Resources> -->
+	<UserControl.Resources>
+		<BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+		<Style x:Key="WrappingTextStyle" TargetType="TextBlock">
+			<Setter Property="TextWrapping" Value="Wrap"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
+			<Setter Property="Padding" Value="5"/>
+		</Style>
+	</UserControl.Resources>
 
-    <Grid Margin="20">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-            <!-- NEW ROW for radio buttons -->
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+	<Grid Margin="20">
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto"/>
+			<RowDefinition Height="Auto"/>
+			<RowDefinition Height="Auto"/>
+			<RowDefinition Height="*"/>
+			<RowDefinition Height="Auto"/>
+			<!-- NEW ROW for radio buttons -->
+			<RowDefinition Height="Auto"/>
+		</Grid.RowDefinitions>
 
-        <!-- Evaluation Method Selection (at the top and centered) -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,20" HorizontalAlignment="Center">
-            
-            <RadioButton Content="1D CAX"
-                        IsChecked="{Binding Is1DCAXSelected}"
-                        GroupName="EvaluationMethod"
-                        Margin="5"/>
-            <RadioButton Content="2D Isocenter Planar"
-                        IsChecked="{Binding IsIsocenterMethodSelected}"
-                        GroupName="EvaluationMethod"
-                        Margin="5"/>
-            <RadioButton Content="2D Normal Multiplanar P/V Interpolation"
-                        IsChecked="{Binding Is2DPlanarSelected}"
-                        GroupName="EvaluationMethod"
-                        Margin="5"/>
-            <RadioButton Content="3D Dose P/V Interpolation"
-                        IsChecked="{Binding Is3DEvaluationSelected}"
-                        GroupName="EvaluationMethod"
-                        Margin="5"/>
-        </StackPanel>
+		<!-- Evaluation Method Selection (at the top and centered) -->
+		<StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,20" HorizontalAlignment="Center">
+			
+			<RadioButton Content="1D CAX"
+						IsChecked="{Binding Is1DCAXSelected}"
+						GroupName="EvaluationMethod"
+						Margin="5"/>
+			<RadioButton Content="2D Isocenter Planar"
+						IsChecked="{Binding IsIsocenterMethodSelected}"
+						GroupName="EvaluationMethod"
+						Margin="5"/>
+			<RadioButton Content="2D Normal Multiplanar P/V Interpolation"
+						IsChecked="{Binding Is2DPlanarSelected}"
+						GroupName="EvaluationMethod"
+						Margin="5"/>
+			<RadioButton Content="3D Dose Metrics"
+						IsChecked="{Binding Is3DEvaluationSelected}"
+						GroupName="EvaluationMethod"
+						Margin="5"/>
+		</StackPanel>
 
-        <!-- Selection Controls -->
-        <Grid Grid.Row="1" Margin="0,0,0,20">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
+		<!-- Selection Controls -->
+		<Grid Grid.Row="1" Margin="0,0,0,20">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="*"/>
+				<ColumnDefinition Width="*"/>
+			</Grid.ColumnDefinitions>
 
-            <!-- Structure Selection -->
-            <StackPanel Grid.Column="0" Margin="0,0,10,0">
-                <TextBlock Text="Select Target Structure:" FontWeight="SemiBold" Margin="0,0,0,5"/>
-                <ComboBox ItemsSource="{Binding PotentialTargets}"
-                         SelectedItem="{Binding SelectedTumorId}"
-                         Margin="0,0,0,10"/>
-            </StackPanel>
-            <!-- PTV ALL [composite] Selection -->
-            <StackPanel Grid.Column="0" Margin="0,50,10,0">
-                <TextBlock Text="Select PTV ALL:" FontWeight="SemiBold" Margin="0,0,0,5"/>
-                <ComboBox ItemsSource="{Binding PotentialTargets}"
-                SelectedItem="{Binding PtvAllId}"
-                 Margin="0,0,0,10"/>
-            </StackPanel>
-            <!-- Beam Selection - fades out when 3D Evaluation is selected -->
-            <StackPanel Grid.Column="1" Margin="10,0,0,0">
-                <TextBlock Text="Select Treatment Beam:" FontWeight="SemiBold" Margin="0,0,0,5"/>
-                <ComboBox ItemsSource="{Binding TreatmentBeams}"
-                         SelectedItem="{Binding SelectedBeamId}"
-                         Margin="0,0,0,10"/>
+			<!-- Structure Selection -->
+			<StackPanel Grid.Column="0" Margin="0,0,10,0">
+				<TextBlock Text="Select Target Structure:" FontWeight="SemiBold" Margin="0,0,0,5"/>
+				<ComboBox ItemsSource="{Binding PotentialTargets}"
+						 SelectedItem="{Binding SelectedTumorId}"
+						 Margin="0,0,0,10"/>
+			</StackPanel>
+			<!-- PTV ALL [composite] Selection 
+			<StackPanel Grid.Column="0" Margin="0,50,10,0">
+				<TextBlock Text="Select PTV ALL:" FontWeight="SemiBold" Margin="0,0,0,5"/>
+				<ComboBox ItemsSource="{Binding PotentialTargets}"
+				SelectedItem="{Binding PtvAllId}"
+				 Margin="0,0,0,10"/>
+			</StackPanel> -->
+			<!-- Beam Selection - fades out when 3D Evaluation is selected -->
+			<StackPanel Grid.Column="1" Margin="10,0,0,0">
+				<TextBlock Text="Select Treatment Beam:" FontWeight="SemiBold" Margin="0,0,0,5"/>
+				<ComboBox ItemsSource="{Binding TreatmentBeams}"
+						 SelectedItem="{Binding SelectedBeamId}"
+						 Margin="0,0,0,10"/>
 
-                <!-- Apply style directly to the StackPanel -->
-                <StackPanel.Style>
-                    <Style TargetType="StackPanel">
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding Is3DEvaluationSelected}" Value="True">
-                                <Setter Property="Opacity" Value="0.3"/>
-                                <Setter Property="IsEnabled" Value="False"/>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </StackPanel.Style>
-            </StackPanel>
-        </Grid>
+				<!-- Apply style directly to the StackPanel -->
+				<StackPanel.Style>
+					<Style TargetType="StackPanel">
+						<Style.Triggers>
+							<DataTrigger Binding="{Binding Is3DEvaluationSelected}" Value="True">
+								<Setter Property="Opacity" Value="0.3"/>
+								<Setter Property="IsEnabled" Value="False"/>
+							</DataTrigger>
+						</Style.Triggers>
+					</Style>
+				</StackPanel.Style>
+			</StackPanel>
+		</Grid>
 
-        <!-- Output Log and Plot Area -->
-        <Border Grid.Row="3" BorderBrush="LightGray" BorderThickness="1" Margin="0,0,0,20">
-            <Grid>
-                <ScrollViewer VerticalScrollBarVisibility="Auto"
-                             Visibility="{Binding bTextVis, Converter={StaticResource BooleanToVisibilityConverter}}">
-                    <TabControl Height="338">
-                        <TabItem Header="Output Log">
-                    <TextBox Text="{Binding OutputLog}" IsReadOnly="True"
-                            FontFamily="Consolas" Padding="10"
-                            VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
-                            AcceptsReturn="True" TextWrapping="Wrap"/>
-                        </TabItem>
-                        
-                        <TabItem Header="Dosimetrics">
-                            <DataGrid x:Name="DataGridEval" ItemsSource="{Binding AllMetrics}"></DataGrid>
-                        </TabItem>
-                    </TabControl>
+		<!-- Output Log and Plot Area -->
+		<Border Grid.Row="3" BorderBrush="LightGray" BorderThickness="1" Margin="0,0,0,20">
+			<Grid>
+				<ScrollViewer VerticalScrollBarVisibility="Auto"
+							 Visibility="{Binding bTextVis, Converter={StaticResource BooleanToVisibilityConverter}}"
+							 Panel.ZIndex="1">
+					<TabControl Height="338">
+						<TabItem Header="Output Log">
+							<TextBox Text="{Binding OutputLog}" IsReadOnly="True"
+									FontFamily="Consolas" Padding="10"
+									VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
+									AcceptsReturn="True" TextWrapping="Wrap"/>
+						</TabItem>
 
-                </ScrollViewer>
+						<TabItem Header="Dosimetrics">
+							<DataGrid x:Name="DataGridEval"
+									  ItemsSource="{Binding AllMetrics}"
+									  AutoGenerateColumns="False"
+									  CanUserAddRows="False"
+									  IsReadOnly="True"
+									  GridLinesVisibility="Horizontal"
+									  HeadersVisibility="Column"
+									  RowHeaderWidth="0"
+									  Background="White"
+									  AlternatingRowBackground="LightGray">
+								<DataGrid.Columns>
+									<DataGridTextColumn Header="Metric"
+													   Binding="{Binding metric}"
+													   Width="*"
+													   ElementStyle="{StaticResource WrappingTextStyle}"/>
+									<DataGridTextColumn Header="Value"
+													   Binding="{Binding value}"
+													   Width="1.25*"
+													   ElementStyle="{StaticResource WrappingTextStyle}"/>
+								</DataGrid.Columns>
+							</DataGrid>
+						</TabItem>
+					</TabControl>
+				</ScrollViewer>
 
-                <!-- Updated Canvas with minimum size constraints -->
-                <Canvas x:Name="PlotCanvas"
-                        Background="White"
-                        MinWidth="600"
-                        MinHeight="300"
-                        Visibility="{Binding bPlotVis, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="150,112,0,-31"/>
-            </Grid>
-        </Border>
+				<!-- Updated Canvas with minimum size constraints -->
+				<Canvas x:Name="PlotCanvas"
+						Background="White"
+						MaxWidth="750"
+						MaxHeight="318"
+						MinWidth="400"
+						MinHeight="250"
+						Visibility="{Binding bPlotVis, Converter={StaticResource BooleanToVisibilityConverter}}"
+						Margin="0,0,0,20"
+						Panel.ZIndex="0"/>
+			</Grid>
+		</Border>
 
-        <!-- NEW: View Toggle Radio Buttons -->
-        <Grid Grid.Row="4" Margin="0,0,0,10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
+		<!-- NEW: View Toggle Radio Buttons -->
+		<Grid Grid.Row="4" Margin="0,0,0,10">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="*"/>
+				<ColumnDefinition Width="*"/>
+			</Grid.ColumnDefinitions>
 
-            <RadioButton Grid.Column="0"
-                        Content="Text View"
-                        IsChecked="{Binding bTextVis}"
-                        GroupName="ViewToggle"
-                        HorizontalAlignment="Center"
-                        Margin="5"/>
+			<RadioButton Grid.Column="0"
+						Content="Text View"
+						IsChecked="{Binding bTextVis}"
+						GroupName="ViewToggle"
+						HorizontalAlignment="Center"
+						Margin="5"/>
 
-            <RadioButton Grid.Column="1"
-                        Content="Plot View"
-                        IsChecked="{Binding bPlotVis}"
-                        GroupName="ViewToggle"
-                        HorizontalAlignment="Center"
-                        Margin="5"/>
-        </Grid>
+			<RadioButton Grid.Column="1"
+						Content="Plot View"
+						IsChecked="{Binding bPlotVis}"
+						GroupName="ViewToggle"
+						HorizontalAlignment="Center"
+						Margin="5"/>
+		</Grid>
 
-        <!-- Action Buttons (moved to Row 5) -->
-        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button Content="Compute Dose" Command="{Binding ComputeCommand}"
-                    Width="120" Height="30" Margin="0,0,10,0"/>
-            <Button Content="Save CSV" Command="{Binding SaveCsvCommand}"
-                    Width="120" Height="30" Margin="0,0,10,0"/>
-            <Button Content="Show Plot"
-                    Command="{Binding ShowPlotCommand}"
-                    Margin="0,0,10,0"
-                    Padding="5,2"
-                    Width="120" Height="30"
-                    IsEnabled="{Binding CanExecuteShowPlot}"/>
-            <!-- Optional Refresh Plot button for debugging -->
-            <Button Content="Refresh Plot" 
-                    Command="{Binding RefreshPlotCommand}"
-                    Width="120" Height="30" Margin="0,0,0,0"
-                    Visibility="{Binding bPlotVis, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-        </StackPanel>
-    </Grid>
+		<!-- Action Buttons (moved to Row 5) -->
+		<StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right">
+			<Button Content="Compute Dose" Command="{Binding ComputeCommand}"
+					Width="120" Height="30" Margin="0,0,10,0"/>
+			<Button Content="Save CSV" Command="{Binding SaveCsvCommand}"
+					Width="120" Height="30" Margin="0,0,10,0"/>
+			<Button Content="Show Plot"
+					Command="{Binding ShowPlotCommand}"
+					Margin="0,0,10,0"
+					Padding="5,2"
+					Width="120" Height="30"
+					IsEnabled="{Binding CanExecuteShowPlot}"/>
+			<!-- Optional Refresh Plot button for debugging -->
+			<Button Content="Refresh Plot" 
+					Command="{Binding RefreshPlotCommand}"
+					Width="120" Height="30" Margin="0,0,0,0"
+					Visibility="{Binding bPlotVis, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+		</StackPanel>
+	</Grid>
 </UserControl>

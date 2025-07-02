@@ -490,8 +490,9 @@ namespace MAAS_SFRThelper.ViewModels
                 // Copy selected IDs to local variables to avoid potential thread issues
                 string selectedBeamId = SelectedBeamId;
                 string selectedTumorId = SelectedTumorId;
-                string ptvAllName = PtvAllId;
-              
+                //string ptvAllName = PtvAllId;
+                string ptvAllName = SelectedTumorId;
+
 
 
 
@@ -1037,7 +1038,8 @@ namespace MAAS_SFRThelper.ViewModels
                 OutputLog += $"Using dimensions: {canvasWidth} x {canvasHeight}\n";
 
                 // Use proportional margins that work better with smaller canvases
-                double leftMargin = Math.Max(50, canvasWidth * 0.08);
+                //double leftMargin = Math.Max(50, canvasWidth * 0.08);
+                double leftMargin = Math.Max(65, canvasWidth * 0.09);  // Just a bit more space
                 double rightMargin = Math.Max(20, canvasWidth * 0.03);
                 double topMargin = Math.Max(30, canvasHeight * 0.08);
                 double bottomMargin = Math.Max(50, canvasHeight * 0.12);
@@ -1062,7 +1064,9 @@ namespace MAAS_SFRThelper.ViewModels
                 OutputLog += $"Data ranges: Distance {minDist:F1} to {maxDist:F1}, Dose 0 to {maxDose:F3}\n";
 
                 // Add title with responsive font size
-                double titleFontSize = Math.Max(10, Math.Min(16, canvasHeight * 0.04));
+                //double titleFontSize = Math.Max(10, Math.Min(16, canvasHeight * 0.04));
+                double titleFontSize = Math.Max(14, Math.Min(20, canvasHeight * 0.06));
+
                 TextBlock title = new TextBlock
                 {
                     Text = $"Central Axis Dose Plot - {tumorId} - {beamId}",
@@ -1100,7 +1104,8 @@ namespace MAAS_SFRThelper.ViewModels
                 plotCanvas.Children.Add(verticalAxis);
 
                 // Add axis labels with responsive font size
-                double labelFontSize = Math.Max(8, Math.Min(12, canvasHeight * 0.03));
+                //double labelFontSize = Math.Max(8, Math.Min(12, canvasHeight * 0.03));
+                double labelFontSize = Math.Max(12, Math.Min(16, canvasHeight * 0.05));
 
                 TextBlock xAxisLabel = new TextBlock
                 {
@@ -1119,7 +1124,8 @@ namespace MAAS_SFRThelper.ViewModels
                     HorizontalAlignment = HorizontalAlignment.Center,
                     LayoutTransform = new RotateTransform(-90)
                 };
-                Canvas.SetLeft(yAxisLabel, 15);
+                //Canvas.SetLeft(yAxisLabel, 15);
+                Canvas.SetLeft(yAxisLabel, 10);
                 Canvas.SetTop(yAxisLabel, canvasHeight / 2);
                 plotCanvas.Children.Add(yAxisLabel);
 
@@ -1171,7 +1177,8 @@ namespace MAAS_SFRThelper.ViewModels
                 double entryX = leftMargin + (entryDist - minDist) / (maxDist - minDist) * plotWidth;
                 double exitX = leftMargin + (exitDist - minDist) / (maxDist - minDist) * plotWidth;
 
-                double boundaryLabelFontSize = Math.Max(7, Math.Min(10, canvasHeight * 0.025));
+                //double boundaryLabelFontSize = Math.Max(7, Math.Min(10, canvasHeight * 0.025));
+                double boundaryLabelFontSize = Math.Max(10, Math.Min(14, canvasHeight * 0.04));
 
                 // Entry line
                 if (!double.IsNaN(entryX) && !double.IsInfinity(entryX))
@@ -1226,7 +1233,8 @@ namespace MAAS_SFRThelper.ViewModels
                 }
 
                 // Add axis ticks and values with responsive sizing
-                double tickFontSize = Math.Max(6, Math.Min(9, canvasHeight * 0.02));
+                //double tickFontSize = Math.Max(6, Math.Min(9, canvasHeight * 0.02));
+                double tickFontSize = Math.Max(10, Math.Min(14, canvasHeight * 0.035));
 
                 // X-axis ticks - adjust number based on width
                 int numXTicks = Math.Max(4, Math.Min(10, (int)(plotWidth / 60)));
@@ -1285,7 +1293,8 @@ namespace MAAS_SFRThelper.ViewModels
                         FontSize = tickFontSize
                     };
 
-                    Canvas.SetLeft(tickLabel, leftMargin - 40);
+                    //Canvas.SetLeft(tickLabel, leftMargin - 40);
+                    Canvas.SetLeft(tickLabel, leftMargin - 30);  // Move further from axis line
                     Canvas.SetTop(tickLabel, tickY - 8);
 
                     plotCanvas.Children.Add(tick);
@@ -1301,62 +1310,160 @@ namespace MAAS_SFRThelper.ViewModels
             }
         }
 
+        //public void update3DMetrics(string tumorName, string ptvAllName, PlanSetup plan)
+        //{
+        //    OutputLog += "Starting 3D Dosimetric Calculations \n";
+
+
+        //    Structure structureForEval = _structureSet.Structures.FirstOrDefault(s => s.Id == tumorName);
+        //    Structure ptvAll = _structureSet.Structures.FirstOrDefault(s => s.Id == ptvAllName);
+
+
+
+        //    MetricData dosePerFrac = new MetricData();
+        //    dosePerFrac.metric = "Prescription Dose / fraction ";
+        //    dosePerFrac.value = plan.DosePerFraction.ToString();
+
+        //    AllMetrics.Add(dosePerFrac);
+
+        //    MetricData gtv = new MetricData();
+        //    gtv.metric = "Gross Target Volume (cc)";
+        //    gtv.value = Math.Round(structureForEval.Volume, 2).ToString();
+
+
+
+        //    // Volume of vertices
+        //    MetricData V_vertices = new MetricData();
+        //    V_vertices.metric = "Volume of Vertices (cc) ";
+        //    V_vertices.value = Math.Round(ptvAll.Volume, 2).ToString();
+
+        //    // number of vertices
+        //    MetricData ptvCount = new MetricData();
+        //    ptvCount.metric = "Number of Vertices";
+        //    ptvCount.value = ptvAll.GetNumberOfSeparateParts().ToString(); ;
+
+        //    // percent of gtv that is total lattice volume
+        //    MetricData latticeVolPercent = new MetricData();
+        //    latticeVolPercent.metric = "percent of gtv that is total lattice volume";
+        //    latticeVolPercent.value = Math.Round((100 * ptvAll.Volume / structureForEval.Volume), 2).ToString();
+
+        //    // assume absolute dosevalue/volume presentations
+        //    var absoluteVolume = VolumePresentation.AbsoluteCm3;
+        //    var absoluteDoseValue = DoseValuePresentation.Absolute;
+
+        //    AllMetrics.Clear();
+
+        //    AllMetrics.Add(gtv);
+        //    AllMetrics.Add(ptvCount); 
+        //    AllMetrics.Add(V_vertices);
+        //    AllMetrics.Add(latticeVolPercent);
+
+        //    //D95
+        //    MetricData d95 = new MetricData();
+        //    d95.metric = "Dose covering 95% of target (D95)";
+        //    d95.value = plan.GetDoseAtVolume(structureForEval, 95, absoluteVolume, absoluteDoseValue).ToString();
+
+        //    AllMetrics.Add(d95);
+
+
+        //}
+
         public void update3DMetrics(string tumorName, string ptvAllName, PlanSetup plan)
         {
             OutputLog += "Starting 3D Dosimetric Calculations \n";
-          
+            OutputLog += "Starting 3D Dosimetric Calculations \n";
+            OutputLog += $"Selected tumor: {tumorName}, PTV All: {ptvAllName}\n";
 
             Structure structureForEval = _structureSet.Structures.FirstOrDefault(s => s.Id == tumorName);
             Structure ptvAll = _structureSet.Structures.FirstOrDefault(s => s.Id == ptvAllName);
 
+            if (structureForEval == null)
+            {
+                OutputLog += $"Error: Could not find structure '{tumorName}'\n";
+                return;
+            }
 
+            if (ptvAll == null)
+            {
+                OutputLog += $"Error: Could not find PTV ALL structure '{ptvAllName}'\n";
+                return;
+            }
 
-            MetricData dosePerFrac = new MetricData();
-            dosePerFrac.metric = "Prescription Dose / fraction ";
-            dosePerFrac.value = plan.DosePerFraction.ToString();
-
-            AllMetrics.Add(dosePerFrac);
-
-            MetricData gtv = new MetricData();
-            gtv.metric = "Gross Target Volume (cc)";
-            gtv.value = Math.Round(structureForEval.Volume, 2).ToString();
-
-
-
-            // Volume of vertices
-            MetricData V_vertices = new MetricData();
-            V_vertices.metric = "Volume of Vertices (cc) ";
-            V_vertices.value = Math.Round(ptvAll.Volume, 2).ToString();
-
-            // number of vertices
-            MetricData ptvCount = new MetricData();
-            ptvCount.metric = "Number of Vertices";
-            ptvCount.value = ptvAll.GetNumberOfSeparateParts().ToString(); ;
-
-            // percent of gtv that is total lattice volume
-            MetricData latticeVolPercent = new MetricData();
-            latticeVolPercent.metric = "percent of gtv that is total lattice volume";
-            latticeVolPercent.value = Math.Round((100 * ptvAll.Volume / structureForEval.Volume), 2).ToString();
-
-            // assume absolute dosevalue/volume presentations
-            var absoluteVolume = VolumePresentation.AbsoluteCm3;
-            var absoluteDoseValue = DoseValuePresentation.Absolute;
-
+            // Clear all previous metrics first
             AllMetrics.Clear();
 
-            AllMetrics.Add(gtv);
-            AllMetrics.Add(ptvCount); 
-            AllMetrics.Add(V_vertices);
-            AllMetrics.Add(latticeVolPercent);
+            // Dose per fraction
+            AllMetrics.Add(new MetricData
+            {
+                metric = "Prescription Dose per Fraction (Gy)",
+                value = plan.DosePerFraction.ToString()
+            });
 
-            //D95
-            MetricData d95 = new MetricData();
-            d95.metric = "Dose covering 95% of target (D95)";
-            d95.value = plan.GetDoseAtVolume(structureForEval, 95, absoluteVolume, absoluteDoseValue).ToString();
+            // Gross Target Volume
+            AllMetrics.Add(new MetricData
+            {
+                metric = "Gross Target Volume (cc)",
+                value = Math.Round(structureForEval.Volume, 2).ToString()
+            });
 
-            AllMetrics.Add(d95);
+            // Number of vertices (separate parts)
+            AllMetrics.Add(new MetricData
+            {
+                metric = "Number of Vertices",
+                value = ptvAll.GetNumberOfSeparateParts().ToString()
+            });
 
+            // Volume of vertices
+            AllMetrics.Add(new MetricData
+            {
+                metric = "Total Volume of Vertices (cc)",
+                value = Math.Round(ptvAll.Volume, 2).ToString()
+            });
 
+            // Percent of GTV that is total lattice volume
+            double latticePercent = Math.Round((100 * ptvAll.Volume / structureForEval.Volume), 2);
+            AllMetrics.Add(new MetricData
+            {
+                metric = "Percent of GTV Covered by Lattice (%)",
+                value = latticePercent.ToString()
+            });
+
+            // D95 calculation
+            try
+            {
+                var absoluteVolume = VolumePresentation.AbsoluteCm3;
+                var absoluteDoseValue = DoseValuePresentation.Absolute;
+                var d95Value = plan.GetDoseAtVolume(structureForEval, 95, absoluteVolume, absoluteDoseValue);
+
+                AllMetrics.Add(new MetricData
+                {
+                    metric = "Dose Covering 95% of Target (D95) (Gy)",
+                    value = Math.Round(d95Value.Dose, 3).ToString()
+                });
+            }
+            catch (Exception ex)
+            {
+                OutputLog += $"Error calculating D95: {ex.Message}\n";
+                AllMetrics.Add(new MetricData
+                {
+                    metric = "Dose Covering 95% of Target (D95) (Gy)",
+                    value = "Error - Unable to calculate"
+                });
+            }
+
+            // Additional useful metrics
+            AllMetrics.Add(new MetricData
+            {
+                metric = "Average Vertex Volume (cc)",
+                value = Math.Round(ptvAll.Volume / ptvAll.GetNumberOfSeparateParts(), 3).ToString()
+            });
+
+            OutputLog += $"Added {AllMetrics.Count} metrics to collection\n";
+
+            // Force UI update
+            RaisePropertyChanged(nameof(AllMetrics));
+
+            OutputLog += $"3D Dosimetric Calculations complete. {AllMetrics.Count} metrics calculated.\n";
         }
 
         /// <summary>
