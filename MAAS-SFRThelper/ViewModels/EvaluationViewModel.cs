@@ -1454,17 +1454,59 @@ namespace MAAS_SFRThelper.ViewModels
                     value = Math.Round(d50Value.Dose, 3).ToString()
                 });
 
+                // d20
+                var d20Value = plan.GetDoseAtVolume(structureForEval, 20, absoluteVolume, absoluteDoseValue);
+                AllMetrics.Add(new MetricData
+                {
+                    metric = "Dose Covering 20% of Target (D20) (Gy)",
+                    value = Math.Round(d20Value.Dose, 3).ToString()
+                });
+                
+                // d10
+                var d10Value = plan.GetDoseAtVolume(structureForEval, 50, absoluteVolume, absoluteDoseValue);
+                AllMetrics.Add(new MetricData
+                {
+                    metric = "Dose Covering 10% of Target (D10) (Gy)",
+                    value = Math.Round(d10Value.Dose, 3).ToString()
+                });
+                
+                // d5
+                var d5Value= plan.GetDoseAtVolume(structureForEval, 50, absoluteVolume, absoluteDoseValue);
+                AllMetrics.Add(new MetricData
+                {
+                    metric = "Dose Covering 5% of Target (D5) (Gy)",
+                    value = Math.Round(d5Value.Dose, 3).ToString()
+                });
 
+                // d95/d5
+                AllMetrics.Add(new MetricData
+                {
+                    metric = "D95/D5",
+                    value = Math.Round(d95Value.Dose/d5Value.Dose, 3).ToString()
+                });
 
+                // d10/d90
+                AllMetrics.Add(new MetricData
+                {
+                    metric = "D10/D90",
+                    value = Math.Round(d10Value.Dose/d90Value.Dose, 3).ToString()
+                });
+
+                // High dose core number density
+                AllMetrics.Add(new MetricData
+                {
+                    metric = "High Dose Core Number Density (HCND)",
+                    value = Math.Round(d10Value.Dose / d90Value.Dose, 3).ToString()
+                });
 
             }
             catch (Exception ex)
             {
-                OutputLog += $"Error calculating D95: {ex.Message}\n";
+                OutputLog += $"Error calculating Dose: {ex.Message}\n";
                 AllMetrics.Add(new MetricData
                 {
-                    metric = "Dose Covering 95% of Target (D95) (Gy)",
-                    value = "Error - Unable to calculate"
+                    metric = "Dose Covering x% of Target (Dx) (Gy)", // with the added doses I'm not sure how to report this best
+                    value = "Error - Unable to calculate Dose/DVH"
                 });
             }
 
