@@ -1440,6 +1440,23 @@ namespace MAAS_SFRThelper.ViewModels
                     metric = "Dose Covering 95% of Target (D95) (Gy)",
                     value = Math.Round(d95Value.Dose, 3).ToString()
                 });
+                var d90Value = plan.GetDoseAtVolume(structureForEval, 90, absoluteVolume, absoluteDoseValue);
+                AllMetrics.Add(new MetricData
+                {
+                    metric = "Dose Covering 90% of Target (D95) (Gy)",
+                    value = Math.Round(d90Value.Dose, 3).ToString()
+                });
+
+                var d50Value = plan.GetDoseAtVolume(structureForEval, 50, absoluteVolume, absoluteDoseValue);
+                AllMetrics.Add(new MetricData
+                {
+                    metric = "Dose Covering 50% of Target (D50) (Gy)",
+                    value = Math.Round(d50Value.Dose, 3).ToString()
+                });
+
+
+
+
             }
             catch (Exception ex)
             {
