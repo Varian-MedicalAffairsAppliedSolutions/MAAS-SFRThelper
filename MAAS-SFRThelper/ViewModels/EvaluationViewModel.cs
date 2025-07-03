@@ -1407,10 +1407,11 @@ namespace MAAS_SFRThelper.ViewModels
             });
 
             // Number of vertices (separate parts)
+            var numVertices = ptvAll.GetNumberOfSeparateParts();
             AllMetrics.Add(new MetricData
             {
                 metric = "Number of Vertices",
-                value = ptvAll.GetNumberOfSeparateParts().ToString()
+                value = numVertices.ToString()
             });
 
             // Volume of vertices
@@ -1496,7 +1497,7 @@ namespace MAAS_SFRThelper.ViewModels
                 AllMetrics.Add(new MetricData
                 {
                     metric = "High Dose Core Number Density (HCND)",
-                    value = Math.Round(d10Value.Dose / d90Value.Dose, 3).ToString()
+                    value = Math.Round((numVertices * 100 / structureForEval.Volume), 3).ToString()
                 });
 
             }
