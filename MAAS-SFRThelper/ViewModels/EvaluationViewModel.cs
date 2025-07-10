@@ -12,6 +12,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
+using System.Windows.Media.Media3D;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using VMS.TPS.Common.Model.API;
@@ -66,15 +67,6 @@ namespace MAAS_SFRThelper.ViewModels
             set { SetProperty(ref _is1DCAXSelected, value); }
         }
 
-        //IsIsocenterMethodSelected
-        private bool _isIsocenterMethodSelected;
-
-        public bool IsIsocenterMethodSelected
-        {
-            get { return _isIsocenterMethodSelected; }
-            set { SetProperty(ref _isIsocenterMethodSelected, value); }
-        }
-
         //Is2DPlanarSelected
         private bool _is2DPlanarSelected;
 
@@ -84,13 +76,22 @@ namespace MAAS_SFRThelper.ViewModels
             set { SetProperty(ref _is2DPlanarSelected, value); }
         }
 
-        //Is3DEvaluationSelected
+        //Dose Metrics
         private bool _is3dEvaluationSelected;
 
         public bool Is3DEvaluationSelected
         {
             get { return _is3dEvaluationSelected; }
             set { SetProperty(ref _is3dEvaluationSelected, value); }
+        }
+
+        //3D interpolation
+        private bool _is3dInterpolationSelected;
+
+        public bool Is3DInterpolationSelected
+        {
+            get { return _is3dInterpolationSelected; }
+            set { SetProperty(ref _is3dInterpolationSelected, value); }
         }
 
         // Compute status
@@ -524,6 +525,13 @@ namespace MAAS_SFRThelper.ViewModels
                             OutputLog += "No 3D dose is calculated for this plan. Please calculate dose first.\n";
                             return;
                         }
+                                                
+                        if (Is2DPlanarSelected)
+                        {
+                            Run2DPVDRMetric(selectedTumorId, plan);
+                            OutputLog += "2D Dosimetrics complete\n";
+                            return;
+                        }
 
                         bool execute3DDose = Is3DEvaluationSelected;
                         
@@ -902,16 +910,16 @@ namespace MAAS_SFRThelper.ViewModels
 
                     OutputLog += "1D CAX embedded plot creation completed.\n";
                 }
-                else if (IsIsocenterMethodSelected)
-                {
-                    OutputLog += "Using 2D Isocenter Planar evaluation method for plot...\n";
-                    // TODO: Implement 2D Isocenter plotting logic
-                    MessageBox.Show("2D Isocenter Planar plotting not yet implemented.",
-                        "Feature Not Available", MessageBoxButton.OK, MessageBoxImage.Information);
-                    // Switch back to text view since plot isn't implemented
-                    bTextVis = true;
-                    bPlotVis = false;
-                }
+                //else if (IsIsocenterMethodSelected)
+                //{
+                //    OutputLog += "Using 2D Isocenter Planar evaluation method for plot...\n";
+                //    // TODO: Implement 2D Isocenter plotting logic
+                //    MessageBox.Show("2D Isocenter Planar plotting not yet implemented.",
+                //        "Feature Not Available", MessageBoxButton.OK, MessageBoxImage.Information);
+                //    // Switch back to text view since plot isn't implemented
+                //    bTextVis = true;
+                //    bPlotVis = false;
+                //}
                 else if (Is2DPlanarSelected)
                 {
                     OutputLog += "Using 2D Normal Multiplanar P/V Interpolation evaluation method for plot...\n";
@@ -1310,63 +1318,232 @@ namespace MAAS_SFRThelper.ViewModels
             }
         }
 
-        //public void update3DMetrics(string tumorName, string ptvAllName, PlanSetup plan)
-        //{
-        //    OutputLog += "Starting 3D Dosimetric Calculations \n";
+        public void Run2DPVDRMetric(string tumorId, PlanSetup plan)
+        {
+            try
+            {
+                OutputLog += "\nStarting 2D PVDR analysis...\n";
+
+                // Step 1: Access beam
+                var beam = plan.Beams.FirstOrDefault(b => b.Id == SelectedBeamId);
+                if (beam == null)
+                {
+                    OutputLog += "Selected beam not found.\n";
+                    return;
+                }
+
+                // Step 2: Access structure from the plan's structure set
+                var structureSet = plan.StructureSet;
+                if (structureSet == null)
+                {
+                    OutputLog += " No StructureSet associated with the selected plan.\n";
+                    return;
+                }
+
+                // Get structure from name
+                var structure = plan.StructureSet.Structures.FirstOrDefault(s => s.Id == tumorId);
+                if (structure == null)
+                {
+                    OutputLog += " Structure {tumorId} not found.\n";
+                    return;
+                }
+
+                // Use ESAPI built-in center point
+                var targetCenter = structure.CenterPoint; // VVector in mm
+
+                // target bounds
+                try
+                {
+                    var mesh = structure.MeshGeometry;
+
+                    if (mesh == null || mesh.Positions == null || mesh.Positions.Count == 0)
+                    {
+                        OutputLog += "Mesh geometry not available for structure: " + structure.Id + "\n";
+                    }
+                    else
+                    {
+                        double minX = double.MaxValue, minY = double.MaxValue, minZ = double.MaxValue;
+                        double maxX = double.MinValue, maxY = double.MinValue, maxZ = double.MinValue;
+
+                        foreach (var point in mesh.Positions)
+                        {
+                            if (point.X < minX) minX = point.X;
+                            if (point.Y < minY) minY = point.Y;
+                            if (point.Z < minZ) minZ = point.Z;
+
+                            if (point.X > maxX) maxX = point.X;
+                            if (point.Y > maxY) maxY = point.Y;
+                            if (point.Z > maxZ) maxZ = point.Z;
+                        }
+
+                        OutputLog += "Structure bounding box (mm):\n";
+                        OutputLog += "  Min: (" + minX.ToString("F1") + ", " + minY.ToString("F1") + ", " + minZ.ToString("F1") + ")\n";
+                        OutputLog += "  Max: (" + maxX.ToString("F1") + ", " + maxY.ToString("F1") + ", " + maxZ.ToString("F1") + ")\n";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    OutputLog += "Error computing mesh bounds: " + ex.Message + "\n";
+                }
 
 
-        //    Structure structureForEval = _structureSet.Structures.FirstOrDefault(s => s.Id == tumorName);
-        //    Structure ptvAll = _structureSet.Structures.FirstOrDefault(s => s.Id == ptvAllName);
+
+                OutputLog += $"Target centroid: ({targetCenter.x:F1}, {targetCenter.y:F1}, {targetCenter.z:F1}) mm \n";
 
 
+                // Step 3: Extract jaw and MLC geometry
+                OutputLog += "Extracting jaw and MLC positions...\n";
+                // TODO: Add actual MLC/jaw extraction logic here
+                //LogBeamApertureGeometry(beam);
+                RunSphericalPVDRMetric(tumorId, plan);
 
-        //    MetricData dosePerFrac = new MetricData();
-        //    dosePerFrac.metric = "Prescription Dose / fraction ";
-        //    dosePerFrac.value = plan.DosePerFraction.ToString();
+                // Step 4: Define sampling grid in plane perpendicular to beam central axis
+                OutputLog += "Defining planar grid for dose sampling...\n";
+                // TODO: Add ray projection to target logic here
 
-        //    AllMetrics.Add(dosePerFrac);
+                // Step 5: Sample dose at projected beamlet intersections (peaks/valleys)
+                OutputLog += "Sampling dose at grid points...\n";
+                // TODO: Dose sampling at grid points
 
-        //    MetricData gtv = new MetricData();
-        //    gtv.metric = "Gross Target Volume (cc)";
-        //    gtv.value = Math.Round(structureForEval.Volume, 2).ToString();
+                // Step 6: Compute PVDR metric from dose grid
+                OutputLog += "Computing PVDR metrics...\n";
+                // TODO: Compute peak and valley logic here
+
+                // Step 7: Log results (optional for now)
+                // AllMetrics.Add(new EvalMetric { metric = "PVDR (2D)", value = "TBD" });
+                OutputLog += "Logging PVDR metric complete.\n";
+
+                // Step 8: (optional) Show heatmap or profile
+                // Show2DHeatmapOnCanvas(); // Optional if wired in later
+
+                OutputLog += "2D PVDR analysis complete.\n";
+            }
+            catch (Exception ex)
+            {
+                OutputLog += $"Error during PVDR analysis: {ex.Message}\n";
+            }
+        }
+
+        public void RunSphericalPVDRMetric(string tumorId, PlanSetup plan)
+        {
+            OutputLog += "\n===== Starting Spherical Shell PVDR Evaluation =====\n";
+
+            // Step 1: Get beam and structure
+            var beam = plan.Beams.FirstOrDefault(b => b.Id == SelectedBeamId);
+            if (beam == null)
+            {
+                OutputLog += "Selected beam not found.\n";
+                return;
+            }
+
+            var structure = plan.StructureSet.Structures.FirstOrDefault(s => s.Id == tumorId);
+            if (structure == null)
+            {
+                OutputLog += $"Structure '{tumorId}' not found.\n";
+                return;
+            }
+
+            var shellOrigin = structure.CenterPoint;
+            OutputLog += $"Target centroid (shell origin): ({shellOrigin.x:F1}, {shellOrigin.y:F1}, {shellOrigin.z:F1}) mm\n";
+
+            // Step 2: Loop over all control points
+            int cpIndex = 0;
+            foreach (var cp in beam.ControlPoints)
+            {
+                OutputLog += $"\n--- Control Point {cpIndex} ---\n";
+
+                double gantry = cp.GantryAngle;
+                double collimator = cp.CollimatorAngle;
+                double couch = cp.PatientSupportAngle;
+
+                OutputLog += $"Gantry: {gantry:F1}°, Collimator: {collimator:F1}°, Couch: {couch:F1}°\n";
+
+                var jaws = cp.JawPositions;
+                OutputLog += $"Jaws (cm): X1 = {jaws.X1}, X2 = {jaws.X2}, Y1 = {jaws.Y1}, Y2 = {jaws.Y2}\n";
+
+                // Convert jaws to mm
+                double jawX1 = jaws.X1 * 10.0;
+                double jawX2 = jaws.X2 * 10.0;
+                double jawY1 = jaws.Y1 * 10.0;
+                double jawY2 = jaws.Y2 * 10.0;
+
+                // MLC leaf positions
+                var mlc = cp.LeafPositions;
+                int nLeafPairs = mlc.GetLength(1);  // Should be 60 for Millennium 120
+
+                OutputLog += $"Leaf matrix shape: [{mlc.GetLength(0)} x {mlc.GetLength(1)}]\n";
 
 
+                for (int i = 0; i < nLeafPairs; i++)
+                {
+                    double x1 = mlc[0, i] * 10.0;  // bank A
+                    double x2 = mlc[1, i] * 10.0;  // bank B
+                    double gap = Math.Abs(x2 - x1);
 
-        //    // Volume of vertices
-        //    MetricData V_vertices = new MetricData();
-        //    V_vertices.metric = "Volume of Vertices (cc) ";
-        //    V_vertices.value = Math.Round(ptvAll.Volume, 2).ToString();
+                    if (gap > 0.1)
+                    {
+                        double centerX = (x1 + x2) / 2.0;
+                        double centerY = GetLeafCenterY(i, nLeafPairs, jawY1, jawY2);
 
-        //    // number of vertices
-        //    MetricData ptvCount = new MetricData();
-        //    ptvCount.metric = "Number of Vertices";
-        //    ptvCount.value = ptvAll.GetNumberOfSeparateParts().ToString(); ;
+                        OutputLog += $"  Leaf {i:D2}: Center = ({centerX:F1}, {centerY:F1}) mm, Gap = {gap:F1} mm\n";
+                    }
+                }
 
-        //    // percent of gtv that is total lattice volume
-        //    MetricData latticeVolPercent = new MetricData();
-        //    latticeVolPercent.metric = "percent of gtv that is total lattice volume";
-        //    latticeVolPercent.value = Math.Round((100 * ptvAll.Volume / structureForEval.Volume), 2).ToString();
+                cpIndex++;
+            }
 
-        //    // assume absolute dosevalue/volume presentations
-        //    var absoluteVolume = VolumePresentation.AbsoluteCm3;
-        //    var absoluteDoseValue = DoseValuePresentation.Absolute;
+            OutputLog += "\n===== Control point loop complete =====\n";
+        }
 
-        //    AllMetrics.Clear();
+        public double GetLeafCenterY(int leafIndex, int totalLeaves, double jawY1, double jawY2)
+        {
+            // Map leaf index to Y position assuming evenly spaced leaves
+            // We'll just center them between jawY1 and jawY2
+            double fieldHeight = jawY2 - jawY1;
+            double leafHeight = fieldHeight / totalLeaves;
 
-        //    AllMetrics.Add(gtv);
-        //    AllMetrics.Add(ptvCount); 
-        //    AllMetrics.Add(V_vertices);
-        //    AllMetrics.Add(latticeVolPercent);
-
-        //    //D95
-        //    MetricData d95 = new MetricData();
-        //    d95.metric = "Dose covering 95% of target (D95)";
-        //    d95.value = plan.GetDoseAtVolume(structureForEval, 95, absoluteVolume, absoluteDoseValue).ToString();
-
-        //    AllMetrics.Add(d95);
+            return jawY1 + leafHeight * (leafIndex + 0.5);
+        }
 
 
-        //}
+        public void LogBeamApertureGeometry(Beam beam)
+        {
+            try
+            {
+                OutputLog += $"Logging geometry for beam: {beam.Id}\n";
+
+                // Log gantry and collimator angle
+                OutputLog += $"  Gantry Angle: {beam.ControlPoints[0].GantryAngle}\n";
+                OutputLog += $"  Collimator Angle: {beam.ControlPoints[0].CollimatorAngle}\n";
+
+                // Get jaws (X1, X2, Y1, Y2) from first control point
+                var jaws = beam.ControlPoints[0].JawPositions;
+                OutputLog += $"  Jaw positions (cm): X1 = {jaws.X1}, X2 = {jaws.X2}, Y1 = {jaws.Y1}, Y2 = {jaws.Y2}\n";
+
+                // Get MLC leaf positions
+                var mlcLeaves = beam.ControlPoints[0].LeafPositions;
+                int numLeaves = mlcLeaves.GetLength(0);
+
+                OutputLog += $"  MLC Leaf Openings (cm):\n";
+                OutputLog += $"Total MLC leaves: {numLeaves}\n";
+
+                for (int leaf = 0; leaf < numLeaves; leaf++)
+                {
+                    double leafX1 = mlcLeaves[leaf, 0];
+                    double leafX2 = mlcLeaves[leaf, 1];
+                    double opening = Math.Abs(leafX2 - leafX1);
+                    OutputLog += $"    Leaf {leaf + 1}: X1 = {leafX1}, X2 = {leafX2}, Width = {opening}\n";
+                }
+
+
+                OutputLog += "  Beam geometry logging complete.\n";
+            }
+            catch (Exception ex)
+            {
+                OutputLog += $"Error while logging beam geometry: {ex.Message}\n";
+            }
+        }
+
 
         public void update3DMetrics(string tumorName, string ptvAllName, PlanSetup plan)
         {

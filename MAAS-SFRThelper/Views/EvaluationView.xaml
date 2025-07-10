@@ -35,24 +35,23 @@
 
 		<!-- Evaluation Method Selection (at the top and centered) -->
 		<StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,20" HorizontalAlignment="Center">
-			
-			<RadioButton Content="1D CAX"
+            <RadioButton Content="Dose Metrics"
+			IsChecked="{Binding Is3DEvaluationSelected}"
+			GroupName="EvaluationMethod"
+			Margin="5"/>
+            <RadioButton Content="1D CAX"
 						IsChecked="{Binding Is1DCAXSelected}"
 						GroupName="EvaluationMethod"
-						Margin="5"/>
-			<RadioButton Content="2D Isocenter Planar"
-						IsChecked="{Binding IsIsocenterMethodSelected}"
-						GroupName="EvaluationMethod"
-						Margin="5"/>
+						Margin="5"/>			
 			<RadioButton Content="2D Normal Multiplanar P/V Interpolation"
 						IsChecked="{Binding Is2DPlanarSelected}"
 						GroupName="EvaluationMethod"
 						Margin="5"/>
-			<RadioButton Content="3D Dose Metrics"
-						IsChecked="{Binding Is3DEvaluationSelected}"
-						GroupName="EvaluationMethod"
-						Margin="5"/>
-		</StackPanel>
+            <RadioButton Content="3D P/V Interpolation"
+				IsChecked="{Binding Is3DInterpolationSelected}"
+				GroupName="EvaluationMethod"
+				Margin="5"/>
+        </StackPanel>
 
 		<!-- Selection Controls -->
 		<Grid Grid.Row="1" Margin="0,0,0,20">
