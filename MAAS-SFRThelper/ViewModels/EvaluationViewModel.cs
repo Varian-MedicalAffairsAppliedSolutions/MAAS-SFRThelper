@@ -94,6 +94,18 @@ namespace MAAS_SFRThelper.ViewModels
             set { SetProperty(ref _is3dInterpolationSelected, value); }
         }
 
+        //PVDR Options
+
+
+        private string _selectedPvdrMode;
+        public string SelectedPvdrMode
+        {
+            get => _selectedPvdrMode;
+            set => SetProperty(ref _selectedPvdrMode, value);
+        }
+
+        public ObservableCollection<string> PvdrModeOptions { get; set; }
+
         // Compute status
         private bool _canCompute;
         public bool CanCompute
@@ -230,6 +242,9 @@ namespace MAAS_SFRThelper.ViewModels
                 _esapiWorker = esapiWorker ?? throw new ArgumentNullException(nameof(esapiWorker), "ESAPI worker cannot be null");
 
                 // Initialize collections
+                PvdrModeOptions = new ObservableCollection<string> { "Fixed Beam", "VMAT" };
+                SelectedPvdrMode = PvdrModeOptions.First(); // default to "Fixed Beam"
+
                 PotentialTargets = new ObservableCollection<string>();
                 TreatmentBeams = new ObservableCollection<string>();
                 AllMetrics = new ObservableCollection<MetricData>();
@@ -478,12 +493,7 @@ namespace MAAS_SFRThelper.ViewModels
         {
             try
             {
-                // Clear previous data first
-                _distances = new List<double>();
-                _doseValues = new List<double>();
-                _insideTumorFlags = new List<bool>();
-                _hasPlotData = false;
-
+    
                 OutputLog += "Starting dose computation...\n";
 
               
@@ -493,8 +503,7 @@ namespace MAAS_SFRThelper.ViewModels
                 string selectedTumorId = SelectedTumorId;
                 //string ptvAllName = PtvAllId;
                 string ptvAllName = SelectedTumorId;
-
-
+                string selectedPvdrMode = SelectedPvdrMode;
 
 
                 if (string.IsNullOrEmpty(selectedBeamId))
@@ -525,6 +534,14 @@ namespace MAAS_SFRThelper.ViewModels
                             OutputLog += "No 3D dose is calculated for this plan. Please calculate dose first.\n";
                             return;
                         }
+
+                        if (Is1DCAXSelected)
+                        {
+                            Run1DPVDRMetric(selectedTumorId, plan);
+                            OutputLog += "1D CAX Dosimetrics complete\n";
+                            return;
+
+                        }
                                                 
                         if (Is2DPlanarSelected)
                         {
@@ -543,187 +560,9 @@ namespace MAAS_SFRThelper.ViewModels
 
                         }
 
-                        // Get actual beam and structure objects from their IDs
-                        Beam beam = null;
-                        Structure tumor = null;
 
-                     
-
-
-                        beam = plan.Beams.FirstOrDefault(b => b.Id == selectedBeamId);
-                        if (beam == null)
-                        {
-                            OutputLog += $"Could not find beam with ID '{selectedBeamId}'. Please select another beam.\n";
-                            return;
-                        }
-
-                        if (_structureSet == null)
-                        {
-                            OutputLog += "No structure set available. Cannot compute dose.\n";
-                            return;
-                        }
-
-                        tumor = _structureSet.Structures.FirstOrDefault(s => s.Id == selectedTumorId);
-                        if (tumor == null)
-                        {
-                            OutputLog += $"Could not find structure with ID '{selectedTumorId}'. Please select another structure.\n";
-                            return;
-                        }
-
-                        // Calculate beam direction
-                        OutputLog += "Calculating beam direction...\n";
-                        var isocenter = beam.IsocenterPosition;
-                        var cp0 = beam.ControlPoints.First();
-
-                        // Calculate the beam direction using gantry and couch angles
-                        double gantryAngle = cp0.GantryAngle;
-                        double couchAngle = cp0.PatientSupportAngle;
-
-                        // Convert angles to radians
-                        double gantryRad = gantryAngle * Math.PI / 180.0;
-                        double couchRad = couchAngle * Math.PI / 180.0;
-
-                        // Calculate direction vector from gantry and couch angles
-                        VVector dVec = new VVector(
-                            Math.Sin(gantryRad),
-                            -Math.Cos(gantryRad),
-                            0
-                        );
-
-                        // Apply couch rotation if needed
-                        if (Math.Abs(couchAngle) > 0.1)
-                        {
-                            double x = dVec.x;
-                            double z = dVec.z;
-                            dVec.x = x * Math.Cos(couchRad) + z * Math.Sin(couchRad);
-                            dVec.z = -x * Math.Sin(couchRad) + z * Math.Cos(couchRad);
-                        }
-
-                        // Normalize to unit vector
-                        double length = Math.Sqrt(dVec.x * dVec.x + dVec.y * dVec.y + dVec.z * dVec.z);
-                        VVector direction = new VVector(dVec.x / length, dVec.y / length, dVec.z / length);
-
-                        // Find entry/exit by scanning
-                        OutputLog += "Finding beam entry and exit points...\n";
-                        double searchStartDist = -300.0;
-                        double searchEndDist = 300.0;
-                        double stepSize = 2.0; // Increased for stability
-                        bool insideTumor = false;
-                        _entryDist = double.NaN;
-                        _exitDist = double.NaN;
-
-                        // Temporary storage for computed data
-                        var tempDistances = new List<double>();
-                        var tempDoseValues = new List<double>();
-                        var tempInsideFlags = new List<bool>();
-
-                        for (double dist = searchStartDist; dist <= searchEndDist; dist += stepSize)
-                        {
-                            var point = isocenter + dist * direction;
-                            bool pointInTumor = false;
-
-                            try
-                            {
-                                pointInTumor = tumor.IsPointInsideSegment(point);
-                            }
-                            catch (Exception ex)
-                            {
-                                OutputLog += $"Error checking point: {ex.Message}\n";
-                                continue;
-                            }
-
-                            if (!insideTumor && pointInTumor)
-                            {
-                                _entryDist = dist;
-                                insideTumor = true;
-                            }
-                            else if (insideTumor && !pointInTumor)
-                            {
-                                _exitDist = dist;
-                                break;
-                            }
-                        }
-
-                        if (double.IsNaN(_entryDist) || double.IsNaN(_exitDist))
-                        {
-                            OutputLog += "Beam does not intersect the tumor structure.\n";
-                            return;
-                        }
-
-                        // Sample the dose within the tumor region
-                        OutputLog += "Sampling dose along beam path...\n";
-                        double margin = 5.0; // Increased margins
-                        double startDist = _entryDist - margin;
-                        double endDist = _exitDist + margin;
-                        stepSize = 1.0; // Normal step size for sampling
-
-                        for (double dist = startDist; dist <= endDist; dist += stepSize)
-                        {
-                            try
-                            {
-                                var samplePoint = isocenter + dist * direction;
-                                bool isInside = tumor.IsPointInsideSegment(samplePoint);
-
-                                // Check if dose value is accessible
-                                DoseValue doseValue = plan.Dose.GetDoseToPoint(samplePoint);
-                                if (doseValue == null)
-                                {
-                                    OutputLog += $"Null dose value at distance {dist}\n";
-                                    continue;
-                                }
-
-                                double doseInGy = doseValue.Dose;
-
-                                // Store in temporary lists
-                                tempDistances.Add(dist);
-                                tempDoseValues.Add(doseInGy);
-                                tempInsideFlags.Add(isInside);
-                            }
-                            catch (Exception ex)
-                            {
-                                OutputLog += $"Error sampling point at distance {dist}: {ex.Message}\n";
-                            }
-                        }
-
-                        // If we have data, transfer to the main lists
-                        if (tempDistances.Count > 0)
-                        {
-                            _distances = new List<double>(tempDistances);
-                            _doseValues = new List<double>(tempDoseValues);
-                            _insideTumorFlags = new List<bool>(tempInsideFlags);
-                            _hasPlotData = true;
-                        }
-
-                        if (_distances.Count == 0)
-                        {
-                            OutputLog += "No valid dose samples collected.\n";
-                            return;
-                        }
-
-                        // Compute basic stats
-                        OutputLog += "Computing statistics...\n";
-                        var tumorDoses = new List<double>();
-                        for (int i = 0; i < _doseValues.Count; i++)
-                        {
-                            if (_insideTumorFlags[i]) tumorDoses.Add(_doseValues[i]);
-                        }
-
-                        // Avoid divide by zero by checking count
-                        double maxDose = tumorDoses.Count > 0 ? tumorDoses.Max() : 0.0;
-                        double minDose = tumorDoses.Count > 0 ? tumorDoses.Min() : 0.0;
-                        double avgDose = tumorDoses.Count > 0 ? tumorDoses.Average() : 0.0;
-
-                        // Update output log
-                        OutputLog += "===== Computation Complete =====\n";
-                        OutputLog += $"Plan: {plan.Id}, Beam: {beam.Id}, Structure: {tumor.Id}\n";
-                        OutputLog += $"Entry Dist: {_entryDist:F1} mm, Exit Dist: {_exitDist:F1} mm\n";
-                        OutputLog += $"Tumor length along axis: {_exitDist - _entryDist:F1} mm\n";
-                        OutputLog += $"Max Dose: {maxDose:F3} Gy\n";
-                        OutputLog += $"Min Dose: {minDose:F3} Gy\n";
-                        OutputLog += $"Avg Dose: {avgDose:F3} Gy\n";
-                        OutputLog += $"Total samples: {_distances.Count}\n";
-                        OutputLog += "================================\n";
                     }
+
                     catch (Exception ex)
                     {
                         OutputLog += $"Error during dose computation: {ex.Message}\n";
@@ -1318,105 +1157,323 @@ namespace MAAS_SFRThelper.ViewModels
             }
         }
 
+        public void Run1DPVDRMetric(string tumorId, PlanSetup plan)
+        {
+            // Clear previous data first
+            _distances = new List<double>();
+            _doseValues = new List<double>();
+            _insideTumorFlags = new List<bool>();
+            _hasPlotData = false;
+
+            OutputLog += "Starting dose computation...\n";
+
+            string selectedBeamId = SelectedBeamId;
+            string selectedTumorId = SelectedTumorId;
+           
+            // Get actual beam and structure objects from their IDs
+            Beam beam = null;
+            Structure tumor = null;
+
+
+            beam = plan.Beams.FirstOrDefault(b => b.Id == selectedBeamId);
+            if (beam == null)
+            {
+                OutputLog += $"Could not find beam with ID '{selectedBeamId}'. Please select another beam.\n";
+                return;
+            }
+
+            if (_structureSet == null)
+            {
+                OutputLog += "No structure set available. Cannot compute dose.\n";
+                return;
+            }
+
+            tumor = _structureSet.Structures.FirstOrDefault(s => s.Id == selectedTumorId);
+            if (tumor == null)
+            {
+                OutputLog += $"Could not find structure with ID '{selectedTumorId}'. Please select another structure.\n";
+                return;
+            }
+
+            // Calculate beam direction
+            OutputLog += "Calculating beam direction...\n";
+            var isocenter = beam.IsocenterPosition;
+            var cp0 = beam.ControlPoints.First();
+
+            // Calculate the beam direction using gantry and couch angles
+            double gantryAngle = cp0.GantryAngle;
+            double couchAngle = cp0.PatientSupportAngle;
+
+            // Convert angles to radians
+            double gantryRad = gantryAngle * Math.PI / 180.0;
+            double couchRad = couchAngle * Math.PI / 180.0;
+
+            // Calculate direction vector from gantry and couch angles
+            VVector dVec = new VVector(
+                Math.Sin(gantryRad),
+                -Math.Cos(gantryRad),
+                0
+            );
+
+            // Apply couch rotation if needed
+            if (Math.Abs(couchAngle) > 0.1)
+            {
+                double x = dVec.x;
+                double z = dVec.z;
+                dVec.x = x * Math.Cos(couchRad) + z * Math.Sin(couchRad);
+                dVec.z = -x * Math.Sin(couchRad) + z * Math.Cos(couchRad);
+            }
+
+            // Normalize to unit vector
+            double length = Math.Sqrt(dVec.x * dVec.x + dVec.y * dVec.y + dVec.z * dVec.z);
+            VVector direction = new VVector(dVec.x / length, dVec.y / length, dVec.z / length);
+
+            // Find entry/exit by scanning
+            OutputLog += "Finding beam entry and exit points...\n";
+            double searchStartDist = -300.0;
+            double searchEndDist = 300.0;
+            double stepSize = 2.0; // Increased for stability
+            bool insideTumor = false;
+            _entryDist = double.NaN;
+            _exitDist = double.NaN;
+
+            // Temporary storage for computed data
+            var tempDistances = new List<double>();
+            var tempDoseValues = new List<double>();
+            var tempInsideFlags = new List<bool>();
+
+            for (double dist = searchStartDist; dist <= searchEndDist; dist += stepSize)
+            {
+                var point = isocenter + dist * direction;
+                bool pointInTumor = false;
+
+                try
+                {
+                    pointInTumor = tumor.IsPointInsideSegment(point);
+                }
+                catch (Exception ex)
+                {
+                    OutputLog += $"Error checking point: {ex.Message}\n";
+                    continue;
+                }
+
+                if (!insideTumor && pointInTumor)
+                {
+                    _entryDist = dist;
+                    insideTumor = true;
+                }
+                else if (insideTumor && !pointInTumor)
+                {
+                    _exitDist = dist;
+                    break;
+                }
+            }
+
+            if (double.IsNaN(_entryDist) || double.IsNaN(_exitDist))
+            {
+                OutputLog += "Beam does not intersect the tumor structure.\n";
+                return;
+            }
+
+            // Sample the dose within the tumor region
+            OutputLog += "Sampling dose along beam path...\n";
+            double margin = 5.0; // Increased margins
+            double startDist = _entryDist - margin;
+            double endDist = _exitDist + margin;
+            stepSize = 1.0; // Normal step size for sampling
+
+            for (double dist = startDist; dist <= endDist; dist += stepSize)
+            {
+                try
+                {
+                    var samplePoint = isocenter + dist * direction;
+                    bool isInside = tumor.IsPointInsideSegment(samplePoint);
+
+                    // Check if dose value is accessible
+                    DoseValue doseValue = plan.Dose.GetDoseToPoint(samplePoint);
+                    if (doseValue == null)
+                    {
+                        OutputLog += $"Null dose value at distance {dist}\n";
+                        continue;
+                    }
+
+                    double doseInGy = doseValue.Dose;
+
+                    // Store in temporary lists
+                    tempDistances.Add(dist);
+                    tempDoseValues.Add(doseInGy);
+                    tempInsideFlags.Add(isInside);
+                }
+                catch (Exception ex)
+                {
+                    OutputLog += $"Error sampling point at distance {dist}: {ex.Message}\n";
+                }
+            }
+
+            // If we have data, transfer to the main lists
+            if (tempDistances.Count > 0)
+            {
+                _distances = new List<double>(tempDistances);
+                _doseValues = new List<double>(tempDoseValues);
+                _insideTumorFlags = new List<bool>(tempInsideFlags);
+                _hasPlotData = true;
+            }
+
+            if (_distances.Count == 0)
+            {
+                OutputLog += "No valid dose samples collected.\n";
+                return;
+            }
+
+            // Compute basic stats
+            OutputLog += "Computing statistics...\n";
+            var tumorDoses = new List<double>();
+            for (int i = 0; i < _doseValues.Count; i++)
+            {
+                if (_insideTumorFlags[i]) tumorDoses.Add(_doseValues[i]);
+            }
+
+            // Avoid divide by zero by checking count
+            double maxDose = tumorDoses.Count > 0 ? tumorDoses.Max() : 0.0;
+            double minDose = tumorDoses.Count > 0 ? tumorDoses.Min() : 0.0;
+            double avgDose = tumorDoses.Count > 0 ? tumorDoses.Average() : 0.0;
+
+            // Update output log
+            OutputLog += "===== Computation Complete =====\n";
+            OutputLog += $"Plan: {plan.Id}, Beam: {beam.Id}, Structure: {tumor.Id}\n";
+            OutputLog += $"Entry Dist: {_entryDist:F1} mm, Exit Dist: {_exitDist:F1} mm\n";
+            OutputLog += $"Tumor length along axis: {_exitDist - _entryDist:F1} mm\n";
+            OutputLog += $"Max Dose: {maxDose:F3} Gy\n";
+            OutputLog += $"Min Dose: {minDose:F3} Gy\n";
+            OutputLog += $"Avg Dose: {avgDose:F3} Gy\n";
+            OutputLog += $"Total samples: {_distances.Count}\n";
+            OutputLog += "================================\n";
+
+            // Update the commands that depend on data availability
+            SaveCsvCommand.RaiseCanExecuteChanged();
+            ShowPlotCommand.RaiseCanExecuteChanged();
+            RefreshPlotCommand?.RaiseCanExecuteChanged();
+        }
+        
+
         public void Run2DPVDRMetric(string tumorId, PlanSetup plan)
         {
             try
             {
                 OutputLog += "\nStarting 2D PVDR analysis...\n";
+                string selectedPvdrMode = SelectedPvdrMode;
 
-                // Step 1: Access beam
-                var beam = plan.Beams.FirstOrDefault(b => b.Id == SelectedBeamId);
-                if (beam == null)
+                if (selectedPvdrMode == "Fixed Beam")
                 {
-                    OutputLog += "Selected beam not found.\n";
-                    return;
+                    // === YOUR EXISTING FIXED BEAM PLANAR LOGIC HERE ===
+                    // (grid, projection, P/V sampling, etc.)
                 }
-
-                // Step 2: Access structure from the plan's structure set
-                var structureSet = plan.StructureSet;
-                if (structureSet == null)
+                else if (selectedPvdrMode == "VMAT")
                 {
-                    OutputLog += " No StructureSet associated with the selected plan.\n";
-                    return;
-                }
-
-                // Get structure from name
-                var structure = plan.StructureSet.Structures.FirstOrDefault(s => s.Id == tumorId);
-                if (structure == null)
-                {
-                    OutputLog += " Structure {tumorId} not found.\n";
-                    return;
-                }
-
-                // Use ESAPI built-in center point
-                var targetCenter = structure.CenterPoint; // VVector in mm
-
-                // target bounds
-                try
-                {
-                    var mesh = structure.MeshGeometry;
-
-                    if (mesh == null || mesh.Positions == null || mesh.Positions.Count == 0)
+                    // Step 1: Access beam
+                    var beam = plan.Beams.FirstOrDefault(b => b.Id == SelectedBeamId);
+                    if (beam == null)
                     {
-                        OutputLog += "Mesh geometry not available for structure: " + structure.Id + "\n";
+                        OutputLog += "Selected beam not found.\n";
+                        return;
                     }
-                    else
-                    {
-                        double minX = double.MaxValue, minY = double.MaxValue, minZ = double.MaxValue;
-                        double maxX = double.MinValue, maxY = double.MinValue, maxZ = double.MinValue;
 
-                        foreach (var point in mesh.Positions)
+                    // Step 2: Access structure from the plan's structure set
+                    var structureSet = plan.StructureSet;
+                    if (structureSet == null)
+                    {
+                        OutputLog += " No StructureSet associated with the selected plan.\n";
+                        return;
+                    }
+
+                    // Get structure from name
+                    var structure = plan.StructureSet.Structures.FirstOrDefault(s => s.Id == tumorId);
+                    if (structure == null)
+                    {
+                        OutputLog += " Structure {tumorId} not found.\n";
+                        return;
+                    }
+
+                    // Use ESAPI built-in center point
+                    var targetCenter = structure.CenterPoint; // VVector in mm
+
+                    // target bounds
+                    try
+                    {
+                        var mesh = structure.MeshGeometry;
+
+                        if (mesh == null || mesh.Positions == null || mesh.Positions.Count == 0)
                         {
-                            if (point.X < minX) minX = point.X;
-                            if (point.Y < minY) minY = point.Y;
-                            if (point.Z < minZ) minZ = point.Z;
-
-                            if (point.X > maxX) maxX = point.X;
-                            if (point.Y > maxY) maxY = point.Y;
-                            if (point.Z > maxZ) maxZ = point.Z;
+                            OutputLog += "Mesh geometry not available for structure: " + structure.Id + "\n";
                         }
+                        else
+                        {
+                            double minX = double.MaxValue, minY = double.MaxValue, minZ = double.MaxValue;
+                            double maxX = double.MinValue, maxY = double.MinValue, maxZ = double.MinValue;
 
-                        OutputLog += "Structure bounding box (mm):\n";
-                        OutputLog += "  Min: (" + minX.ToString("F1") + ", " + minY.ToString("F1") + ", " + minZ.ToString("F1") + ")\n";
-                        OutputLog += "  Max: (" + maxX.ToString("F1") + ", " + maxY.ToString("F1") + ", " + maxZ.ToString("F1") + ")\n";
+                            foreach (var point in mesh.Positions)
+                            {
+                                if (point.X < minX) minX = point.X;
+                                if (point.Y < minY) minY = point.Y;
+                                if (point.Z < minZ) minZ = point.Z;
+
+                                if (point.X > maxX) maxX = point.X;
+                                if (point.Y > maxY) maxY = point.Y;
+                                if (point.Z > maxZ) maxZ = point.Z;
+                            }
+
+                            OutputLog += "Structure bounding box (mm):\n";
+                            OutputLog += "  Min: (" + minX.ToString("F1") + ", " + minY.ToString("F1") + ", " + minZ.ToString("F1") + ")\n";
+                            OutputLog += "  Max: (" + maxX.ToString("F1") + ", " + maxY.ToString("F1") + ", " + maxZ.ToString("F1") + ")\n";
+                        }
                     }
+                    catch (Exception ex)
+                    {
+                        OutputLog += "Error computing mesh bounds: " + ex.Message + "\n";
+                    }
+
+
+
+                    OutputLog += $"Target centroid: ({targetCenter.x:F1}, {targetCenter.y:F1}, {targetCenter.z:F1}) mm \n";
+
+
+                    // Step 3: Extract jaw and MLC geometry
+                    OutputLog += "Extracting jaw and MLC positions...\n";
+                    // TODO: Add actual MLC/jaw extraction logic here
+                    //LogBeamApertureGeometry(beam);
+                    RunSphericalPVDRMetric(tumorId, plan);
+
+                    // Step 4: Define sampling grid in plane perpendicular to beam central axis
+                    OutputLog += "Defining planar grid for dose sampling...\n";
+                    // TODO: Add ray projection to target logic here
+
+                    // Step 5: Sample dose at projected beamlet intersections (peaks/valleys)
+                    OutputLog += "Sampling dose at grid points...\n";
+                    // TODO: Dose sampling at grid points
+
+                    // Step 6: Compute PVDR metric from dose grid
+                    OutputLog += "Computing PVDR metrics...\n";
+                    // TODO: Compute peak and valley logic here
+
+                    // Step 7: Log results (optional for now)
+                    // AllMetrics.Add(new EvalMetric { metric = "PVDR (2D)", value = "TBD" });
+                    OutputLog += "Logging PVDR metric complete.\n";
+
+                    // Step 8: (optional) Show heatmap or profile
+                    // Show2DHeatmapOnCanvas(); // Optional if wired in later
+
+                    OutputLog += "2D PVDR analysis complete.\n";
+
+                    // Matt - BEV, at what surfaces does arc cover? For a full 
+
+                    return; // skip rest
                 }
-                catch (Exception ex)
+                else
                 {
-                    OutputLog += "Error computing mesh bounds: " + ex.Message + "\n";
+                    OutputLog += $"Unknown PVDR mode: {selectedPvdrMode}\n";
+                    return;
                 }
 
-
-
-                OutputLog += $"Target centroid: ({targetCenter.x:F1}, {targetCenter.y:F1}, {targetCenter.z:F1}) mm \n";
-
-
-                // Step 3: Extract jaw and MLC geometry
-                OutputLog += "Extracting jaw and MLC positions...\n";
-                // TODO: Add actual MLC/jaw extraction logic here
-                //LogBeamApertureGeometry(beam);
-                RunSphericalPVDRMetric(tumorId, plan);
-
-                // Step 4: Define sampling grid in plane perpendicular to beam central axis
-                OutputLog += "Defining planar grid for dose sampling...\n";
-                // TODO: Add ray projection to target logic here
-
-                // Step 5: Sample dose at projected beamlet intersections (peaks/valleys)
-                OutputLog += "Sampling dose at grid points...\n";
-                // TODO: Dose sampling at grid points
-
-                // Step 6: Compute PVDR metric from dose grid
-                OutputLog += "Computing PVDR metrics...\n";
-                // TODO: Compute peak and valley logic here
-
-                // Step 7: Log results (optional for now)
-                // AllMetrics.Add(new EvalMetric { metric = "PVDR (2D)", value = "TBD" });
-                OutputLog += "Logging PVDR metric complete.\n";
-
-                // Step 8: (optional) Show heatmap or profile
-                // Show2DHeatmapOnCanvas(); // Optional if wired in later
-
-                OutputLog += "2D PVDR analysis complete.\n";
             }
             catch (Exception ex)
             {
