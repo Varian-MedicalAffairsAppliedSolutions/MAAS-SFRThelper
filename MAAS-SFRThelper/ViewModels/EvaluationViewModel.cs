@@ -564,24 +564,19 @@ namespace MAAS_SFRThelper.ViewModels
                             OutputLog += "Running 2D Planar computation...\n";
                             Run2DPVDRMetric(selectedTumorId, plan);
                             OutputLog += "2D Dosimetrics complete\n";
-                            //if (_has2DPlotData && _dose2DGrid != null)
+                            /// just added below
+                            //if (Is2DPlanarSelected && _has2DPlotData)
                             //{
-                            //    //Show2DDoseHeatmapOnCanvas(PlotCanvas, _dose2DGrid, _inStruct2D);
-                            //    //OutputLog += "2D dose heatmap plotted.\n";
                             //    System.Windows.Application.Current.Dispatcher.Invoke(() =>
                             //    {
+                            //        // make sure we’re in plot view
+                            //        bTextVis = false;
+                            //        bPlotVis = true;
                             //        Show2DDoseHeatmapOnCanvas(PlotCanvas, _dose2DGrid, _inStruct2D);
                             //        OutputLog += "2D dose heatmap plotted.\n";
                             //    });
+                            //}
 
-                            //}
-                            //else
-                            //{
-                            //    MessageBox.Show("No 2D grid data available to plot. Please run 2D computation first.",
-                            //        "No Data", MessageBoxButton.OK, MessageBoxImage.Information);
-                            //    bTextVis = true;
-                            //    bPlotVis = false;
-                            //}
                             return;
                         }
 
@@ -608,6 +603,14 @@ namespace MAAS_SFRThelper.ViewModels
                         }
                     }
                 });
+
+                if (Is2DPlanarSelected && _has2DPlotData)
+                {
+                    // bTextVis = false;
+                    // bPlotVis = true;
+                    Show2DDoseHeatmapOnCanvas(PlotCanvas, _dose2DGrid, _inStruct2D);
+                    OutputLog += "2D dose heatmap plotted.\n";
+                }
 
                 // Update the commands that depend on data availability
                 SaveCsvCommand.RaiseCanExecuteChanged();
@@ -637,21 +640,46 @@ namespace MAAS_SFRThelper.ViewModels
             }
         }
 
+        //public bool CanExecuteShowPlot()
+        //{
+        //    try
+        //    {
+        //        if (_distances == null || _doseValues == null || _insideTumorFlags == null)
+        //            return false;
+
+        //        return _distances.Count > 0 && _doseValues.Count > 0 && _insideTumorFlags.Count > 0;
+        //    }
+        //    catch
+        //    {
+        //        // If there's any error accessing the collections, assume we can't plot
+        //        return false;
+        //    }
+        //}
+
         public bool CanExecuteShowPlot()
         {
             try
             {
-                if (_distances == null || _doseValues == null || _insideTumorFlags == null)
-                    return false;
+                // 1D CAX ready?
+                if (Is1DCAXSelected)
+                    return _distances?.Count > 0;
 
-                return _distances.Count > 0 && _doseValues.Count > 0 && _insideTumorFlags.Count > 0;
+                // 2D Planar ready?
+                if (Is2DPlanarSelected)
+                    return _has2DPlotData;
+
+                // (optional) later: 3D readiness
+                if (Is3DEvaluationSelected)
+                    return false; // or hook up when you implement 3D plotting
+
+                return false;
             }
             catch
             {
-                // If there's any error accessing the collections, assume we can't plot
                 return false;
             }
         }
+
 
         private void ExecuteSaveCsv()
         {
@@ -788,14 +816,29 @@ namespace MAAS_SFRThelper.ViewModels
                 
                 else if (Is2DPlanarSelected)
                 {
-                    OutputLog += "Using 2D Normal Multiplanar P/V Interpolation evaluation method for plot...\n";
-                    // TODO: Implement 2D Multiplanar plotting logic
-                    MessageBox.Show("2D Normal Multiplanar P/V Interpolation plotting not yet implemented.",
-                        "Feature Not Available", MessageBoxButton.OK, MessageBoxImage.Information);
-                    // Switch back to text view since plot isn't implemented
-                    bTextVis = true;
-                    bPlotVis = false;
+                    OutputLog += "Rendering 2D planar dose heatmap...\n";
+                    // ensure we have the data
+                    if (!_has2DPlotData || _dose2DGrid == null)
+                    {
+                        MessageBox.Show("No 2D grid data available. Run 2D computation first.",
+                                        "No Data", MessageBoxButton.OK, MessageBoxImage.Information);
+                        bTextVis = true;
+                        bPlotVis = false;
+                        return;
+                    }
+                    // draw it
+                    Show2DDoseHeatmapOnCanvas(PlotCanvas, _dose2DGrid, _inStruct2D);
+                    OutputLog += "2D heatmap drawn successfully.\n";
                 }
+                //{
+                //    OutputLog += "Using 2D Normal Multiplanar P/V Interpolation evaluation method for plot...\n";
+                //    // TODO: Implement 2D Multiplanar plotting logic
+                //    MessageBox.Show("2D Normal Multiplanar P/V Interpolation plotting not yet implemented.",
+                //        "Feature Not Available", MessageBoxButton.OK, MessageBoxImage.Information);
+                //    // Switch back to text view since plot isn't implemented
+                //    bTextVis = true;
+                //    bPlotVis = false;
+                //}
                 else if (Is3DEvaluationSelected)
                 {
                     OutputLog += "Using 3D Dose P/V Interpolation evaluation method for plot...\n";
@@ -1457,32 +1500,75 @@ namespace MAAS_SFRThelper.ViewModels
 
                         OutputLog += $"Fixed Beam 2D grid: n={nX * nY}\n";
 
-                        // 4. Scan grid
+                        // 4. Scan grid into your 2D arrays
+                        //    We loop 0..nX-1, mapping each index back to physical coords
+                        for (int ix = 0; ix < _nX2D; ix++)
+                        {
+                            double px = (ix - _nX2D / 2.0) * gridStep;
+                            for (int iy = 0; iy < _nY2D; iy++)
+                            {
+                                double py = (iy - _nY2D / 2.0) * gridStep;
+                                var pt = iso + (px * u) + (py * v);
 
+                                bool inside = false;
+                                try
+                                {
+                                    inside = structure.IsPointInsideSegment(pt);
+                                }
+                                catch
+                                {
+                                    // leave inside=false
+                                }
+
+                                // store mask
+                                _inStruct2D[ix, iy] = inside;
+
+                                if (!inside)
+                                {
+                                    _dose2DGrid[ix, iy] = double.NaN;
+                                    continue;
+                                }
+
+                                // sample dose
+                                double doseGy = double.NaN;
+                                try
+                                {
+                                    var dv = plan.Dose.GetDoseToPoint(pt);
+                                    if (dv != null) doseGy = dv.Dose;
+                                }
+                                catch
+                                {
+                                    // leave NaN
+                                }
+
+                                _dose2DGrid[ix, iy] = doseGy;
+                            }
+                        }
+
+                        // now that the arrays are filled, flag for plotting
+                        _has2DPlotData = true;
+
+                        // log summary
+                        OutputLog += $"Filled 2D grid: {_nX2D}×{_nY2D} points, ready to plot.\n";
+
+
+                        //var doseList = new List<double>();
+                        //var peakDoseList = new List<double>();
                         //int nInsideStruct = 0, nDoseNaN = 0, nDoseZero = 0;
 
-                        //for (int ix = 0; ix < nX; ix++)
+                        //for (int ix = -nX / 2; ix <= nX / 2; ix++)
                         //{
-                        //    for (int iy = 0; iy < nY; iy++)
+                        //    for (int iy = -nY / 2; iy <= nY / 2; iy++)
                         //    {
-                        //        // Map grid index to plane position
-                        //        double px = ((ix - nX / 2) * gridStep);
-                        //        double py = ((iy - nY / 2) * gridStep);
-                        //        var pt = iso + px * u + py * v;
-
-                        //        _x2DGrid[ix, iy] = pt.x;
-                        //        _y2DGrid[ix, iy] = pt.y;
+                        //        // Position in the plane
+                        //        var pt = iso + (ix * gridStep) * u + (iy * gridStep) * v;
 
                         //        // Only use points inside the target
                         //        bool inside = false;
                         //        try { inside = structure.IsPointInsideSegment(pt); }
-                        //        catch { }
-                        //        _inStruct2D[ix, iy] = inside;
-                        //        if (!inside)
-                        //        {
-                        //            _dose2DGrid[ix, iy] = double.NaN;
-                        //            continue;
-                        //        }
+                        //        catch { continue; }
+                        //        if (!inside) continue;
+
                         //        nInsideStruct++;
 
                         //        // Sample dose
@@ -1494,84 +1580,40 @@ namespace MAAS_SFRThelper.ViewModels
                         //        }
                         //        catch { }
 
+                        //        // Check for invalid doses
                         //        if (double.IsNaN(doseGy))
                         //        {
                         //            nDoseNaN++;
-                        //            _dose2DGrid[ix, iy] = double.NaN;
                         //            continue;
                         //        }
                         //        if (doseGy == 0.0)
                         //        {
                         //            nDoseZero++;
-                        //            _dose2DGrid[ix, iy] = 0.0;
                         //            continue;
                         //        }
 
-                        //        _dose2DGrid[ix, iy] = doseGy;
+                        //        doseList.Add(doseGy);
+
+                        //        // Peak detection example: here, just collect all points for now
+                        //        // Later, filter for peaks using morphological/threshold filter
+                        //        peakDoseList.Add(doseGy); /// just added
                         //    }
                         //}
+
                         //_has2DPlotData = true;
-                        var doseList = new List<double>();
-                        var peakDoseList = new List<double>();
-                        int nInsideStruct = 0, nDoseNaN = 0, nDoseZero = 0;
+                        //OutputLog += $"Grid points in structure: {nInsideStruct}\n";
+                        //OutputLog += $"NaN dose points: {nDoseNaN}\n";
+                        //OutputLog += $"Zero dose points: {nDoseZero}\n";
 
-                        for (int ix = -nX / 2; ix <= nX / 2; ix++)
-                        {
-                            for (int iy = -nY / 2; iy <= nY / 2; iy++)
-                            {
-                                // Position in the plane
-                                var pt = iso + (ix * gridStep) * u + (iy * gridStep) * v;
+                        //// 5. Compute metrics robustly
+                        //double meanPeakDose = peakDoseList.Count > 0 ? peakDoseList.Average() : double.NaN;
+                        //double maxPeakDose = peakDoseList.Count > 0 ? peakDoseList.Max() : double.NaN;
+                        //double minPeakDose = peakDoseList.Count > 0 ? peakDoseList.Min() : double.NaN;
 
-                                // Only use points inside the target
-                                bool inside = false;
-                                try { inside = structure.IsPointInsideSegment(pt); }
-                                catch { continue; }
-                                if (!inside) continue;
-
-                                nInsideStruct++;
-
-                                // Sample dose
-                                double doseGy = double.NaN;
-                                try
-                                {
-                                    DoseValue dv = plan.Dose.GetDoseToPoint(pt);
-                                    if (dv != null) doseGy = dv.Dose;
-                                }
-                                catch { }
-
-                                // Check for invalid doses
-                                if (double.IsNaN(doseGy))
-                                {
-                                    nDoseNaN++;
-                                    continue;
-                                }
-                                if (doseGy == 0.0)
-                                {
-                                    nDoseZero++;
-                                    continue;
-                                }
-
-                                doseList.Add(doseGy);
-
-                                // Peak detection example: here, just collect all points for now
-                                // Later, filter for peaks using morphological/threshold filter
-                                peakDoseList.Add(doseGy);
-                            }
-                        }
-
-                        OutputLog += $"Grid points in structure: {nInsideStruct}\n";
-                        OutputLog += $"NaN dose points: {nDoseNaN}\n";
-                        OutputLog += $"Zero dose points: {nDoseZero}\n";
-
-                        // 5. Compute metrics robustly
-                        double meanPeakDose = peakDoseList.Count > 0 ? peakDoseList.Average() : double.NaN;
-                        double maxPeakDose = peakDoseList.Count > 0 ? peakDoseList.Max() : double.NaN;
-                        double minPeakDose = peakDoseList.Count > 0 ? peakDoseList.Min() : double.NaN;
-
-                        OutputLog += $"Peak dose mean: {(double.IsNaN(meanPeakDose) ? "NaN" : meanPeakDose.ToString("F2"))} Gy, ";
-                        OutputLog += $"max: {(double.IsNaN(maxPeakDose) ? "NaN" : maxPeakDose.ToString("F2"))}, ";
-                        OutputLog += $"min: {(double.IsNaN(minPeakDose) ? "NaN" : minPeakDose.ToString("F2"))}\n";
-                        OutputLog += "2D Dosimetrics complete\n";
+                        //OutputLog += $"Peak dose mean: {(double.IsNaN(meanPeakDose) ? "NaN" : meanPeakDose.ToString("F2"))} Gy, ";
+                        //OutputLog += $"max: {(double.IsNaN(maxPeakDose) ? "NaN" : maxPeakDose.ToString("F2"))}, ";
+                        //OutputLog += $"min: {(double.IsNaN(minPeakDose) ? "NaN" : minPeakDose.ToString("F2"))}\n";
+                        //OutputLog += "2D Dosimetrics complete\n";
                     }
 
                 }
@@ -2270,72 +2312,362 @@ namespace MAAS_SFRThelper.ViewModels
             );
         }
 
-        // Draws 2D heatmap of dose on the Canvas
+        // Draws 2D heatmap of dose on the Canvas ///////////////////////////////
+
         private void Show2DDoseHeatmapOnCanvas(Canvas targetCanvas, double[,] doseGrid, bool[,] inStruct = null)
         {
-            if (targetCanvas == null || doseGrid == null)
-                return;
-
             targetCanvas.Children.Clear();
+
+            OutputLog += "=== Show2DDoseHeatmapOnCanvas CALLED ===\n";
+
+            if (targetCanvas == null || doseGrid == null)
+            {
+                OutputLog += "ERROR: Canvas or doseGrid is null\n";
+                return;
+            }
+
             targetCanvas.UpdateLayout();
 
             int nX = doseGrid.GetLength(0);
             int nY = doseGrid.GetLength(1);
 
-            // Find min/max dose for scaling
-            double minDose = double.MaxValue, maxDose = double.MinValue;
-            for (int i = 0; i < nX; i++)
-                for (int j = 0; j < nY; j++)
-                    if (!double.IsNaN(doseGrid[i, j]))
-                    {
-                        if (doseGrid[i, j] < minDose) minDose = doseGrid[i, j];
-                        if (doseGrid[i, j] > maxDose) maxDose = doseGrid[i, j];
-                    }
-            if (maxDose - minDose < 1e-6) maxDose = minDose + 1;
-
-            // Canvas scaling
             double canvasW = targetCanvas.ActualWidth;
             double canvasH = targetCanvas.ActualHeight;
-            double plotW = canvasW * 0.90;
-            double plotH = canvasH * 0.90;
-            double left = canvasW * 0.05;
-            double top = canvasH * 0.05;
 
-            double cellW = plotW / nX;
-            double cellH = plotH / nY;
+            if (canvasW <= 0 || canvasH <= 0)
+            {
+                canvasW = 600;
+                canvasH = 400;
+            }
+
+            // === CANVAS DIVISION ===
+            // Left side: 75% for heatmap, Right side: 25% for colorbar
+            double heatmapWidth = canvasW * 0.75;
+            double colorbarWidth = canvasW * 0.25;
+            double dividerX = heatmapWidth;
+
+            // Find the bounding box of the structure to focus on relevant area
+            int minI = nX, maxI = -1, minJ = nY, maxJ = -1;
+            int validDoseCount = 0;
+            int structureCount = 0;
+            double minDose = double.MaxValue;
+            double maxDose = double.MinValue;
 
             for (int i = 0; i < nX; i++)
             {
                 for (int j = 0; j < nY; j++)
                 {
                     double dose = doseGrid[i, j];
-                    if (double.IsNaN(dose)) continue;
+                    bool inStructure = (inStruct != null && inStruct[i, j]);
 
-                    double norm = (dose - minDose) / (maxDose - minDose);
-
-                    // Simple blue->green->yellow
-                    Color col = (norm < 0.5)
-                        ? Color.FromRgb(0, (byte)(norm * 2 * 255), (byte)((1 - norm * 2) * 255))
-                        : Color.FromRgb((byte)((norm - 0.5) * 2 * 255), 255, 0);
-
-                    SolidColorBrush brush = new SolidColorBrush(col);
-
-                    Rectangle rect = new Rectangle
+                    // Track structure bounds
+                    if (inStructure || !double.IsNaN(dose))
                     {
-                        Width = cellW + 1,
-                        Height = cellH + 1,
-                        Fill = brush,
-                        Stroke = (inStruct != null && inStruct[i, j]) ? Brushes.Red : null,
-                        StrokeThickness = (inStruct != null && inStruct[i, j]) ? 0.5 : 0
-                    };
-                    double px = left + i * cellW;
-                    double py = top + (nY - 1 - j) * cellH; // Y axis flip
-                    Canvas.SetLeft(rect, px);
-                    Canvas.SetTop(rect, py);
+                        minI = Math.Min(minI, i);
+                        maxI = Math.Max(maxI, i);
+                        minJ = Math.Min(minJ, j);
+                        maxJ = Math.Max(maxJ, j);
+                    }
 
-                    targetCanvas.Children.Add(rect);
+                    if (inStructure) structureCount++;
+
+                    if (!double.IsNaN(dose))
+                    {
+                        validDoseCount++;
+                        minDose = Math.Min(minDose, dose);
+                        maxDose = Math.Max(maxDose, dose);
+                    }
                 }
             }
+
+            OutputLog += $"Grid: {nX}x{nY}, Valid dose: {validDoseCount}, Structure: {structureCount}\n";
+            OutputLog += $"Data bounds: i=[{minI},{maxI}], j=[{minJ},{maxJ}]\n";
+            OutputLog += $"Dose range: {(validDoseCount > 0 ? $"{minDose:F3} to {maxDose:F3}" : "No dose")}\n";
+
+            if (validDoseCount == 0 && structureCount == 0)
+            {
+                var noDataText = new TextBlock
+                {
+                    Text = "NO DATA TO PLOT",
+                    FontSize = 20,
+                    Foreground = Brushes.Red,
+                    FontWeight = FontWeights.Bold
+                };
+                Canvas.SetLeft(noDataText, heatmapWidth / 2 - 80);
+                Canvas.SetTop(noDataText, canvasH / 2);
+                targetCanvas.Children.Add(noDataText);
+                return;
+            }
+
+            // Expand bounds slightly and ensure they're valid
+            if (maxI >= minI && maxJ >= minJ)
+            {
+                int padding = Math.Max(5, Math.Max((maxI - minI) / 4, (maxJ - minJ) / 4));
+                minI = Math.Max(0, minI - padding);
+                maxI = Math.Min(nX - 1, maxI + padding);
+                minJ = Math.Max(0, minJ - padding);
+                maxJ = Math.Min(nY - 1, maxJ + padding);
+            }
+            else
+            {
+                // Show entire grid if no bounds found
+                minI = 0; maxI = nX - 1;
+                minJ = 0; maxJ = nY - 1;
+            }
+
+            int plotNX = maxI - minI + 1;
+            int plotNY = maxJ - minJ + 1;
+
+            OutputLog += $"Focusing on region: {plotNX}x{plotNY} (was {nX}x{nY})\n";
+
+            // Force reasonable dose range
+            if (validDoseCount > 0 && maxDose - minDose < 1e-6)
+                maxDose = minDose + 1;
+            else if (validDoseCount == 0)
+            {
+                minDose = 0;
+                maxDose = 1;
+            }
+
+            // === HEATMAP REGION LAYOUT (LEFT SIDE) ===
+            double heatmapMargin = 40;
+            double titleHeight = 30;
+            double bottomLabelSpace = 30;
+
+            double availableHeatmapWidth = heatmapWidth - 2 * heatmapMargin;
+            double availableHeatmapHeight = canvasH - titleHeight - bottomLabelSpace - heatmapMargin;
+
+            // Calculate cell size to fit the heatmap region
+            double cellW = availableHeatmapWidth / plotNX;
+            double cellH = availableHeatmapHeight / plotNY;
+
+            // Ensure minimum cell size for visibility
+            double minCellSize = 6;
+            if (cellW < minCellSize || cellH < minCellSize)
+            {
+                double scale = Math.Min(minCellSize / cellW, minCellSize / cellH);
+                cellW *= scale;
+                cellH *= scale;
+            }
+
+            // Center the heatmap in the left region
+            double actualHeatmapWidth = cellW * plotNX;
+            double actualHeatmapHeight = cellH * plotNY;
+            double gridLeft = (heatmapWidth - actualHeatmapWidth) / 2;
+            double gridTop = titleHeight + (availableHeatmapHeight - actualHeatmapHeight) / 2;
+
+            // === COLORBAR REGION LAYOUT (RIGHT SIDE) ===
+            double colorbarMargin = 20;
+            double colorbarBarWidth = 40;
+            double colorbarLeft = dividerX + colorbarMargin;
+            double colorbarTop = titleHeight + 20;
+            double colorbarHeight = canvasH - titleHeight - 60;
+
+            OutputLog += $"Layout: Heatmap {actualHeatmapWidth:F0}x{actualHeatmapHeight:F0}, Cells {cellW:F1}x{cellH:F1}\n";
+
+            // === DRAW VISUAL DIVIDER ===
+            var dividerLine = new Line
+            {
+                X1 = dividerX,
+                Y1 = 0,
+                X2 = dividerX,
+                Y2 = canvasH,
+                Stroke = Brushes.LightGray,
+                StrokeThickness = 1,
+                StrokeDashArray = new DoubleCollection { 5, 5 }
+            };
+            targetCanvas.Children.Add(dividerLine);
+
+            // === ADD TITLE (CENTERED IN HEATMAP REGION) ===
+            var title = new TextBlock
+            {
+                Text = $"2D Dose Distribution ({plotNX}×{plotNY} focus region)",
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            Canvas.SetLeft(title, heatmapWidth / 2 - 150);
+            Canvas.SetTop(title, 5);
+            targetCanvas.Children.Add(title);
+
+            // === DRAW HEATMAP (LEFT REGION) ===
+            int cellsDrawn = 0;
+            for (int i = minI; i <= maxI; i++)
+            {
+                for (int j = minJ; j <= maxJ; j++)
+                {
+                    double dose = doseGrid[i, j];
+                    bool inStructure = (inStruct != null && inStruct[i, j]);
+
+                    Color cellColor;
+
+                    if (inStructure)
+                    {
+                        if (double.IsNaN(dose))
+                        {
+                            cellColor = Colors.Yellow;  // Structure with no dose - bright yellow
+                        }
+                        else
+                        {
+                            // Structure with dose - make it very visible
+                            double norm = (dose - minDose) / (maxDose - minDose);
+                            norm = Math.Max(0, Math.Min(1, norm));
+
+                            // Hot colors for structure
+                            if (norm < 0.5)
+                            {
+                                double t = norm * 2;
+                                cellColor = Color.FromRgb((byte)(255 * t), (byte)(128 + 127 * t), 0);  // Orange to yellow
+                            }
+                            else
+                            {
+                                double t = (norm - 0.5) * 2;
+                                cellColor = Color.FromRgb(255, (byte)(255 - 128 * t), (byte)(255 * t));  // Yellow to magenta
+                            }
+                        }
+                    }
+                    else if (!double.IsNaN(dose))
+                    {
+                        // Dose outside structure - cooler colors
+                        double norm = (dose - minDose) / (maxDose - minDose);
+                        norm = Math.Max(0, Math.Min(1, norm));
+
+                        if (norm < 0.5)
+                        {
+                            double t = norm * 2;
+                            cellColor = Color.FromRgb(0, (byte)(t * 255), (byte)((1 - t) * 255));  // Blue to cyan
+                        }
+                        else
+                        {
+                            double t = (norm - 0.5) * 2;
+                            cellColor = Color.FromRgb((byte)(t * 128), 255, (byte)((1 - t) * 255));  // Cyan to light green
+                        }
+                    }
+                    else
+                    {
+                        continue;  // Skip empty areas
+                    }
+
+                    var rect = new Rectangle
+                    {
+                        Width = cellW + 0.5,
+                        Height = cellH + 0.5,
+                        Fill = new SolidColorBrush(cellColor),
+                        Stroke = inStructure ? Brushes.Black : null,
+                        StrokeThickness = inStructure ? 2 : 0
+                    };
+
+                    double px = gridLeft + (i - minI) * cellW;
+                    double py = gridTop + (maxJ - j) * cellH;  // Flip Y
+
+                    Canvas.SetLeft(rect, px);
+                    Canvas.SetTop(rect, py);
+                    targetCanvas.Children.Add(rect);
+                    cellsDrawn++;
+                }
+            }
+
+            OutputLog += $"Drew {cellsDrawn} cells in focused region\n";
+
+            // === DRAW COLORBAR (RIGHT REGION) ===
+            if (validDoseCount > 0)
+            {
+                // Colorbar background
+                var colorbarBg = new Rectangle
+                {
+                    Width = colorbarBarWidth + 4,
+                    Height = colorbarHeight + 4,
+                    Fill = Brushes.White,
+                    Stroke = Brushes.Black,
+                    StrokeThickness = 1
+                };
+                Canvas.SetLeft(colorbarBg, colorbarLeft - 2);
+                Canvas.SetTop(colorbarBg, colorbarTop - 2);
+                targetCanvas.Children.Add(colorbarBg);
+
+                // Colorbar gradient
+                int colorSteps = 50;
+                double stepHeight = colorbarHeight / colorSteps;
+
+                for (int s = 0; s < colorSteps; s++)
+                {
+                    double norm = (double)s / (colorSteps - 1);
+
+                    // Same color scheme as the plot
+                    Color barColor;
+                    if (norm < 0.5)
+                    {
+                        double t = norm * 2;
+                        barColor = Color.FromRgb(0, (byte)(t * 255), (byte)((1 - t) * 255));
+                    }
+                    else
+                    {
+                        double t = (norm - 0.5) * 2;
+                        barColor = Color.FromRgb((byte)(t * 128), 255, (byte)((1 - t) * 255));
+                    }
+
+                    var barRect = new Rectangle
+                    {
+                        Width = colorbarBarWidth,
+                        Height = stepHeight + 1,
+                        Fill = new SolidColorBrush(barColor)
+                    };
+
+                    Canvas.SetLeft(barRect, colorbarLeft);
+                    Canvas.SetTop(barRect, colorbarTop + (colorSteps - 1 - s) * stepHeight);
+                    targetCanvas.Children.Add(barRect);
+                }
+
+                // === COLORBAR LABELS (RIGHT REGION) ===
+                double labelX = colorbarLeft + colorbarBarWidth + 10;
+
+                var maxLabel = new TextBlock
+                {
+                    Text = $"{maxDose:F1}",
+                    FontSize = 14,
+                    FontWeight = FontWeights.Bold,
+                    Foreground = Brushes.Black
+                };
+                Canvas.SetLeft(maxLabel, labelX);
+                Canvas.SetTop(maxLabel, colorbarTop - 5);
+                targetCanvas.Children.Add(maxLabel);
+
+                var midLabel = new TextBlock
+                {
+                    Text = $"{(minDose + maxDose) / 2:F1}",
+                    FontSize = 14,
+                    FontWeight = FontWeights.Bold,
+                    Foreground = Brushes.Black
+                };
+                Canvas.SetLeft(midLabel, labelX);
+                Canvas.SetTop(midLabel, colorbarTop + colorbarHeight / 2 - 10);
+                targetCanvas.Children.Add(midLabel);
+
+                var minLabel = new TextBlock
+                {
+                    Text = $"{minDose:F1}",
+                    FontSize = 14,
+                    FontWeight = FontWeights.Bold,
+                    Foreground = Brushes.Black
+                };
+                Canvas.SetLeft(minLabel, labelX);
+                Canvas.SetTop(minLabel, colorbarTop + colorbarHeight - 15);
+                targetCanvas.Children.Add(minLabel);
+
+                // Unit label
+                var unitLabel = new TextBlock
+                {
+                    Text = "Dose (Gy)",
+                    FontSize = 16,
+                    FontWeight = FontWeights.Bold,
+                    Foreground = Brushes.Black
+                };
+                Canvas.SetLeft(unitLabel, colorbarLeft);
+                Canvas.SetTop(unitLabel, colorbarTop - 35);
+                targetCanvas.Children.Add(unitLabel);
+            }
+
+            OutputLog += "=== Two-Panel Layout Complete ===\n";
         }
 
     }
