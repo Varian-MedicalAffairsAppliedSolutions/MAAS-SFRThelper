@@ -1431,12 +1431,13 @@ namespace MAAS_SFRThelper.ViewModels
 
                 if (selectedPvdrMode == "Fixed Beam")
                 {
+
                     // === YOUR EXISTING FIXED BEAM PLANAR LOGIC HERE ===
                     // (grid, projection, P/V sampling, etc.)
 
                     if (selectedPvdrMode == "Fixed Beam")
                     {
-                        OutputLog += "\n===== Starting Fixed Beam 2D PVDR Analysis =====\n";
+                        OutputLog += "\n===== Enhanced Fixed Beam 2D PVDR Analysis =====\n";
 
                         // 1. Get the beam and structure
                         var beam = plan.Beams.FirstOrDefault(b => b.Id == SelectedBeamId);
@@ -1452,19 +1453,16 @@ namespace MAAS_SFRThelper.ViewModels
                             return;
                         }
 
-                        // 2. Setup 2D plane perpendicular to beam central axis at isocenter
+                        // 2. Setup beam geometry
                         var iso = beam.IsocenterPosition;
                         var cp0 = beam.ControlPoints.First();
 
-                        // Beam direction from gantry/couch angles
+                        // Calculate beam direction
                         double gantryRad = cp0.GantryAngle * Math.PI / 180.0;
                         double couchRad = cp0.PatientSupportAngle * Math.PI / 180.0;
-                        VVector beamDir = new VVector(
-                            Math.Sin(gantryRad),
-                            -Math.Cos(gantryRad),
-                            0
-                        );
-                        // Apply couch if needed
+                        VVector beamDir = new VVector(Math.Sin(gantryRad), -Math.Cos(gantryRad), 0);
+
+                        // Apply couch rotation if needed
                         if (Math.Abs(cp0.PatientSupportAngle) > 0.1)
                         {
                             double x = beamDir.x, z = beamDir.z;
@@ -1474,23 +1472,101 @@ namespace MAAS_SFRThelper.ViewModels
                         double norm = Math.Sqrt(beamDir.x * beamDir.x + beamDir.y * beamDir.y + beamDir.z * beamDir.z);
                         beamDir = new VVector(beamDir.x / norm, beamDir.y / norm, beamDir.z / norm);
 
-                        // Find two orthogonal vectors for the plane
-                        VVector up = new VVector(0, 0, 1); // patient sup/inf
-                        VVector u = EvaluationViewModel.Cross(beamDir, up); // lateral axis
-                        if (u.Length == 0) u = new VVector(1, 0, 0);
-                        u = u / u.Length;
-                        VVector v = EvaluationViewModel.Cross(beamDir, u); // vertical axis (ant/post or sup/inf)
-                        v = v / v.Length;
+                        // Create orthogonal vectors for the plane
+                        VVector up = new VVector(0, 0, 1);
+                        VVector uAxis = EvaluationViewModel.Cross(beamDir, up);
+                        if (uAxis.Length == 0) uAxis = new VVector(1, 0, 0);
+                        uAxis = uAxis / uAxis.Length;
+                        VVector vAxis = EvaluationViewModel.Cross(beamDir, uAxis);
+                        vAxis = vAxis / vAxis.Length;
 
-                        // 3. Define grid size and step
-                        double fieldWidth = 200;  // mm, change as needed
-                        double fieldHeight = 200; // mm, change as needed
-                        double gridStep = 2.0;    // mm
+                        OutputLog += $"Beam direction: ({beamDir.x:F3}, {beamDir.y:F3}, {beamDir.z:F3})\n";
 
-                        int nX = (int)(fieldWidth / gridStep);
-                        int nY = (int)(fieldHeight / gridStep);
+                        // 3. Find structure bounding box in the 2D plane
+                        OutputLog += "Finding structure bounding box in beam plane...\n";
 
-                        // Add to fields so we can plot later
+                        double minU = double.MaxValue, maxU = double.MinValue;
+                        double minV = double.MaxValue, maxV = double.MinValue;
+                        int structureSampleCount = 0;
+
+                        // Sample structure mesh to find 2D bounds
+                        var mesh = structure.MeshGeometry;
+                        if (mesh != null && mesh.Positions.Count > 0)
+                        {
+                            foreach (var point3D in mesh.Positions)
+                            {
+                                var pt = new VVector(point3D.X, point3D.Y, point3D.Z);
+                                var relative = pt - iso;
+
+                                // Project onto the 2D plane using manual dot product
+                                double projU = relative.x * uAxis.x + relative.y * uAxis.y + relative.z * uAxis.z;
+                                double projV = relative.x * vAxis.x + relative.y * vAxis.y + relative.z * vAxis.z;
+
+                                minU = Math.Min(minU, projU);
+                                maxU = Math.Max(maxU, projU);
+                                minV = Math.Min(minV, projV);
+                                maxV = Math.Max(maxV, projV);
+                                structureSampleCount++;
+                            }
+                        }
+
+                        OutputLog += $"Structure bounds in beam plane: U=[{minU:F1}, {maxU:F1}], V=[{minV:F1}, {maxV:F1}] mm\n";
+                        OutputLog += $"Structure mesh points sampled: {structureSampleCount}\n";
+
+                        // 4. Adaptive grid setup - focus on structure region
+                        //double structureWidth = maxU - minU;
+                        //double structureHeight = maxV - minV;
+                        //double padding = Math.Max(10, Math.Max(structureWidth, structureHeight) * 0.3); // 30% padding
+
+                        //double gridMinU = minU - padding;
+                        //double gridMaxU = maxU + padding;
+                        //double gridMinV = minV - padding;
+                        //double gridMaxV = maxV + padding;
+
+                        //// Dense sampling inside structure
+                        //double fineStep = 1.0;    // 1mm for inside structure
+
+                        //// Calculate grid dimensions
+                        //double gridWidth = gridMaxU - gridMinU;
+                        //double gridHeight = gridMaxV - gridMinV;
+
+                        //// Use fine step for grid sizing
+                        //int nX = (int)Math.Ceiling(gridWidth / fineStep);
+                        //int nY = (int)Math.Ceiling(gridHeight / fineStep);
+
+                        //OutputLog += $"Adaptive grid: {nX}×{nY} points covering {gridWidth:F1}×{gridHeight:F1} mm\n";
+
+                        //// Initialize arrays
+                        //_nX2D = nX;
+                        //_nY2D = nY;
+                        //_dose2DGrid = new double[nX, nY];
+                        //_x2DGrid = new double[nX, nY];
+                        //_y2DGrid = new double[nX, nY];
+                        //_inStruct2D = new bool[nX, nY];
+
+                        // 4. Structure-focused grid setup - minimal padding, focus on target
+                        double structureWidth = maxU - minU;
+                        double structureHeight = maxV - minV;
+                        double padding = Math.Max(3, Math.Max(structureWidth, structureHeight) * 0.1); // Only 10% padding
+
+                        double gridMinU = minU - padding;
+                        double gridMaxU = maxU + padding;
+                        double gridMinV = minV - padding;
+                        double gridMaxV = maxV + padding;
+
+                        // High-resolution sampling for structure analysis
+                        double fineStep = 0.5;    // 0.5mm for detailed analysis
+
+                        double gridWidth = gridMaxU - gridMinU;
+                        double gridHeight = gridMaxV - gridMinV;
+
+                        int nX = (int)Math.Ceiling(gridWidth / fineStep);
+                        int nY = (int)Math.Ceiling(gridHeight / fineStep);
+
+                        OutputLog += $"Structure-focused grid: {nX}×{nY} points covering {gridWidth:F1}×{gridHeight:F1} mm\n";
+                        OutputLog += $"Grid resolution: {fineStep} mm ({1.0 / fineStep} points per mm)\n";
+
+                        // Initialize arrays
                         _nX2D = nX;
                         _nY2D = nY;
                         _dose2DGrid = new double[nX, nY];
@@ -1498,18 +1574,27 @@ namespace MAAS_SFRThelper.ViewModels
                         _y2DGrid = new double[nX, nY];
                         _inStruct2D = new bool[nX, nY];
 
-                        OutputLog += $"Fixed Beam 2D grid: n={nX * nY}\n";
+                        // 5. Structure-focused sampling - only care about target dose
+                        OutputLog += "Starting structure-focused dose sampling...\n";
+                        int insideCount = 0, nearStructureCount = 0, totalSampled = 0;
+                        var structureDoseList = new List<double>(); // ONLY structure doses for statistics
 
-                        // 4. Scan grid into your 2D arrays
-                        //    We loop 0..nX-1, mapping each index back to physical coords
-                        for (int ix = 0; ix < _nX2D; ix++)
+                        for (int ix = 0; ix < nX; ix++)
                         {
-                            double px = (ix - _nX2D / 2.0) * gridStep;
-                            for (int iy = 0; iy < _nY2D; iy++)
-                            {
-                                double py = (iy - _nY2D / 2.0) * gridStep;
-                                var pt = iso + (px * u) + (py * v);
+                            double paramU = gridMinU + (ix / (double)(nX - 1)) * gridWidth;
 
+                            for (int iy = 0; iy < nY; iy++)
+                            {
+                                double paramV = gridMinV + (iy / (double)(nY - 1)) * gridHeight;
+
+                                // Convert to 3D coordinates
+                                var pt = iso + (paramU * uAxis) + (paramV * vAxis);
+
+                                // Store coordinates
+                                _x2DGrid[ix, iy] = paramU;
+                                _y2DGrid[ix, iy] = paramV;
+
+                                // Check if point is inside structure
                                 bool inside = false;
                                 try
                                 {
@@ -1517,105 +1602,252 @@ namespace MAAS_SFRThelper.ViewModels
                                 }
                                 catch
                                 {
-                                    // leave inside=false
-                                }
-
-                                // store mask
-                                _inStruct2D[ix, iy] = inside;
-
-                                if (!inside)
-                                {
                                     _dose2DGrid[ix, iy] = double.NaN;
+                                    _inStruct2D[ix, iy] = false;
                                     continue;
                                 }
 
-                                // sample dose
-                                double doseGy = double.NaN;
-                                try
+                                _inStruct2D[ix, iy] = inside;
+
+                                // Sample dose - prioritize structure, minimal outside
+                                bool shouldSample = inside; // Always sample inside structure
+
+                                if (!inside)
                                 {
-                                    var dv = plan.Dose.GetDoseToPoint(pt);
-                                    if (dv != null) doseGy = dv.Dose;
-                                }
-                                catch
-                                {
-                                    // leave NaN
+                                    // Only sample a few points outside for visualization context
+                                    shouldSample = (ix % 4 == 0 && iy % 4 == 0); // Very sparse outside
                                 }
 
-                                _dose2DGrid[ix, iy] = doseGy;
+                                if (shouldSample)
+                                {
+                                    try
+                                    {
+                                        var dv = plan.Dose.GetDoseToPoint(pt);
+                                        if (dv != null)
+                                        {
+                                            double doseGy = dv.Dose;
+                                            _dose2DGrid[ix, iy] = doseGy;
+
+                                            if (inside)
+                                            {
+                                                structureDoseList.Add(doseGy); // Only add structure doses to statistics
+                                                insideCount++;
+                                            }
+                                            else
+                                            {
+                                                nearStructureCount++;
+                                            }
+                                            totalSampled++;
+                                        }
+                                        else
+                                        {
+                                            _dose2DGrid[ix, iy] = double.NaN;
+                                        }
+                                    }
+                                    catch
+                                    {
+                                        _dose2DGrid[ix, iy] = double.NaN;
+                                    }
+                                }
+                                else
+                                {
+                                    // Don't sample - leave as NaN for clean visualization
+                                    _dose2DGrid[ix, iy] = double.NaN;
+                                }
                             }
                         }
 
-                        // now that the arrays are filled, flag for plotting
-                        _has2DPlotData = true;
+                        OutputLog += $"Structure-focused sampling: {insideCount} inside target, {nearStructureCount} context points\n";
+                        OutputLog += $"Structure dose range: {structureDoseList.Min():F1} - {structureDoseList.Max():F1} Gy\n";
 
-                        // log summary
-                        OutputLog += $"Filled 2D grid: {_nX2D}×{_nY2D} points, ready to plot.\n";
+                        if (insideCount == 0)
+                        {
+                            OutputLog += "ERROR: No valid dose points inside structure!\n";
+                            return;
+                        }
+
+                        // Add dose distribution analysis first
+                        AnalyzeDoseDistribution(structureDoseList);
+
+                        // 6. Aggressive peak detection
+                        OutputLog += "Detecting peaks INSIDE target structure (aggressive mode)...\n";
+                        var peaks = DetectStructurePeaks(_dose2DGrid, _inStruct2D, nX, nY, fineStep, structureDoseList);
+                        int peakCount = peaks.Count(); // Fixed: use Count() instead of Count
+                        OutputLog += $"Found {peakCount} dose peaks in target\n";
+
+                        // 7. Aggressive valley detection  
+                        OutputLog += "Detecting valleys INSIDE target structure (aggressive mode)...\n";
+                        var valleys = DetectStructureValleys(_dose2DGrid, _inStruct2D, nX, nY, fineStep, structureDoseList);
+                        int valleyCount = valleys.Count(); // Fixed: use Count() instead of Count
+                        OutputLog += $"Found {valleyCount} dose valleys in target\n";
 
 
+                        // 6. Structure-only peak detection
+                        //OutputLog += "Detecting peaks INSIDE target structure...\n";
+                        //var peaks = DetectStructurePeaks(_dose2DGrid, _inStruct2D, nX, nY, fineStep, structureDoseList);
+                        //int peakCount = peaks.Count;
+                        //OutputLog += $"Found {peakCount} dose peaks in target\n";
+
+                        // 7. Structure-only valley detection
+                        //OutputLog += "Detecting valleys INSIDE target structure...\n";
+                        //var valleys = DetectStructureValleys(_dose2DGrid, _inStruct2D, nX, nY, fineStep, structureDoseList);
+                        //int valleyCount = valleys.Count;
+                        //OutputLog += $"Found {valleyCount} dose valleys in target\n";
+
+
+
+                        //OutputLog += "Starting adaptive dose sampling...\n";
+                        //int insideCount = 0, outsideCount = 0, totalSampled = 0;
                         //var doseList = new List<double>();
-                        //var peakDoseList = new List<double>();
-                        //int nInsideStruct = 0, nDoseNaN = 0, nDoseZero = 0;
 
-                        //for (int ix = -nX / 2; ix <= nX / 2; ix++)
+                        //for (int ix = 0; ix < nX; ix++)
                         //{
-                        //    for (int iy = -nY / 2; iy <= nY / 2; iy++)
+                        //    double paramU = gridMinU + (ix / (double)(nX - 1)) * gridWidth;
+
+                        //    for (int iy = 0; iy < nY; iy++)
                         //    {
-                        //        // Position in the plane
-                        //        var pt = iso + (ix * gridStep) * u + (iy * gridStep) * v;
+                        //        double paramV = gridMinV + (iy / (double)(nY - 1)) * gridHeight;
 
-                        //        // Only use points inside the target
+                        //        // Convert to 3D coordinates
+                        //        var pt = iso + (paramU * uAxis) + (paramV * vAxis);
+
+                        //        // Store coordinates
+                        //        _x2DGrid[ix, iy] = paramU;
+                        //        _y2DGrid[ix, iy] = paramV;
+
+                        //        // Check if point is inside structure
                         //        bool inside = false;
-                        //        try { inside = structure.IsPointInsideSegment(pt); }
-                        //        catch { continue; }
-                        //        if (!inside) continue;
-
-                        //        nInsideStruct++;
-
-                        //        // Sample dose
-                        //        double doseGy = double.NaN;
                         //        try
                         //        {
-                        //            DoseValue dv = plan.Dose.GetDoseToPoint(pt);
-                        //            if (dv != null) doseGy = dv.Dose;
+                        //            inside = structure.IsPointInsideSegment(pt);
                         //        }
-                        //        catch { }
-
-                        //        // Check for invalid doses
-                        //        if (double.IsNaN(doseGy))
+                        //        catch
                         //        {
-                        //            nDoseNaN++;
-                        //            continue;
-                        //        }
-                        //        if (doseGy == 0.0)
-                        //        {
-                        //            nDoseZero++;
+                        //            // Skip points that can't be evaluated
+                        //            _dose2DGrid[ix, iy] = double.NaN;
+                        //            _inStruct2D[ix, iy] = false;
                         //            continue;
                         //        }
 
-                        //        doseList.Add(doseGy);
+                        //        _inStruct2D[ix, iy] = inside;
 
-                        //        // Peak detection example: here, just collect all points for now
-                        //        // Later, filter for peaks using morphological/threshold filter
-                        //        peakDoseList.Add(doseGy); /// just added
+                        //        // Adaptive sampling decision
+                        //        bool shouldSample = inside; // Always sample inside
+                        //        if (!inside)
+                        //        {
+                        //            // Sample outside points more sparsely
+                        //            shouldSample = (ix % 3 == 0 && iy % 3 == 0); // Every 3rd point
+                        //        }
+
+                        //        if (shouldSample)
+                        //        {
+                        //            try
+                        //            {
+                        //                var dv = plan.Dose.GetDoseToPoint(pt);
+                        //                if (dv != null)
+                        //                {
+                        //                    double doseGy = dv.Dose;
+                        //                    _dose2DGrid[ix, iy] = doseGy;
+
+                        //                    if (inside && doseGy > 0)
+                        //                    {
+                        //                        doseList.Add(doseGy);
+                        //                        insideCount++;
+                        //                    }
+                        //                    else if (!inside)
+                        //                    {
+                        //                        outsideCount++;
+                        //                    }
+                        //                    totalSampled++;
+                        //                }
+                        //                else
+                        //                {
+                        //                    _dose2DGrid[ix, iy] = double.NaN;
+                        //                }
+                        //            }
+                        //            catch
+                        //            {
+                        //                _dose2DGrid[ix, iy] = double.NaN;
+                        //            }
+                        //        }
+                        //        else
+                        //        {
+                        //            _dose2DGrid[ix, iy] = double.NaN;
+                        //        }
                         //    }
                         //}
 
-                        //_has2DPlotData = true;
-                        //OutputLog += $"Grid points in structure: {nInsideStruct}\n";
-                        //OutputLog += $"NaN dose points: {nDoseNaN}\n";
-                        //OutputLog += $"Zero dose points: {nDoseZero}\n";
+                        //OutputLog += $"Sampling complete: {totalSampled} total, {insideCount} inside structure, {outsideCount} outside\n";
 
-                        //// 5. Compute metrics robustly
-                        //double meanPeakDose = peakDoseList.Count > 0 ? peakDoseList.Average() : double.NaN;
-                        //double maxPeakDose = peakDoseList.Count > 0 ? peakDoseList.Max() : double.NaN;
-                        //double minPeakDose = peakDoseList.Count > 0 ? peakDoseList.Min() : double.NaN;
+                        //if (insideCount == 0)
+                        //{
+                        //    OutputLog += "ERROR: No valid dose points inside structure!\n";
+                        //    return;
+                        //}
 
-                        //OutputLog += $"Peak dose mean: {(double.IsNaN(meanPeakDose) ? "NaN" : meanPeakDose.ToString("F2"))} Gy, ";
-                        //OutputLog += $"max: {(double.IsNaN(maxPeakDose) ? "NaN" : maxPeakDose.ToString("F2"))}, ";
-                        //OutputLog += $"min: {(double.IsNaN(minPeakDose) ? "NaN" : minPeakDose.ToString("F2"))}\n";
-                        //OutputLog += "2D Dosimetrics complete\n";
+
+
+                        // 6. PEAK DETECTION
+                        //OutputLog += "Detecting dose peaks...\n";
+                        //var peaks = DetectPeaks(_dose2DGrid, _inStruct2D, nX, nY, fineStep);
+                        //int peakCount = peaks.Count;
+                        //OutputLog += $"Found {peakCount} dose peaks\n";
+
+                        //// 7. VALLEY DETECTION  
+                        //OutputLog += "Detecting dose valleys...\n";
+                        //var valleys = DetectValleys(_dose2DGrid, _inStruct2D, nX, nY, fineStep);
+                        //int valleyCount = valleys.Count;
+                        //OutputLog += $"Found {valleyCount} dose valleys\n";
+
+                        // 8. PVDR CALCULATION
+                        if (peakCount > 0 && valleyCount > 0)
+                        {
+                            double avgPeakDose = peaks.Average(p => p.dose);
+                            double avgValleyDose = valleys.Average(val => val.dose);
+                            double maxPeakDose = peaks.Max(p => p.dose);
+                            double minValleyDose = valleys.Min(val => val.dose);
+
+                            double avgPVDR = avgPeakDose / avgValleyDose;
+                            double maxPVDR = maxPeakDose / minValleyDose;
+
+                            OutputLog += "\n===== PVDR ANALYSIS RESULTS =====\n";
+                            OutputLog += $"Peak Analysis:\n";
+                            OutputLog += $"  Number of peaks: {peakCount}\n";
+                            OutputLog += $"  Average peak dose: {avgPeakDose:F2} Gy\n";
+                            OutputLog += $"  Maximum peak dose: {maxPeakDose:F2} Gy\n";
+
+                            OutputLog += $"Valley Analysis:\n";
+                            OutputLog += $"  Number of valleys: {valleyCount}\n";
+                            OutputLog += $"  Average valley dose: {avgValleyDose:F2} Gy\n";
+                            OutputLog += $"  Minimum valley dose: {minValleyDose:F2} Gy\n";
+
+                            OutputLog += $"PVDR Metrics:\n";
+                            OutputLog += $"  Average PVDR: {avgPVDR:F2}\n";
+                            OutputLog += $"  Maximum PVDR: {maxPVDR:F2}\n";
+                            OutputLog += $"  Overall dose range: {minValleyDose:F2} - {maxPeakDose:F2} Gy\n";
+
+                            // Add metrics to the collection for display
+                            AllMetrics.Clear();
+                            AllMetrics.Add(new MetricData { metric = "Number of Dose Peaks", value = peakCount.ToString() });
+                            AllMetrics.Add(new MetricData { metric = "Number of Dose Valleys", value = valleyCount.ToString() });
+                            AllMetrics.Add(new MetricData { metric = "Average Peak Dose (Gy)", value = avgPeakDose.ToString("F2") });
+                            AllMetrics.Add(new MetricData { metric = "Average Valley Dose (Gy)", value = avgValleyDose.ToString("F2") });
+                            AllMetrics.Add(new MetricData { metric = "Average PVDR", value = avgPVDR.ToString("F2") });
+                            AllMetrics.Add(new MetricData { metric = "Maximum PVDR", value = maxPVDR.ToString("F2") });
+                            AllMetrics.Add(new MetricData { metric = "Peak-Valley Dose Difference (Gy)", value = (avgPeakDose - avgValleyDose).ToString("F2") });
+                        }
+                        else
+                        {
+                            OutputLog += "WARNING: Could not detect sufficient peaks or valleys for PVDR calculation\n";
+                            OutputLog += $"Peaks found: {peakCount}, Valleys found: {valleyCount}\n";
+                        }
+
+                        // Set flag for plotting
+                        _has2DPlotData = true;
+                        OutputLog += "Enhanced 2D PVDR analysis complete\n";
+
+                        
                     }
-
                 }
                 else if (selectedPvdrMode == "VMAT")
                 {
@@ -2346,88 +2578,62 @@ namespace MAAS_SFRThelper.ViewModels
             double colorbarWidth = canvasW * 0.25;
             double dividerX = heatmapWidth;
 
-            // Find the bounding box of the structure to focus on relevant area
-            int minI = nX, maxI = -1, minJ = nY, maxJ = -1;
-            int validDoseCount = 0;
-            int structureCount = 0;
-            double minDose = double.MaxValue;
-            double maxDose = double.MinValue;
+            // Find structure-only dose range for optimal color scaling
+            var (structureMinDose, structureMaxDose) = GetStructureDoseRange(doseGrid, inStruct, nX, nY);
 
-            for (int i = 0; i < nX; i++)
+            OutputLog += $"Grid: {nX}x{nY}, Structure dose range: {structureMinDose:F3} to {structureMaxDose:F3}\n";
+
+            if (structureMaxDose - structureMinDose < 1e-6)
             {
-                for (int j = 0; j < nY; j++)
-                {
-                    double dose = doseGrid[i, j];
-                    bool inStructure = (inStruct != null && inStruct[i, j]);
+                OutputLog += "No valid structure dose data found!\n";
 
-                    // Track structure bounds
-                    if (inStructure || !double.IsNaN(dose))
-                    {
-                        minI = Math.Min(minI, i);
-                        maxI = Math.Max(maxI, i);
-                        minJ = Math.Min(minJ, j);
-                        maxJ = Math.Max(maxJ, j);
-                    }
-
-                    if (inStructure) structureCount++;
-
-                    if (!double.IsNaN(dose))
-                    {
-                        validDoseCount++;
-                        minDose = Math.Min(minDose, dose);
-                        maxDose = Math.Max(maxDose, dose);
-                    }
-                }
-            }
-
-            OutputLog += $"Grid: {nX}x{nY}, Valid dose: {validDoseCount}, Structure: {structureCount}\n";
-            OutputLog += $"Data bounds: i=[{minI},{maxI}], j=[{minJ},{maxJ}]\n";
-            OutputLog += $"Dose range: {(validDoseCount > 0 ? $"{minDose:F3} to {maxDose:F3}" : "No dose")}\n";
-
-            if (validDoseCount == 0 && structureCount == 0)
-            {
                 var noDataText = new TextBlock
                 {
-                    Text = "NO DATA TO PLOT",
+                    Text = "NO STRUCTURE DOSE DATA",
                     FontSize = 20,
                     Foreground = Brushes.Red,
                     FontWeight = FontWeights.Bold
                 };
-                Canvas.SetLeft(noDataText, heatmapWidth / 2 - 80);
+                Canvas.SetLeft(noDataText, heatmapWidth / 2 - 120);
                 Canvas.SetTop(noDataText, canvasH / 2);
                 targetCanvas.Children.Add(noDataText);
                 return;
             }
 
-            // Expand bounds slightly and ensure they're valid
-            if (maxI >= minI && maxJ >= minJ)
+            // Find the bounding box of structure cells only
+            int minI = nX, maxI = -1, minJ = nY, maxJ = -1;
+            int structureCount = 0;
+
+            for (int i = 0; i < nX; i++)
             {
-                int padding = Math.Max(5, Math.Max((maxI - minI) / 4, (maxJ - minJ) / 4));
-                minI = Math.Max(0, minI - padding);
-                maxI = Math.Min(nX - 1, maxI + padding);
-                minJ = Math.Max(0, minJ - padding);
-                maxJ = Math.Min(nY - 1, maxJ + padding);
+                for (int j = 0; j < nY; j++)
+                {
+                    bool inStructure = (inStruct != null && inStruct[i, j]);
+                    double dose = doseGrid[i, j];
+
+                    if (inStructure && !double.IsNaN(dose))
+                    {
+                        minI = Math.Min(minI, i);
+                        maxI = Math.Max(maxI, i);
+                        minJ = Math.Min(minJ, j);
+                        maxJ = Math.Max(maxJ, j);
+                        structureCount++;
+                    }
+                }
             }
-            else
+
+            OutputLog += $"Structure bounds: i=[{minI},{maxI}], j=[{minJ},{maxJ}], cells={structureCount}\n";
+
+            if (structureCount == 0)
             {
-                // Show entire grid if no bounds found
-                minI = 0; maxI = nX - 1;
-                minJ = 0; maxJ = nY - 1;
+                OutputLog += "No structure cells found!\n";
+                return;
             }
 
             int plotNX = maxI - minI + 1;
             int plotNY = maxJ - minJ + 1;
 
-            OutputLog += $"Focusing on region: {plotNX}x{plotNY} (was {nX}x{nY})\n";
-
-            // Force reasonable dose range
-            if (validDoseCount > 0 && maxDose - minDose < 1e-6)
-                maxDose = minDose + 1;
-            else if (validDoseCount == 0)
-            {
-                minDose = 0;
-                maxDose = 1;
-            }
+            OutputLog += $"Focusing on structure region: {plotNX}x{plotNY}\n";
 
             // === HEATMAP REGION LAYOUT (LEFT SIDE) ===
             double heatmapMargin = 40;
@@ -2481,17 +2687,18 @@ namespace MAAS_SFRThelper.ViewModels
             // === ADD TITLE (CENTERED IN HEATMAP REGION) ===
             var title = new TextBlock
             {
-                Text = $"2D Dose Distribution ({plotNX}×{plotNY} focus region)",
+                Text = $"Target Dose Distribution ({plotNX}×{plotNY} structure region)",
                 FontSize = 16,
                 FontWeight = FontWeights.Bold,
                 HorizontalAlignment = HorizontalAlignment.Center
             };
-            Canvas.SetLeft(title, heatmapWidth / 2 - 150);
+            Canvas.SetLeft(title, heatmapWidth / 2 - 180);
             Canvas.SetTop(title, 5);
             targetCanvas.Children.Add(title);
 
-            // === DRAW HEATMAP (LEFT REGION) ===
-            int cellsDrawn = 0;
+            // === DRAW HEATMAP (LEFT REGION) - STRUCTURE ONLY ===
+            int structureCellsDrawn = 0;
+
             for (int i = minI; i <= maxI; i++)
             {
                 for (int j = minJ; j <= maxJ; j++)
@@ -2499,53 +2706,46 @@ namespace MAAS_SFRThelper.ViewModels
                     double dose = doseGrid[i, j];
                     bool inStructure = (inStruct != null && inStruct[i, j]);
 
+                    // ONLY draw cells that are inside the structure
+                    if (!inStructure || double.IsNaN(dose))
+                        continue;
+
+                    // Map dose to color using structure-only range
+                    double norm = (dose - structureMinDose) / (structureMaxDose - structureMinDose);
+                    norm = Math.Max(0, Math.Min(1, norm));
+
                     Color cellColor;
 
-                    if (inStructure)
+                    // Clinical color scheme
+                    if (norm < 0.2)
                     {
-                        if (double.IsNaN(dose))
-                        {
-                            cellColor = Colors.Yellow;  // Structure with no dose - bright yellow
-                        }
-                        else
-                        {
-                            // Structure with dose - make it very visible
-                            double norm = (dose - minDose) / (maxDose - minDose);
-                            norm = Math.Max(0, Math.Min(1, norm));
-
-                            // Hot colors for structure
-                            if (norm < 0.5)
-                            {
-                                double t = norm * 2;
-                                cellColor = Color.FromRgb((byte)(255 * t), (byte)(128 + 127 * t), 0);  // Orange to yellow
-                            }
-                            else
-                            {
-                                double t = (norm - 0.5) * 2;
-                                cellColor = Color.FromRgb(255, (byte)(255 - 128 * t), (byte)(255 * t));  // Yellow to magenta
-                            }
-                        }
+                        // Dark blue to blue
+                        double t = norm / 0.2;
+                        cellColor = Color.FromRgb(0, 0, (byte)(100 + t * 155));
                     }
-                    else if (!double.IsNaN(dose))
+                    else if (norm < 0.4)
                     {
-                        // Dose outside structure - cooler colors
-                        double norm = (dose - minDose) / (maxDose - minDose);
-                        norm = Math.Max(0, Math.Min(1, norm));
-
-                        if (norm < 0.5)
-                        {
-                            double t = norm * 2;
-                            cellColor = Color.FromRgb(0, (byte)(t * 255), (byte)((1 - t) * 255));  // Blue to cyan
-                        }
-                        else
-                        {
-                            double t = (norm - 0.5) * 2;
-                            cellColor = Color.FromRgb((byte)(t * 128), 255, (byte)((1 - t) * 255));  // Cyan to light green
-                        }
+                        // Blue to cyan
+                        double t = (norm - 0.2) / 0.2;
+                        cellColor = Color.FromRgb(0, (byte)(t * 255), 255);
+                    }
+                    else if (norm < 0.6)
+                    {
+                        // Cyan to green
+                        double t = (norm - 0.4) / 0.2;
+                        cellColor = Color.FromRgb(0, 255, (byte)((1 - t) * 255));
+                    }
+                    else if (norm < 0.8)
+                    {
+                        // Green to yellow
+                        double t = (norm - 0.6) / 0.2;
+                        cellColor = Color.FromRgb((byte)(t * 255), 255, 0);
                     }
                     else
                     {
-                        continue;  // Skip empty areas
+                        // Yellow to red
+                        double t = (norm - 0.8) / 0.2;
+                        cellColor = Color.FromRgb(255, (byte)((1 - t) * 255), 0);
                     }
 
                     var rect = new Rectangle
@@ -2553,8 +2753,8 @@ namespace MAAS_SFRThelper.ViewModels
                         Width = cellW + 0.5,
                         Height = cellH + 0.5,
                         Fill = new SolidColorBrush(cellColor),
-                        Stroke = inStructure ? Brushes.Black : null,
-                        StrokeThickness = inStructure ? 2 : 0
+                        Stroke = Brushes.Black,
+                        StrokeThickness = 0.3
                     };
 
                     double px = gridLeft + (i - minI) * cellW;
@@ -2563,111 +2763,757 @@ namespace MAAS_SFRThelper.ViewModels
                     Canvas.SetLeft(rect, px);
                     Canvas.SetTop(rect, py);
                     targetCanvas.Children.Add(rect);
-                    cellsDrawn++;
+                    structureCellsDrawn++;
                 }
             }
 
-            OutputLog += $"Drew {cellsDrawn} cells in focused region\n";
+            OutputLog += $"Drew {structureCellsDrawn} structure cells (target-only visualization)\n";
 
             // === DRAW COLORBAR (RIGHT REGION) ===
-            if (validDoseCount > 0)
+            // Colorbar background
+            var colorbarBg = new Rectangle
             {
-                // Colorbar background
-                var colorbarBg = new Rectangle
+                Width = colorbarBarWidth + 4,
+                Height = colorbarHeight + 4,
+                Fill = Brushes.White,
+                Stroke = Brushes.Black,
+                StrokeThickness = 1
+            };
+            Canvas.SetLeft(colorbarBg, colorbarLeft - 2);
+            Canvas.SetTop(colorbarBg, colorbarTop - 2);
+            targetCanvas.Children.Add(colorbarBg);
+
+            // Colorbar gradient
+            int colorSteps = 50;
+            double stepHeight = colorbarHeight / colorSteps;
+
+            for (int s = 0; s < colorSteps; s++)
+            {
+                double norm = (double)s / (colorSteps - 1);
+
+                // Same color scheme as the plot
+                Color barColor;
+                if (norm < 0.2)
                 {
-                    Width = colorbarBarWidth + 4,
-                    Height = colorbarHeight + 4,
-                    Fill = Brushes.White,
-                    Stroke = Brushes.Black,
-                    StrokeThickness = 1
-                };
-                Canvas.SetLeft(colorbarBg, colorbarLeft - 2);
-                Canvas.SetTop(colorbarBg, colorbarTop - 2);
-                targetCanvas.Children.Add(colorbarBg);
-
-                // Colorbar gradient
-                int colorSteps = 50;
-                double stepHeight = colorbarHeight / colorSteps;
-
-                for (int s = 0; s < colorSteps; s++)
+                    double t = norm / 0.2;
+                    barColor = Color.FromRgb(0, 0, (byte)(100 + t * 155));
+                }
+                else if (norm < 0.4)
                 {
-                    double norm = (double)s / (colorSteps - 1);
-
-                    // Same color scheme as the plot
-                    Color barColor;
-                    if (norm < 0.5)
-                    {
-                        double t = norm * 2;
-                        barColor = Color.FromRgb(0, (byte)(t * 255), (byte)((1 - t) * 255));
-                    }
-                    else
-                    {
-                        double t = (norm - 0.5) * 2;
-                        barColor = Color.FromRgb((byte)(t * 128), 255, (byte)((1 - t) * 255));
-                    }
-
-                    var barRect = new Rectangle
-                    {
-                        Width = colorbarBarWidth,
-                        Height = stepHeight + 1,
-                        Fill = new SolidColorBrush(barColor)
-                    };
-
-                    Canvas.SetLeft(barRect, colorbarLeft);
-                    Canvas.SetTop(barRect, colorbarTop + (colorSteps - 1 - s) * stepHeight);
-                    targetCanvas.Children.Add(barRect);
+                    double t = (norm - 0.2) / 0.2;
+                    barColor = Color.FromRgb(0, (byte)(t * 255), 255);
+                }
+                else if (norm < 0.6)
+                {
+                    double t = (norm - 0.4) / 0.2;
+                    barColor = Color.FromRgb(0, 255, (byte)((1 - t) * 255));
+                }
+                else if (norm < 0.8)
+                {
+                    double t = (norm - 0.6) / 0.2;
+                    barColor = Color.FromRgb((byte)(t * 255), 255, 0);
+                }
+                else
+                {
+                    double t = (norm - 0.8) / 0.2;
+                    barColor = Color.FromRgb(255, (byte)((1 - t) * 255), 0);
                 }
 
-                // === COLORBAR LABELS (RIGHT REGION) ===
-                double labelX = colorbarLeft + colorbarBarWidth + 10;
-
-                var maxLabel = new TextBlock
+                var barRect = new Rectangle
                 {
-                    Text = $"{maxDose:F1}",
-                    FontSize = 14,
-                    FontWeight = FontWeights.Bold,
-                    Foreground = Brushes.Black
+                    Width = colorbarBarWidth,
+                    Height = stepHeight + 1,
+                    Fill = new SolidColorBrush(barColor),
+                    Stroke = Brushes.Black,
+                    StrokeThickness = 0.5
                 };
-                Canvas.SetLeft(maxLabel, labelX);
-                Canvas.SetTop(maxLabel, colorbarTop - 5);
-                targetCanvas.Children.Add(maxLabel);
 
-                var midLabel = new TextBlock
-                {
-                    Text = $"{(minDose + maxDose) / 2:F1}",
-                    FontSize = 14,
-                    FontWeight = FontWeights.Bold,
-                    Foreground = Brushes.Black
-                };
-                Canvas.SetLeft(midLabel, labelX);
-                Canvas.SetTop(midLabel, colorbarTop + colorbarHeight / 2 - 10);
-                targetCanvas.Children.Add(midLabel);
-
-                var minLabel = new TextBlock
-                {
-                    Text = $"{minDose:F1}",
-                    FontSize = 14,
-                    FontWeight = FontWeights.Bold,
-                    Foreground = Brushes.Black
-                };
-                Canvas.SetLeft(minLabel, labelX);
-                Canvas.SetTop(minLabel, colorbarTop + colorbarHeight - 15);
-                targetCanvas.Children.Add(minLabel);
-
-                // Unit label
-                var unitLabel = new TextBlock
-                {
-                    Text = "Dose (Gy)",
-                    FontSize = 16,
-                    FontWeight = FontWeights.Bold,
-                    Foreground = Brushes.Black
-                };
-                Canvas.SetLeft(unitLabel, colorbarLeft);
-                Canvas.SetTop(unitLabel, colorbarTop - 35);
-                targetCanvas.Children.Add(unitLabel);
+                Canvas.SetLeft(barRect, colorbarLeft);
+                Canvas.SetTop(barRect, colorbarTop + (colorSteps - 1 - s) * stepHeight);
+                targetCanvas.Children.Add(barRect);
             }
 
-            OutputLog += "=== Two-Panel Layout Complete ===\n";
+            // === COLORBAR LABELS (RIGHT REGION) ===
+            double labelX = colorbarLeft + colorbarBarWidth + 10;
+
+            var maxLabel = new TextBlock
+            {
+                Text = $"{structureMaxDose:F1}",
+                FontSize = 14,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.Black
+            };
+            Canvas.SetLeft(maxLabel, labelX);
+            Canvas.SetTop(maxLabel, colorbarTop - 5);
+            targetCanvas.Children.Add(maxLabel);
+
+            var midLabel = new TextBlock
+            {
+                Text = $"{(structureMinDose + structureMaxDose) / 2:F1}",
+                FontSize = 14,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.Black
+            };
+            Canvas.SetLeft(midLabel, labelX);
+            Canvas.SetTop(midLabel, colorbarTop + colorbarHeight / 2 - 10);
+            targetCanvas.Children.Add(midLabel);
+
+            var minLabel = new TextBlock
+            {
+                Text = $"{structureMinDose:F1}",
+                FontSize = 14,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.Black
+            };
+            Canvas.SetLeft(minLabel, labelX);
+            Canvas.SetTop(minLabel, colorbarTop + colorbarHeight - 15);
+            targetCanvas.Children.Add(minLabel);
+
+            // Unit label
+            var unitLabel = new TextBlock
+            {
+                Text = "Target Dose (Gy)",
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.Black
+            };
+            Canvas.SetLeft(unitLabel, colorbarLeft);
+            Canvas.SetTop(unitLabel, colorbarTop - 35);
+            targetCanvas.Children.Add(unitLabel);
+
+            // Add note about visualization approach
+            //var targetNote = new TextBlock
+            //{
+            //    Text = "Target Structure Only",
+            //    FontSize = 12,
+            //    FontStyle = FontStyles.Italic,
+            //    Foreground = Brushes.DarkBlue,
+            //    FontWeight = FontWeights.Bold
+            //};
+            //Canvas.SetLeft(targetNote, gridLeft);
+            //Canvas.SetTop(targetNote, gridTop + actualHeatmapHeight + 10);
+            //targetCanvas.Children.Add(targetNote);
+
+            OutputLog += "=== Target-Only Layout Complete ===\n";
+        }
+
+        // Add this helper method to calculate structure-only dose range:
+        private (double minDose, double maxDose) GetStructureDoseRange(double[,] doseGrid, bool[,] inStruct, int nX, int nY)
+        {
+            double minDose = double.MaxValue;
+            double maxDose = double.MinValue;
+            int validCount = 0;
+
+            for (int i = 0; i < nX; i++)
+            {
+                for (int j = 0; j < nY; j++)
+                {
+                    if (inStruct != null && inStruct[i, j] && !double.IsNaN(doseGrid[i, j]))
+                    {
+                        double dose = doseGrid[i, j];
+                        minDose = Math.Min(minDose, dose);
+                        maxDose = Math.Max(maxDose, dose);
+                        validCount++;
+                    }
+                }
+            }
+
+            if (validCount == 0)
+            {
+                return (0, 1); // Fallback range
+            }
+
+            return (minDose, maxDose);
+        }
+
+
+        // Replace your DetectStructurePeaks method with this more sensitive version:
+        //private List<(int x, int y, double dose)> DetectStructurePeaks(double[,] doseGrid, bool[,] inStruct, int nX, int nY, double gridStep, List<double> structureDoses)
+        //{
+        //    var peaks = new List<(int x, int y, double dose)>();
+
+        //    if (structureDoses.Count == 0) return peaks;
+
+        //    // More detailed statistics
+        //    double meanStructureDose = structureDoses.Average();
+        //    double maxStructureDose = structureDoses.Max();
+        //    double minStructureDose = structureDoses.Min();
+        //    var sortedDoses = structureDoses.OrderByDescending(d => d).ToList();
+
+        //    // Use percentile-based thresholds for more sensitivity
+        //    double dose75th = sortedDoses[(int)(sortedDoses.Count * 0.25)]; // Top 25%
+        //    double dose90th = sortedDoses[(int)(sortedDoses.Count * 0.10)]; // Top 10%
+
+        //    // More sensitive peak threshold - choose the lower value for more peaks
+        //    double minPeakHeight = Math.Min(
+        //        meanStructureDose + (maxStructureDose - meanStructureDose) * 0.3, // 30% above mean towards max
+        //        dose75th // Or top 25% of doses
+        //    );
+
+        //    int minSeparation = Math.Max(1, (int)(1.5 / gridStep)); // Reduced to 1.5mm separation
+
+        //    OutputLog += $"Enhanced peak detection:\n";
+        //    OutputLog += $"  Dose range: {minStructureDose:F1} - {maxStructureDose:F1} Gy\n";
+        //    OutputLog += $"  Mean: {meanStructureDose:F1}, 75th percentile: {dose75th:F1}, 90th percentile: {dose90th:F1}\n";
+        //    OutputLog += $"  Peak threshold: {minPeakHeight:F1} Gy\n";
+        //    OutputLog += $"  Min separation: {minSeparation * gridStep:F1} mm\n";
+
+        //    for (int ix = 1; ix < nX - 1; ix++)
+        //    {
+        //        for (int iy = 1; iy < nY - 1; iy++)
+        //        {
+        //            if (!inStruct[ix, iy]) continue;
+
+        //            double centerDose = doseGrid[ix, iy];
+        //            if (double.IsNaN(centerDose) || centerDose < minPeakHeight) continue;
+
+        //            // Check if this point is a local maximum
+        //            bool isPeak = true;
+        //            int validNeighbors = 0;
+        //            double neighborSum = 0;
+
+        //            // Check 3x3 neighborhood
+        //            for (int dx = -1; dx <= 1; dx++)
+        //            {
+        //                for (int dy = -1; dy <= 1; dy++)
+        //                {
+        //                    if (dx == 0 && dy == 0) continue;
+
+        //                    int nx = ix + dx;
+        //                    int ny = iy + dy;
+
+        //                    if (nx >= 0 && nx < nX && ny >= 0 && ny < nY && inStruct[nx, ny])
+        //                    {
+        //                        double neighborDose = doseGrid[nx, ny];
+        //                        if (!double.IsNaN(neighborDose))
+        //                        {
+        //                            validNeighbors++;
+        //                            neighborSum += neighborDose;
+
+        //                            // For peak: center must be strictly higher than ALL neighbors
+        //                            if (neighborDose >= centerDose)
+        //                            {
+        //                                isPeak = false;
+        //                                break;
+        //                            }
+        //                        }
+        //                    }
+        //                }
+        //                if (!isPeak) break;
+        //            }
+
+        //            // Additional check: must be significantly higher than average neighbor
+        //            double avgNeighbor = validNeighbors > 0 ? neighborSum / validNeighbors : centerDose;
+        //            double relativeDifference = (centerDose - avgNeighbor) / meanStructureDose;
+        //            bool significantPeak = relativeDifference > 0.05; // 5% of mean dose difference
+
+        //            if (isPeak && validNeighbors >= 3 && significantPeak)
+        //            {
+        //                // Check separation from existing peaks
+        //                bool wellSeparated = true;
+        //                foreach (var existingPeak in peaks)
+        //                {
+        //                    int distX = Math.Abs(ix - existingPeak.x);
+        //                    int distY = Math.Abs(iy - existingPeak.y);
+        //                    double dist = Math.Sqrt(distX * distX + distY * distY) * gridStep;
+        //                    if (dist < minSeparation * gridStep)
+        //                    {
+        //                        // Keep the higher peak if they're too close
+        //                        if (centerDose > existingPeak.dose)
+        //                        {
+        //                            peaks.Remove(existingPeak);
+        //                            break;
+        //                        }
+        //                        else
+        //                        {
+        //                            wellSeparated = false;
+        //                            break;
+        //                        }
+        //                    }
+        //                }
+
+        //                if (wellSeparated)
+        //                {
+        //                    peaks.Add((ix, iy, centerDose));
+        //                    OutputLog += $"  Peak at grid({ix},{iy}): {centerDose:F1} Gy (neighbors avg: {avgNeighbor:F1})\n";
+        //                }
+        //            }
+        //        }
+        //    }
+
+        //    return peaks;
+        //}
+
+        //// Replace your DetectStructureValleys method with this more sensitive version:
+        //private List<(int x, int y, double dose)> DetectStructureValleys(double[,] doseGrid, bool[,] inStruct, int nX, int nY, double gridStep, List<double> structureDoses)
+        //{
+        //    var valleys = new List<(int x, int y, double dose)>();
+
+        //    if (structureDoses.Count == 0) return valleys;
+
+        //    // More detailed statistics
+        //    double meanStructureDose = structureDoses.Average();
+        //    double maxStructureDose = structureDoses.Max();
+        //    double minStructureDose = structureDoses.Min();
+        //    var sortedDoses = structureDoses.OrderBy(d => d).ToList();
+
+        //    // Use percentile-based thresholds
+        //    double dose25th = sortedDoses[(int)(sortedDoses.Count * 0.25)]; // Bottom 25%
+        //    double dose10th = sortedDoses[(int)(sortedDoses.Count * 0.10)]; // Bottom 10%
+
+        //    // More sensitive valley threshold
+        //    double maxValleyHeight = Math.Max(
+        //        meanStructureDose - (meanStructureDose - minStructureDose) * 0.3, // 30% below mean towards min
+        //        dose25th // Or bottom 25% of doses
+        //    );
+
+        //    int minSeparation = Math.Max(1, (int)(1.5 / gridStep)); // Reduced to 1.5mm separation
+
+        //    OutputLog += $"Enhanced valley detection:\n";
+        //    OutputLog += $"  25th percentile: {dose25th:F1}, 10th percentile: {dose10th:F1}\n";
+        //    OutputLog += $"  Valley threshold: {maxValleyHeight:F1} Gy\n";
+
+        //    for (int ix = 1; ix < nX - 1; ix++)
+        //    {
+        //        for (int iy = 1; iy < nY - 1; iy++)
+        //        {
+        //            if (!inStruct[ix, iy]) continue;
+
+        //            double centerDose = doseGrid[ix, iy];
+        //            if (double.IsNaN(centerDose) || centerDose > maxValleyHeight) continue;
+
+        //            // Check if this point is a local minimum
+        //            bool isValley = true;
+        //            int validNeighbors = 0;
+        //            double neighborSum = 0;
+
+        //            // Check 3x3 neighborhood
+        //            for (int dx = -1; dx <= 1; dx++)
+        //            {
+        //                for (int dy = -1; dy <= 1; dy++)
+        //                {
+        //                    if (dx == 0 && dy == 0) continue;
+
+        //                    int nx = ix + dx;
+        //                    int ny = iy + dy;
+
+        //                    if (nx >= 0 && nx < nX && ny >= 0 && ny < nY && inStruct[nx, ny])
+        //                    {
+        //                        double neighborDose = doseGrid[nx, ny];
+        //                        if (!double.IsNaN(neighborDose))
+        //                        {
+        //                            validNeighbors++;
+        //                            neighborSum += neighborDose;
+
+        //                            // For valley: center must be strictly lower than ALL neighbors
+        //                            if (neighborDose <= centerDose)
+        //                            {
+        //                                isValley = false;
+        //                                break;
+        //                            }
+        //                        }
+        //                    }
+        //                }
+        //                if (!isValley) break;
+        //            }
+
+        //            // Additional check: must be significantly lower than average neighbor
+        //            double avgNeighbor = validNeighbors > 0 ? neighborSum / validNeighbors : centerDose;
+        //            double relativeDifference = (avgNeighbor - centerDose) / meanStructureDose;
+        //            bool significantValley = relativeDifference > 0.05; // 5% of mean dose difference
+
+        //            if (isValley && validNeighbors >= 3 && significantValley)
+        //            {
+        //                // Check separation from existing valleys
+        //                bool wellSeparated = true;
+        //                foreach (var existingValley in valleys)
+        //                {
+        //                    int distX = Math.Abs(ix - existingValley.x);
+        //                    int distY = Math.Abs(iy - existingValley.y);
+        //                    double dist = Math.Sqrt(distX * distX + distY * distY) * gridStep;
+        //                    if (dist < minSeparation * gridStep)
+        //                    {
+        //                        // Keep the lower valley if they're too close
+        //                        if (centerDose < existingValley.dose)
+        //                        {
+        //                            valleys.Remove(existingValley);
+        //                            break;
+        //                        }
+        //                        else
+        //                        {
+        //                            wellSeparated = false;
+        //                            break;
+        //                        }
+        //                    }
+        //                }
+
+        //                if (wellSeparated)
+        //                {
+        //                    valleys.Add((ix, iy, centerDose));
+        //                    OutputLog += $"  Valley at grid({ix},{iy}): {centerDose:F1} Gy (neighbors avg: {avgNeighbor:F1})\n";
+        //                }
+        //            }
+        //        }
+        //    }
+
+        //    return valleys;
+        //}
+
+        private void AnalyzeDoseDistribution(List<double> structureDoses)
+        {
+            if (structureDoses.Count == 0) return;
+
+            var sorted = structureDoses.OrderBy(d => d).ToList();
+            int count = sorted.Count;
+
+            OutputLog += "\n=== DOSE DISTRIBUTION ANALYSIS ===\n";
+            OutputLog += $"Total structure points: {count}\n";
+            OutputLog += $"Min: {sorted[0]:F1} Gy\n";
+            OutputLog += $"10th percentile: {sorted[(int)(count * 0.1)]:F1} Gy\n";
+            OutputLog += $"25th percentile: {sorted[(int)(count * 0.25)]:F1} Gy\n";
+            OutputLog += $"Median: {sorted[count / 2]:F1} Gy\n";
+            OutputLog += $"75th percentile: {sorted[(int)(count * 0.75)]:F1} Gy\n";
+            OutputLog += $"90th percentile: {sorted[(int)(count * 0.9)]:F1} Gy\n";
+            OutputLog += $"Max: {sorted[count - 1]:F1} Gy\n";
+            OutputLog += $"Mean: {structureDoses.Average():F1} Gy\n";
+            OutputLog += $"Std Dev: {Math.Sqrt(structureDoses.Select(d => Math.Pow(d - structureDoses.Average(), 2)).Average()):F1} Gy\n";
+
+            // Count doses in different ranges
+            int lowDose = sorted.Count(d => d < 20);
+            int midDose = sorted.Count(d => d >= 20 && d < 50);
+            int highDose = sorted.Count(d => d >= 50);
+
+            OutputLog += $"Dose distribution: <20Gy: {lowDose} ({100.0 * lowDose / count:F1}%), ";
+            OutputLog += $"20-50Gy: {midDose} ({100.0 * midDose / count:F1}%), ";
+            OutputLog += $">50Gy: {highDose} ({100.0 * highDose / count:F1}%)\n";
+        }
+
+        // Just replace your existing DetectStructurePeaks method with this:
+        private List<(int x, int y, double dose)> DetectStructurePeaks(double[,] doseGrid, bool[,] inStruct, int nX, int nY, double gridStep, List<double> structureDoses)
+        {
+            var peaks = new List<(int x, int y, double dose)>();
+
+            if (structureDoses.Count == 0) return peaks;
+
+            // Simple: anything above 60% of max dose
+            double maxDose = structureDoses.Max();
+            double minPeakHeight = maxDose * 0.6; // 60% of max
+
+            OutputLog += $"Peak detection: threshold {minPeakHeight:F1} Gy (60% of max {maxDose:F1})\n";
+
+            for (int ix = 1; ix < nX - 1; ix++)
+            {
+                for (int iy = 1; iy < nY - 1; iy++)
+                {
+                    if (!inStruct[ix, iy]) continue;
+
+                    double centerDose = doseGrid[ix, iy];
+                    if (double.IsNaN(centerDose) || centerDose < minPeakHeight) continue;
+
+                    // Simple local maximum check
+                    bool isPeak = true;
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        for (int dy = -1; dy <= 1; dy++)
+                        {
+                            if (dx == 0 && dy == 0) continue;
+
+                            int nx = ix + dx;
+                            int ny = iy + dy;
+
+                            if (nx >= 0 && nx < nX && ny >= 0 && ny < nY && inStruct[nx, ny])
+                            {
+                                double neighborDose = doseGrid[nx, ny];
+                                if (!double.IsNaN(neighborDose) && neighborDose >= centerDose)
+                                {
+                                    isPeak = false;
+                                    break;
+                                }
+                            }
+                        }
+                        if (!isPeak) break;
+                    }
+
+                    if (isPeak)
+                    {
+                        // Check 2mm separation
+                        bool wellSeparated = true;
+                        foreach (var existingPeak in peaks)
+                        {
+                            double dist = Math.Sqrt(Math.Pow((ix - existingPeak.x) * gridStep, 2) +
+                                                  Math.Pow((iy - existingPeak.y) * gridStep, 2));
+                            if (dist < 2.0)
+                            {
+                                if (centerDose > existingPeak.dose)
+                                {
+                                    peaks.Remove(existingPeak);
+                                    break;
+                                }
+                                else
+                                {
+                                    wellSeparated = false;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (wellSeparated)
+                        {
+                            peaks.Add((ix, iy, centerDose));
+                            OutputLog += $"Peak at ({ix},{iy}): {centerDose:F1} Gy\n";
+                        }
+                    }
+                }
+            }
+
+            return peaks;
+        }
+
+        // Just replace your existing DetectStructureValleys method with this:
+        private List<(int x, int y, double dose)> DetectStructureValleys(double[,] doseGrid, bool[,] inStruct, int nX, int nY, double gridStep, List<double> structureDoses)
+        {
+            var valleys = new List<(int x, int y, double dose)>();
+
+            if (structureDoses.Count == 0) return valleys;
+
+            // Simple: anything below 40% of max dose or below 25 Gy
+            double maxDose = structureDoses.Max();
+            double maxValleyHeight = Math.Min(maxDose * 0.4, 25.0); // 40% of max or 25 Gy
+
+            OutputLog += $"Valley detection: threshold {maxValleyHeight:F1} Gy (40% of max or 25 Gy)\n";
+
+            // Count how many points qualify
+            int qualifyingPoints = structureDoses.Count(d => d <= maxValleyHeight);
+            OutputLog += $"Points below threshold: {qualifyingPoints} ({100.0 * qualifyingPoints / structureDoses.Count:F1}%)\n";
+
+            for (int ix = 1; ix < nX - 1; ix++)
+            {
+                for (int iy = 1; iy < nY - 1; iy++)
+                {
+                    if (!inStruct[ix, iy]) continue;
+
+                    double centerDose = doseGrid[ix, iy];
+                    if (double.IsNaN(centerDose) || centerDose > maxValleyHeight) continue;
+
+                    // Simple local minimum check - must be lower than most neighbors
+                    int validNeighbors = 0;
+                    int lowerThanNeighbors = 0;
+
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        for (int dy = -1; dy <= 1; dy++)
+                        {
+                            if (dx == 0 && dy == 0) continue;
+
+                            int nx = ix + dx;
+                            int ny = iy + dy;
+
+                            if (nx >= 0 && nx < nX && ny >= 0 && ny < nY && inStruct[nx, ny])
+                            {
+                                double neighborDose = doseGrid[nx, ny];
+                                if (!double.IsNaN(neighborDose))
+                                {
+                                    validNeighbors++;
+                                    if (centerDose < neighborDose)
+                                    {
+                                        lowerThanNeighbors++;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Must be lower than at least half the neighbors
+                    bool isValley = (validNeighbors >= 3) && (lowerThanNeighbors >= validNeighbors / 2);
+
+                    if (isValley)
+                    {
+                        // Check 2mm separation
+                        bool wellSeparated = true;
+                        foreach (var existingValley in valleys)
+                        {
+                            double dist = Math.Sqrt(Math.Pow((ix - existingValley.x) * gridStep, 2) +
+                                                  Math.Pow((iy - existingValley.y) * gridStep, 2));
+                            if (dist < 2.0)
+                            {
+                                if (centerDose < existingValley.dose)
+                                {
+                                    valleys.Remove(existingValley);
+                                    break;
+                                }
+                                else
+                                {
+                                    wellSeparated = false;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (wellSeparated)
+                        {
+                            valleys.Add((ix, iy, centerDose));
+                            OutputLog += $"Valley at ({ix},{iy}): {centerDose:F1} Gy\n";
+                        }
+                    }
+                }
+            }
+
+            return valleys;
+        }
+
+        //// Optional: Add a dose distribution analyzer to understand your data better
+        //private void AnalyzeDoseDistribution(List<double> structureDoses)
+        //{
+        //    if (structureDoses.Count == 0) return;
+
+        //    var sorted = structureDoses.OrderBy(d => d).ToList();
+        //    int count = sorted.Count;
+
+        //    OutputLog += "\n=== DOSE DISTRIBUTION ANALYSIS ===\n";
+        //    OutputLog += $"Total structure points: {count}\n";
+        //    OutputLog += $"Min: {sorted[0]:F1} Gy\n";
+        //    OutputLog += $"10th percentile: {sorted[(int)(count * 0.1)]:F1} Gy\n";
+        //    OutputLog += $"25th percentile: {sorted[(int)(count * 0.25)]:F1} Gy\n";
+        //    OutputLog += $"Median: {sorted[count / 2]:F1} Gy\n";
+        //    OutputLog += $"75th percentile: {sorted[(int)(count * 0.75)]:F1} Gy\n";
+        //    OutputLog += $"90th percentile: {sorted[(int)(count * 0.9)]:F1} Gy\n";
+        //    OutputLog += $"Max: {sorted[count - 1]:F1} Gy\n";
+        //    OutputLog += $"Mean: {structureDoses.Average():F1} Gy\n";
+        //    OutputLog += $"Std Dev: {Math.Sqrt(structureDoses.Select(d => Math.Pow(d - structureDoses.Average(), 2)).Average()):F1} Gy\n";
+
+        //    // Dose histogram in 10 bins
+        //    double binSize = (sorted.Last() - sorted.First()) / 10;
+        //    OutputLog += "Dose histogram:\n";
+        //    for (int i = 0; i < 10; i++)
+        //    {
+        //        double binStart = sorted.First() + i * binSize;
+        //        double binEnd = binStart + binSize;
+        //        int binCount = sorted.Count(d => d >= binStart && d < binEnd);
+        //        if (i == 9) binCount = sorted.Count(d => d >= binStart && d <= binEnd); // Include max in last bin
+        //        OutputLog += $"  {binStart:F1}-{binEnd:F1} Gy: {binCount} points ({100.0 * binCount / count:F1}%)\n";
+        //    }
+        //}
+
+        // Add this helper method to your EvaluationViewModel class:
+        private void InterpolateForVisualization(double[,] doseGrid, bool[,] inStruct, int nX, int nY)
+        {
+            // Simple interpolation for missing values to create smoother visualization
+            var tempGrid = new double[nX, nY];
+
+            // Copy existing values
+            for (int ix = 0; ix < nX; ix++)
+            {
+                for (int iy = 0; iy < nY; iy++)
+                {
+                    tempGrid[ix, iy] = doseGrid[ix, iy];
+                }
+            }
+
+            // Interpolate missing outside values
+            for (int ix = 1; ix < nX - 1; ix++)
+            {
+                for (int iy = 1; iy < nY - 1; iy++)
+                {
+                    if (inStruct[ix, iy] || !double.IsNaN(doseGrid[ix, iy]))
+                        continue; // Don't interpolate structure points or existing values
+
+                    // Find nearby valid values for interpolation
+                    var nearbyValues = new List<double>();
+                    var distances = new List<double>();
+
+                    for (int dx = -2; dx <= 2; dx++)
+                    {
+                        for (int dy = -2; dy <= 2; dy++)
+                        {
+                            if (dx == 0 && dy == 0) continue;
+
+                            int nx = ix + dx;
+                            int ny = iy + dy;
+
+                            if (nx >= 0 && nx < nX && ny >= 0 && ny < nY)
+                            {
+                                double val = doseGrid[nx, ny];
+                                if (!double.IsNaN(val))
+                                {
+                                    nearbyValues.Add(val);
+                                    distances.Add(Math.Sqrt(dx * dx + dy * dy));
+                                }
+                            }
+                        }
+                    }
+
+                    if (nearbyValues.Count >= 3)
+                    {
+                        // Weighted interpolation based on distance
+                        double weightedSum = 0;
+                        double totalWeight = 0;
+
+                        for (int i = 0; i < nearbyValues.Count; i++)
+                        {
+                            double weight = 1.0 / (distances[i] + 0.1); // Avoid division by zero
+                            weightedSum += nearbyValues[i] * weight;
+                            totalWeight += weight;
+                        }
+
+                        if (totalWeight > 0)
+                        {
+                            tempGrid[ix, iy] = weightedSum / totalWeight;
+                        }
+                    }
+                }
+            }
+
+            // Copy interpolated values back
+            for (int ix = 0; ix < nX; ix++)
+            {
+                for (int iy = 0; iy < nY; iy++)
+                {
+                    if (!inStruct[ix, iy] && double.IsNaN(doseGrid[ix, iy]))
+                    {
+                        doseGrid[ix, iy] = tempGrid[ix, iy];
+                    }
+                }
+            }
+        }
+
+        private Color GetSmoothDoseColor(double dose, double minDose, double maxDose)
+        {
+            if (double.IsNaN(dose))
+                return Colors.LightGray;
+    
+            double norm = Math.Max(0, Math.Min(1, (dose - minDose) / (maxDose - minDose)));
+    
+            // Clinical color scheme: Blue -> Cyan -> Green -> Yellow -> Red
+            if (norm < 0.2)
+            {
+                // Dark blue to blue
+                double t = norm / 0.2;
+                return Color.FromRgb(0, 0, (byte)(100 + t * 155));
+            }
+            else if (norm < 0.4)
+            {
+                // Blue to cyan
+                double t = (norm - 0.2) / 0.2;
+                return Color.FromRgb(0, (byte)(t * 255), 255);
+            }
+            else if (norm < 0.6)
+            {
+                // Cyan to green
+                double t = (norm - 0.4) / 0.2;
+                return Color.FromRgb(0, 255, (byte)((1 - t) * 255));
+            }
+            else if (norm < 0.8)
+            {
+                // Green to yellow
+                double t = (norm - 0.6) / 0.2;
+                return Color.FromRgb((byte)(t * 255), 255, 0);
+            }
+            else
+            {
+                // Yellow to red
+                double t = (norm - 0.8) / 0.2;
+                return Color.FromRgb(255, (byte)((1 - t) * 255), 0);
+            }
         }
 
     }
