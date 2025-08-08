@@ -8,11 +8,15 @@
              xmlns:system="clr-namespace:System;assembly=mscorlib"
              
              mc:Ignorable="d"
-             d:DesignHeight="600" d:DesignWidth="800" Background="GhostWhite">
+             d:DesignHeight="650" d:DesignWidth="900" Background="GhostWhite">
 
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
-        <!-- Style for more interactive radio buttons -->
+        <Style x:Key="WrappingTextStyle" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="5"/>
+        </Style>
     </UserControl.Resources>
 
     <Grid Margin="20">
@@ -22,54 +26,68 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
-            <!-- NEW ROW for radio buttons -->
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- Evaluation Method Selection (at the top and centered) -->
         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,20" HorizontalAlignment="Center">
-            
+            <RadioButton Content="Dose Metrics"
+                         IsChecked="{Binding Is3DEvaluationSelected}"
+                         GroupName="EvaluationMethod"
+                         Margin="5"/>
             <RadioButton Content="1D CAX"
-                        IsChecked="{Binding Is1DCAXSelected}"
-                        GroupName="EvaluationMethod"
-                        Margin="5"/>
-            <RadioButton Content="2D Isocenter Planar"
-                        IsChecked="{Binding IsIsocenterMethodSelected}"
-                        GroupName="EvaluationMethod"
-                        Margin="5"/>
-            <RadioButton Content="2D Normal Multiplanar P/V Interpolation"
-                        IsChecked="{Binding Is2DPlanarSelected}"
-                        GroupName="EvaluationMethod"
-                        Margin="5"/>
-            <RadioButton Content="3D Dose P/V Interpolation"
-                        IsChecked="{Binding Is3DEvaluationSelected}"
-                        GroupName="EvaluationMethod"
-                        Margin="5"/>
+                         IsChecked="{Binding Is1DCAXSelected}"
+                         GroupName="EvaluationMethod"
+                         Margin="5"/>
+            <RadioButton Content="2D Multi-Depth Minibeam Analysis"
+                         IsChecked="{Binding Is2DPlanarSelected}"
+                         GroupName="EvaluationMethod"
+                         Margin="5"/>
+            <RadioButton Content="3D P/V Interpolation"
+                         IsChecked="{Binding Is3DInterpolationSelected}"
+                         GroupName="EvaluationMethod"
+                         Margin="5"/>
         </StackPanel>
 
         <!-- Selection Controls -->
         <Grid Grid.Row="1" Margin="0,0,0,20">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <!-- Structure Selection -->
+            <!-- Evaluation Mode Selection -->
             <StackPanel Grid.Column="0" Margin="0,0,10,0">
-                <TextBlock Text="Select Target Structure:" FontWeight="SemiBold" Margin="0,0,0,5"/>
-                <ComboBox ItemsSource="{Binding PotentialTargets}"
-                         SelectedItem="{Binding SelectedTumorId}"
-                         Margin="0,0,0,10"/>
+                <TextBlock Text="Select Evaluation Mode:" FontWeight="SemiBold" Margin="0,0,0,5" HorizontalAlignment="Center"/>
+                <ComboBox ItemsSource="{Binding PvdrModeOptions}"
+                          SelectedItem="{Binding SelectedPvdrMode}"
+                          Width="150"
+                          Margin="0,0,0,10"/>
             </StackPanel>
 
-            <!-- Beam Selection - fades out when 3D Evaluation is selected -->
-            <StackPanel Grid.Column="1" Margin="10,0,0,0">
-                <TextBlock Text="Select Treatment Beam:" FontWeight="SemiBold" Margin="0,0,0,5"/>
-                <ComboBox ItemsSource="{Binding TreatmentBeams}"
-                         SelectedItem="{Binding SelectedBeamId}"
-                         Margin="0,0,0,10"/>
+            <!-- Target Structure Dropdown -->
+            <StackPanel Grid.Column="1" Margin="10,0,10,0">
+                <TextBlock Text="Select Target Structure:"
+                           FontWeight="SemiBold"
+                           Margin="0,0,0,5"
+                           HorizontalAlignment="Center"/>
+                <ComboBox ItemsSource="{Binding PotentialTargets}"
+                          SelectedItem="{Binding SelectedTumorId}"
+                          Width="180"
+                          Margin="0,0,0,10"/>
+            </StackPanel>
 
-                <!-- Apply style directly to the StackPanel -->
+            <!-- Beam Dropdown -->
+            <StackPanel Grid.Column="2" Margin="10,0,0,0">
+                <TextBlock Text="Select Treatment Beam:"
+                           FontWeight="SemiBold"
+                           Margin="0,0,0,5"
+                           HorizontalAlignment="Center"/>
+                <ComboBox ItemsSource="{Binding TreatmentBeams}"
+                          SelectedItem="{Binding SelectedBeamId}"
+                          Width="180"
+                          Margin="0,0,0,10"/>
                 <StackPanel.Style>
                     <Style TargetType="StackPanel">
                         <Style.Triggers>
@@ -83,27 +101,125 @@
             </StackPanel>
         </Grid>
 
-        <!-- Output Log and Plot Area -->
+        <!-- Output Log and Plot Area with Multi-Depth Controls -->
         <Border Grid.Row="3" BorderBrush="LightGray" BorderThickness="1" Margin="0,0,0,20">
-            <Grid>
-                <ScrollViewer VerticalScrollBarVisibility="Auto"
-                             Visibility="{Binding bTextVis, Converter={StaticResource BooleanToVisibilityConverter}}">
-                    <TextBox Text="{Binding OutputLog}" IsReadOnly="True"
-                            FontFamily="Consolas" Padding="10"
-                            VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
-                            AcceptsReturn="True" TextWrapping="Wrap"/>
+            <Grid Name="PlotControlsGrid">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <!-- Main plot area -->
+                    <RowDefinition Height="Auto"/>
+                    <!-- Depth controls -->
+                </Grid.RowDefinitions>
+
+                <!-- Text View (Output Log and Dosimetrics) -->
+                <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto"
+                              Visibility="{Binding bTextVis, Converter={StaticResource BooleanToVisibilityConverter}}"
+                              Panel.ZIndex="1">
+                    <TabControl Height="350">
+                        <TabItem Header="Output Log">
+                            <TextBox Text="{Binding OutputLog}" IsReadOnly="True"
+                                     FontFamily="Consolas" Padding="10"
+                                     VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
+                                     AcceptsReturn="True" TextWrapping="Wrap"/>
+                        </TabItem>
+
+                        <TabItem Header="Dosimetrics">
+                            <DataGrid x:Name="DataGridEval"
+                                      ItemsSource="{Binding AllMetrics}"
+                                      AutoGenerateColumns="False"
+                                      CanUserAddRows="False"
+                                      IsReadOnly="True"
+                                      GridLinesVisibility="Horizontal"
+                                      HeadersVisibility="Column"
+                                      RowHeaderWidth="0"
+                                      Background="White"
+                                      AlternatingRowBackground="LightGray">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Metric"
+                                                        Binding="{Binding metric}"
+                                                        Width="*"
+                                                        ElementStyle="{StaticResource WrappingTextStyle}"/>
+                                    <DataGridTextColumn Header="Value"
+                                                        Binding="{Binding value}"
+                                                        Width="1.25*"
+                                                        ElementStyle="{StaticResource WrappingTextStyle}"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </TabItem>
+                    </TabControl>
                 </ScrollViewer>
 
-                <!-- Updated Canvas with minimum size constraints -->
+                <!-- Plot Canvas -->
                 <Canvas x:Name="PlotCanvas"
+                        Grid.Row="0"
                         Background="White"
-                        MinWidth="600"
-                        MinHeight="300"
-                        Visibility="{Binding bPlotVis, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        MaxWidth="850"
+                        MaxHeight="330"
+                        MinWidth="400"
+                        MinHeight="250"
+                        Visibility="{Binding bPlotVis, Converter={StaticResource BooleanToVisibilityConverter}}"
+                        Margin="0,0,0,20"
+                        Panel.ZIndex="0"/>
+
+                <!-- Multi-Depth Controls - only visible for 2D plots AND plot view -->
+                <StackPanel Grid.Row="1" Orientation="Vertical" Margin="10,5">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding Is2DPlanarSelected}" Value="True"/>
+                                        <Condition Binding="{Binding bPlotVis}" Value="True"/>
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+
+                    <!-- Depth information display -->
+                    <TextBlock Text="{Binding DepthDisplayText}" 
+                               HorizontalAlignment="Center" 
+                               FontSize="14" FontWeight="Bold" 
+                               Margin="0,5"/>
+
+                    <!-- Depth slider -->
+                    <Grid Margin="20,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0" Text="Entry" VerticalAlignment="Center" Margin="5,0"/>
+
+                        <Slider Grid.Column="1" 
+                                Minimum="0" 
+                                Maximum="{Binding MaxDepthIndex}"
+                                Value="{Binding CurrentDepthIndex, Mode=TwoWay}"
+                                TickPlacement="BottomRight"
+                                TickFrequency="1"
+                                IsSnapToTickEnabled="True"
+                                Margin="10,0"/>
+
+                        <TextBlock Grid.Column="2" Text="Exit" VerticalAlignment="Center" Margin="5,0"/>
+                    </Grid>
+
+                    <!-- Previous/Next buttons -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,5">
+                        <Button Content="← Previous" Margin="5,0" Padding="10,2"
+                                Command="{Binding PreviousDepthCommand}" 
+                                IsEnabled="{Binding CanGoToPreviousDepth}"/>
+                        <Button Content="Next →" Margin="5,0" Padding="10,2"
+                                Command="{Binding NextDepthCommand}" 
+                                IsEnabled="{Binding CanGoToNextDepth}"/>
+                    </StackPanel>
+                </StackPanel>
             </Grid>
         </Border>
 
-        <!-- NEW: View Toggle Radio Buttons -->
+        <!-- View Toggle Radio Buttons -->
         <Grid Grid.Row="4" Margin="0,0,0,10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
@@ -111,21 +227,21 @@
             </Grid.ColumnDefinitions>
 
             <RadioButton Grid.Column="0"
-                        Content="Text View"
-                        IsChecked="{Binding bTextVis}"
-                        GroupName="ViewToggle"
-                        HorizontalAlignment="Center"
-                        Margin="5"/>
+                         Content="Text View"
+                         IsChecked="{Binding bTextVis}"
+                         GroupName="ViewToggle"
+                         HorizontalAlignment="Center"
+                         Margin="5"/>
 
             <RadioButton Grid.Column="1"
-                        Content="Plot View"
-                        IsChecked="{Binding bPlotVis}"
-                        GroupName="ViewToggle"
-                        HorizontalAlignment="Center"
-                        Margin="5"/>
+                         Content="Plot View"
+                         IsChecked="{Binding bPlotVis}"
+                         GroupName="ViewToggle"
+                         HorizontalAlignment="Center"
+                         Margin="5"/>
         </Grid>
 
-        <!-- Action Buttons (moved to Row 5) -->
+        <!-- Action Buttons -->
         <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right">
             <Button Content="Compute Dose" Command="{Binding ComputeCommand}"
                     Width="120" Height="30" Margin="0,0,10,0"/>

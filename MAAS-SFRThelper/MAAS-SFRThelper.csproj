@@ -117,6 +117,7 @@
     <Compile Include="Converters\boolVisibilityConverter.cs" />
     <Compile Include="Models\BaseObject.cs" />
     <Compile Include="Models\Circle.cs" />
+    <Compile Include="Models\MetricData.cs" />
     <Compile Include="Models\Polygon.cs" />
     <Compile Include="Models\seedPointModel.cs" />
     <Compile Include="Models\Spacing.cs" />
