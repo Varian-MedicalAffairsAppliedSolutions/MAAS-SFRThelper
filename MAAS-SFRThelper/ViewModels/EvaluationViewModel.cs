@@ -7080,67 +7080,68 @@ namespace MAAS_SFRThelper.ViewModels
             });
 
             // Volume of vertices
-            AllMetrics.Add(new MetricData
-            {
-                metric = "Total Volume of Vertices (cc)",
-                value = Math.Round(ptvAll.Volume, 2).ToString()
-            });
+            //AllMetrics.Add(new MetricData
+            //{
+            //    metric = "Total Volume of Vertices (cc)",
+            //    value = Math.Round(ptvAll.Volume, 2).ToString()
+            //});
 
             // Percent of GTV that is total lattice volume
-            double latticePercent = Math.Round((100 * ptvAll.Volume / structureForEval.Volume), 2);
-            AllMetrics.Add(new MetricData
-            {
-                metric = "Percent of GTV Covered by Lattice (%)",
-                value = latticePercent.ToString()
-            });
+            //double latticePercent = Math.Round((100 * ptvAll.Volume / structureForEval.Volume), 2);
+            //AllMetrics.Add(new MetricData
+            //{
+            //    metric = "Percent of GTV Covered by Lattice (%)",
+            //    value = latticePercent.ToString()
+            //});
 
             // D95 calculation
             try
             {
-                var absoluteVolume = VolumePresentation.AbsoluteCm3;
+                var relativeVolume = VolumePresentation.Relative; // relative volume not changing name for now
                 var absoluteDoseValue = DoseValuePresentation.Absolute;
-                var d95Value = plan.GetDoseAtVolume(structureForEval, 95, absoluteVolume, absoluteDoseValue);
+                var doseUnit = plan.TotalDose.Unit.ToString();
+                var d95Value = plan.GetDoseAtVolume(structureForEval, 95, relativeVolume, absoluteDoseValue);
 
                 AllMetrics.Add(new MetricData
                 {
-                    metric = "Dose Covering 95% of Target (D95) (Gy)",
+                    metric = $"Dose Covering 95% of Target (D95) ({doseUnit})",
                     value = Math.Round(d95Value.Dose, 3).ToString()
                 });
-                var d90Value = plan.GetDoseAtVolume(structureForEval, 90, absoluteVolume, absoluteDoseValue);
+                var d90Value = plan.GetDoseAtVolume(structureForEval, 90, relativeVolume, absoluteDoseValue);
                 AllMetrics.Add(new MetricData
                 {
-                    metric = "Dose Covering 90% of Target (D95) (Gy)",
+                    metric = $"Dose Covering 90% of Target (D95) ({doseUnit})",
                     value = Math.Round(d90Value.Dose, 3).ToString()
                 });
 
-                var d50Value = plan.GetDoseAtVolume(structureForEval, 50, absoluteVolume, absoluteDoseValue);
+                var d50Value = plan.GetDoseAtVolume(structureForEval, 50, relativeVolume, absoluteDoseValue);
                 AllMetrics.Add(new MetricData
                 {
-                    metric = "Dose Covering 50% of Target (D50) (Gy)",
+                    metric = $"Dose Covering 50% of Target (D50) ({doseUnit})",
                     value = Math.Round(d50Value.Dose, 3).ToString()
                 });
 
                 // d20
-                var d20Value = plan.GetDoseAtVolume(structureForEval, 20, absoluteVolume, absoluteDoseValue);
+                var d20Value = plan.GetDoseAtVolume(structureForEval, 20, relativeVolume, absoluteDoseValue);
                 AllMetrics.Add(new MetricData
                 {
-                    metric = "Dose Covering 20% of Target (D20) (Gy)",
+                    metric = $"Dose Covering 20% of Target (D20) ({doseUnit})",
                     value = Math.Round(d20Value.Dose, 3).ToString()
                 });
                 
                 // d10
-                var d10Value = plan.GetDoseAtVolume(structureForEval, 50, absoluteVolume, absoluteDoseValue);
+                var d10Value = plan.GetDoseAtVolume(structureForEval, 10, relativeVolume, absoluteDoseValue);
                 AllMetrics.Add(new MetricData
                 {
-                    metric = "Dose Covering 10% of Target (D10) (Gy)",
+                    metric = $"Dose Covering 10% of Target (D10) ({doseUnit})",
                     value = Math.Round(d10Value.Dose, 3).ToString()
                 });
                 
                 // d5
-                var d5Value= plan.GetDoseAtVolume(structureForEval, 50, absoluteVolume, absoluteDoseValue);
+                var d5Value= plan.GetDoseAtVolume(structureForEval, 5, relativeVolume, absoluteDoseValue);
                 AllMetrics.Add(new MetricData
                 {
-                    metric = "Dose Covering 5% of Target (D5) (Gy)",
+                    metric = $"Dose Covering 5% of Target (D5) ({doseUnit})",
                     value = Math.Round(d5Value.Dose, 3).ToString()
                 });
 
