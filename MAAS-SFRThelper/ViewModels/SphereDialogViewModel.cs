@@ -131,6 +131,17 @@ namespace MAAS_SFRThelper.ViewModels
             }
         }
 
+        private bool isRectAlt;
+        public bool IsRectAlt
+        {
+            get { return isRectAlt; }
+            set
+            {
+                SetProperty(ref isRectAlt, value);
+
+            }
+        }
+
         private bool isCVT3D;
         public bool IsCVT3D
         {
@@ -300,6 +311,7 @@ namespace MAAS_SFRThelper.ViewModels
             ValidSpacings = new ObservableCollection<Spacing>();
             IsHex = true; // default to hex
             IsRect = false;
+            IsRectAlt = false;
             createSingle = true; // default to keeping individual structures
             nullVoidsEnabled = true; // default to not creating nulls and voids - if Voronio or hex are selected that need to go to false
             XShift = 0;
@@ -450,6 +462,64 @@ namespace MAAS_SFRThelper.ViewModels
                             retval.Add(new seedPointModel(ptVoid, SeedTypeEnum.Void));
                         }
                         ProgressValue += progressMax / ((double)xcoords.Count() * (double)ycoords.Count() * (double)zcoords.Count());
+                    }
+                }
+            }
+
+            return retval;
+        }
+
+        private List<seedPointModel> BuildAlternatingCubicGrid(double progressMax, double Xstart, double Xsize,
+    double Ystart, double Ysize, double Zstart, double Zsize,
+    Structure ptvRetract, Structure ptvRetractVoid)
+        {
+            var retval = new List<seedPointModel>();
+            double spacing = SpacingSelected.Value;
+
+            // Calculate grid dimensions
+            int nx = (int)Math.Ceiling(Xsize / spacing) + 1;
+            int ny = (int)Math.Ceiling(Ysize / spacing) + 1;
+            int nz = (int)Math.Ceiling(Zsize / spacing) + 1;
+
+            // Generate alternating cubic pattern
+            for (int i = 0; i < nx; i++)
+            {
+                for (int j = 0; j < ny; j++)
+                {
+                    for (int k = 0; k < nz; k++)
+                    {
+                        double x = Xstart + i * spacing;
+                        double y = Ystart + j * spacing;
+                        double z = Zstart + k * spacing;
+
+                        // Apply lateral scaling
+                        double scaledX = x * LateralScalingFactor;
+                        double scaledY = y * LateralScalingFactor;
+
+                        // Determine if this is a sphere or void position
+                        // Using modulo arithmetic to create alternating pattern
+                        bool isSpherePosition = (i + j + k) % 2 == 0;
+
+                        VVector position = new VVector(scaledX + XShift, scaledY + YShift, z);
+
+                        if (isSpherePosition)
+                        {
+                            // Check if sphere center is inside the retracted PTV
+                            if (ptvRetract.IsPointInsideSegment(position))
+                            {
+                                retval.Add(new seedPointModel(position, SeedTypeEnum.Sphere));
+                            }
+                        }
+                        else
+                        {
+                            // Check if void center is inside the void boundary structure
+                            if (ptvRetractVoid.IsPointInsideSegment(position))
+                            {
+                                retval.Add(new seedPointModel(position, SeedTypeEnum.Void));
+                            }
+                        }
+
+                        ProgressValue += progressMax / (double)(nx * ny * nz);
                     }
                 }
             }
@@ -714,7 +784,7 @@ namespace MAAS_SFRThelper.ViewModels
         private bool PreSpheres()
         {
             // Check if we are ready to make spheres
-            if (!IsHex && !IsRect && !IsCVT3D)
+            if (!IsHex && !IsRect && !IsRectAlt && !IsCVT3D)
             {
                 var msg = "No pattern selected. Returning.";
                 Output += "\n" + msg;
@@ -879,6 +949,20 @@ namespace MAAS_SFRThelper.ViewModels
 
                     grid = BuildGrid(25.0, xcoords, ycoords, zcoords, ptvRetract, ptvRetractVoid);
                     structMain = CreateStructure(sc.StructureSet, "LatticeRect", false, true);
+                }
+                else if (IsRectAlt)
+                {
+                    var xcoords = Arange(bounds.X + XShift, bounds.X + bounds.SizeX + XShift, SpacingSelected.Value);
+                    var ycoords = Arange(bounds.Y + XShift, bounds.Y + bounds.SizeY + YShift, SpacingSelected.Value);
+                    var zcoords = Arange(z0, zf, SpacingSelected.Value);
+
+                    //grid = BuildGrid(25.0, xcoords, ycoords, zcoords, ptvRetract, ptvRetractVoid);
+                    //structMain = CreateStructure(sc.StructureSet, "LatticeRect", false, true);
+                    grid = BuildAlternatingCubicGrid(25.0, bounds.X + XShift, bounds.SizeX,
+                                bounds.Y + YShift, bounds.SizeY,
+                                z0, bounds.SizeZ,
+                                ptvRetract, ptvRetractVoid);
+                    structMain = CreateStructure(sc.StructureSet, "LatticeAltCubic", false, true);
                 }
                 else if (IsCVT3D)
                 {
@@ -1133,6 +1217,44 @@ namespace MAAS_SFRThelper.ViewModels
                             }
 
                         }
+
+                        if (isRectAlt)
+                        {
+
+                            int voidCount = 0;
+
+
+                            foreach (VVector ctr in grid.Where(g => g.SeedType == SeedTypeEnum.Void).Select(g => g.Position))
+                            {
+                                if (isPointInsideBBox(sphereBox, ctr))
+                                {
+                                    Structure currentVoid = null;
+
+                                    currentVoid = voidStructure;
+
+                                    BuildSphere(currentVoid, ctr, voidRadius, sc.Image);
+
+                                    // Crop to target
+                                    currentVoid.SegmentVolume = currentVoid.SegmentVolume.And(target);
+
+                                    voidStructure.SegmentVolume = voidStructure.Or(currentVoid.SegmentVolume);
+                                    voidCount++;
+
+                                    if (isCore)
+                                    {
+                                        Structure currentCore = null;
+                                        currentCore = coreVoid;
+                                        BuildSphere(currentCore, ctr, coreRadius, sc.Image);
+                                        currentCore.SegmentVolume = currentCore.SegmentVolume.And(target);
+                                        coreVoid.SegmentVolume = coreVoid.Or(currentCore.SegmentVolume);
+
+                                    }
+
+                                }
+                            }
+
+                        }
+
 
                         if (isHex)
                         {
