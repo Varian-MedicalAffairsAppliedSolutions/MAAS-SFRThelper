@@ -80,6 +80,12 @@
 
             <!-- Beam Dropdown -->
             <StackPanel Grid.Column="2" Margin="10,0,0,0">
+                <CheckBox x:Name="CacheAllBeamsCheckBox" 
+                            Content="Cache All Beams" 
+                            IsChecked="{Binding CacheAllBeams}"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Top"
+                            Margin="0,0,5,5"/>    
                 <TextBlock Text="Select Treatment Beam:"
                            FontWeight="SemiBold"
                            Margin="0,0,0,5"
