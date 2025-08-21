@@ -10,7 +10,7 @@ on:
 
 jobs:
   build:
-    runs-on: windows-2022
+    runs-on: windows-latest
     env:
       GITHUB_WORKSPACE_PACKAGES_PATH: ..\packages\ESAPI.15.6.0\lib\net45\
       PROJECT_NAME: MAAS-SFRThelper
@@ -34,15 +34,8 @@ jobs:
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
 
-    - name: Install .NET Framework 4.5.2 Developer Pack
-      run: |
-        $url = "https://download.microsoft.com/download/4/3/B/43B61315-B2CE-4F5B-9E32-34CCA07B2F0E/NDP452-KB2901907-x86-x64-AllOS-ENU.exe"
-        $output = "$env:TEMP\NDP452-DevPack.exe"
-        Write-Host "Downloading .NET Framework 4.5.2 Developer Pack..."
-        Invoke-WebRequest -Uri $url -OutFile $output
-        Write-Host "Installing .NET Framework 4.5.2 Developer Pack..."
-        Start-Process -FilePath $output -ArgumentList "/quiet" -Wait
-        Write-Host "Installation completed."
+    - name: Download Microsoft NETFramework ReferenceAssemblies for v4.5
+      run: nuget install Microsoft.NETFramework.ReferenceAssemblies.net452 -OutputDirectory packages
 
     - name: Navigate to Workspace
       run: cd $GITHUB_WORKSPACE
@@ -56,20 +49,7 @@ jobs:
           -BuildNumber ${{ env.BUILD_NUMBER }} `
           -ProjectName ${{ env.PROJECT_NAME }}
 
-    - name: Update Target Framework Version to 4.5.2 - Main Project
-      uses: Nambers/ReplaceStringInFile@v1.1
-      with:
-        path: ${{ env.PROJECT_ROOT }}/${{ env.CSPROJ_FILE_NAME }}
-        oldString: "TargetFrameworkVersion>v[\\d\\.]+<"
-        newString: 'TargetFrameworkVersion>v4.5.2<'
-        
-    - name: Update Target Framework Version to 4.5.2 - Voronoi3d Project
-      uses: Nambers/ReplaceStringInFile@v1.1
-      with:
-        path: Voronoi3d/Voronoi3d.csproj
-        oldString: "TargetFrameworkVersion>v[\\d\\.]+<"
-        newString: 'TargetFrameworkVersion>v4.5.2<'
-        
+
     - name: Setup NuGet.exe for use with actions
       uses: NuGet/setup-nuget@v1
       with:
@@ -77,6 +57,9 @@ jobs:
 
     - name: Download nuget packages
       run: nuget install ${{ env.PROJECT_ROOT }}/packages.config -OutputDirectory packages
+      
+    - name: Download Voronoi3d nuget packages
+      run: nuget install Voronoi3d/packages.config -OutputDirectory packages
 
     - name: Add VIC GitHub NuGet repository
       run: nuget source add `
