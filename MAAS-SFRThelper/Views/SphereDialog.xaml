@@ -52,7 +52,7 @@
             </RadioButton>
 
             <RadioButton Grid.Column ="3" IsEnabled="{Binding PatternEnabled}" IsChecked="{Binding IsRectAlt}" GroupName="Pattern" Margin="2" >
-                <Hyperlink NavigateUri="https://chem.libretexts.org/Bookshelves/Physical_and_Theoretical_Chemistry_Textbook_Maps/Supplemental_Modules_(Physical_and_Theoretical_Chemistry)/Physical_Properties_of_Matter/States_of_Matter/Properties_of_Solids/Crystal_Lattice/Closest_Pack_Structures" RequestNavigate="Hyperlink_RequestNavigate" >
+                <Hyperlink NavigateUri="https://www.phiro.science/article/S2405-6316(24)00019-8/fulltext" RequestNavigate="Hyperlink_RequestNavigate" >
                     Alternating Cubic
                 </Hyperlink>
 
