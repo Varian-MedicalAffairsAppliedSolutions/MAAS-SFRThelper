@@ -34,6 +34,16 @@ jobs:
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
 
+    - name: Install .NET Framework 4.6.1 Developer Pack
+      run: |
+        $url = "https://download.microsoft.com/download/F/1/D/F1DEB8DB-D277-4EF9-9F48-3A2CDC6B37A3/NDP461-DevPack-KB3105179-ENU.exe"
+        $output = "$env:TEMP\NDP461-DevPack.exe"
+        Write-Host "Downloading .NET Framework 4.6.1 Developer Pack..."
+        Invoke-WebRequest -Uri $url -OutFile $output
+        Write-Host "Installing .NET Framework 4.6.1 Developer Pack..."
+        Start-Process -FilePath $output -ArgumentList "/quiet" -Wait
+        Write-Host "Installation completed."
+
     - name: Navigate to Workspace
       run: cd $GITHUB_WORKSPACE
 
