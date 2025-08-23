@@ -20,6 +20,7 @@ using VMS.TPS.Common.Model.Types;
 
 namespace MAAS_SFRThelper.ViewModels
 {
+
     public class EvaluationViewModel : BindableBase
     {
         // Structure selection
@@ -910,93 +911,7 @@ namespace MAAS_SFRThelper.ViewModels
             }
         }
 
-        //private void ExecuteComputeDose()
-        //{
-        //    try
-        //    {
-        //        OutputLog += "Starting dose computation...\n";
-
-        //        // Copy selected IDs to local variables to avoid potential thread issues
-        //        string selectedBeamId = SelectedBeamId;
-        //        string selectedTumorId = SelectedTumorId;
-        //        string ptvAllName = SelectedTumorId;
-        //        string selectedPvdrMode = SelectedPvdrMode;
-
-        //        if (string.IsNullOrEmpty(selectedBeamId))
-        //        {
-        //            OutputLog += "No beam selected. Please select a beam.\n";
-        //            return;
-        //        }
-
-        //        if (string.IsNullOrEmpty(selectedTumorId))
-        //        {
-        //            OutputLog += "No structure selected. Please select a structure.\n";
-        //            return;
-        //        }
-
-        //        _esapiWorker.RunWithWait(context =>
-        //        {
-        //            try
-        //            {
-        //                var plan = _plan;
-        //                if (plan == null)
-        //                {
-        //                    OutputLog += "No plan available. Cannot compute dose.\n";
-        //                    return;
-        //                }
-
-        //                if (plan.Dose == null)
-        //                {
-        //                    OutputLog += "No 3D dose is calculated for this plan. Please calculate dose first.\n";
-        //                    return;
-        //                }
-
-        //                if (Is1DCAXSelected)
-        //                {
-        //                    OutputLog += "Running 1D CAX computation...\n";
-        //                    Run1DPVDRMetric(selectedTumorId, plan);
-        //                    OutputLog += "1D CAX Dosimetrics complete\n";
-        //                    return;
-        //                }
-
-        //                if (Is2DPlanarSelected)
-        //                {
-        //                    OutputLog += "Running 2D Planar computation...\n";
-        //                    Run2DPVDRMetric(selectedTumorId, plan);
-        //                    OutputLog += "2D Planar Dosimetrics complete\n";
-        //                    return;
-        //                }
-
-        //                bool execute3DDose = Is3DEvaluationSelected;
-
-        //                if (execute3DDose)
-        //                {
-        //                    update3DMetrics(selectedTumorId, ptvAllName, plan);
-        //                    OutputLog += "3D Dosimetrics complete\n";
-        //                    return;
-        //                }
-        //            }
-        //            catch (Exception ex)
-        //            {
-        //                OutputLog += $"Error during dose computation: {ex.Message}\n";
-        //                if (ex.InnerException != null)
-        //                {
-        //                    OutputLog += $"Inner Exception: {ex.InnerException.Message}\n";
-        //                }
-        //            }
-        //        });
-
-        //        // Update the commands that depend on data availability
-        //        SaveCsvCommand.RaiseCanExecuteChanged();
-        //        ShowPlotCommand.RaiseCanExecuteChanged();
-        //        RefreshPlotCommand?.RaiseCanExecuteChanged();
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        OutputLog += $"Critical error in ExecuteComputeDose: {ex.Message}\n";
-        //        MessageBox.Show($"Error computing dose: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-        //    }
-        //}
+        
         private void ExecuteComputeDose()
         {
             try
