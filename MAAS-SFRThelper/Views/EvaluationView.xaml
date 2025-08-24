@@ -27,9 +27,12 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <!-- Row 2 - we'll use this for 3D buttons -->
             <RowDefinition Height="*"/>
+            <RowDefinition Height="10"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="10"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
@@ -131,6 +134,38 @@
             </StackPanel>
         </Grid>
 
+        <!-- 3D View Control Buttons - Row 2 (NEW LOCATION) -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,5,0,10">
+            <StackPanel.Style>
+                <Style TargetType="StackPanel">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding Is3DInterpolationSelected}" Value="True"/>
+                                <Condition Binding="{Binding bPlotVis}" Value="True"/>
+                            </MultiDataTrigger.Conditions>
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </MultiDataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </StackPanel.Style>
+
+            <Button Content="Reset View" Click="ResetView_Click" 
+         ToolTip="Reset camera to default (Home key)" 
+         Padding="8,3" Margin="5"/>
+
+            <Button Content="Fit View" 
+         Click="FitView_Click"
+         ToolTip="Zoom to fit all content (F key)" 
+         Padding="8,3" Margin="5"/>
+
+            <Button Content="Export 3D" Click="Export3D_Click" 
+         ToolTip="Save 3D view as image" 
+         Padding="8,3" Margin="5"/>
+        </StackPanel>
+
+
         <!-- Output Log and Plot Area -->
         <Border Grid.Row="3" BorderBrush="LightGray" BorderThickness="1" Margin="0,0,0,10" Height="370" Padding="5">
             <Grid>
@@ -173,6 +208,7 @@
                     </TabControl>
                 </ScrollViewer>
 
+                
                 <!-- Plot View with Canvas and Vertical Slider -->
                 <Grid Visibility="{Binding bPlotVis, Converter={StaticResource BooleanToVisibilityConverter}}"
                       Panel.ZIndex="0">
@@ -372,8 +408,7 @@
             </Grid>
         </Border>
 
-        <!-- 3D View Controls (Row 4) - Only visible in 3D P/V mode -->
-        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,5,0,5">
+        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,5,0,5">
             <StackPanel.Style>
                 <Style TargetType="StackPanel">
                     <Setter Property="Visibility" Value="Collapsed"/>
@@ -391,57 +426,41 @@
 
             <!-- Onion Layer Controls -->
             <CheckBox Content="Show Onion Layers" 
-              IsChecked="{Binding ShowOnionLayers}"
-              VerticalAlignment="Center" Margin="5"/>
+                  IsChecked="{Binding ShowOnionLayers}"
+                  VerticalAlignment="Center" Margin="5"/>
 
             <!-- Shell Selection Controls - Only visible when ShowOnionLayers is true -->
             <StackPanel Orientation="Horizontal" 
-                Visibility="{Binding ShowOnionLayers, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    Visibility="{Binding ShowOnionLayers, Converter={StaticResource BooleanToVisibilityConverter}}">
 
                 <Separator Margin="10,0" Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}"/>
 
                 <Label Content="Shell Depth:" VerticalAlignment="Center" Margin="5,0,0,0"/>
 
                 <Button Content="◄" Command="{Binding PreviousShellCommand}" 
-                Padding="6,4" Margin="2" Width="30"
-                ToolTip="Previous Shell"/>
+                    Padding="6,4" Margin="2" Width="30"
+                    ToolTip="Previous Shell"/>
 
                 <Slider Width="150" 
-                Minimum="0" Maximum="{Binding MaxShellIndex}"
-                Value="{Binding CurrentShellIndex}"
-                TickFrequency="1" IsSnapToTickEnabled="True"
-                VerticalAlignment="Center" Margin="5"/>
+                    Minimum="0" Maximum="{Binding MaxShellIndex}"
+                    Value="{Binding CurrentShellIndex}"
+                    TickFrequency="1" IsSnapToTickEnabled="True"
+                    VerticalAlignment="Center" Margin="5"/>
 
                 <Button Content="►" Command="{Binding NextShellCommand}"
-                Padding="6,4" Margin="2" Width="30"
-                ToolTip="Next Shell"/>
+                    Padding="6,4" Margin="2" Width="30"
+                    ToolTip="Next Shell"/>
 
                 <TextBlock Text="{Binding ShellDisplayText}"
-                   VerticalAlignment="Center" 
-                   FontWeight="Bold" Margin="10,0"/>
+                       VerticalAlignment="Center" 
+                       FontWeight="Bold" Margin="10,0"/>
             </StackPanel>
-
-            <Separator Margin="10,0" Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}"/>
-
-            <!-- View Control Buttons -->
-            <Button Content="Reset View" Click="ResetView_Click" 
-            ToolTip="Reset camera to default (Home key)" 
-            Padding="8,3" Margin="5"/>
-
-            <Button Content="Fit View" 
-            Click="FitView_Click"
-            ToolTip="Zoom to fit all content (F key)" 
-            Padding="8,3" Margin="5"/>
-
-            <Button Content="Export 3D" Click="Export3D_Click" 
-            ToolTip="Save 3D view as image" 
-            Padding="8,3" Margin="5"/>
         </StackPanel>
 
         <!-- Heterogeneity display - Row 5 -->
-        <TextBlock Grid.Row="5" Text="{Binding ShellHeterogeneityText}"
-           HorizontalAlignment="Center"
-           FontStyle="Italic" Margin="0,2,0,5">
+        <TextBlock Grid.Row="6" Text="{Binding ShellHeterogeneityText}"
+               HorizontalAlignment="Center"
+               FontStyle="Italic" Margin="0,2,0,5">
             <TextBlock.Style>
                 <Style TargetType="TextBlock">
                     <Setter Property="Visibility" Value="Collapsed"/>
@@ -458,9 +477,10 @@
                 </Style>
             </TextBlock.Style>
         </TextBlock>
+      
 
-        <!-- View Toggle and Action Buttons (Row 6) -->
-        <Grid Grid.Row="6" Margin="0,0,0,0">
+        <!-- View Toggle and Action Buttons (Now Row 7) -->
+        <Grid Grid.Row="8" Margin="0,0,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
@@ -469,31 +489,31 @@
             <!-- View Toggle Radio Buttons -->
             <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
                 <RadioButton Content="Text View"
-                             IsChecked="{Binding bTextVis}"
-                             GroupName="ViewToggle"
-                             Margin="5"/>
+                         IsChecked="{Binding bTextVis}"
+                         GroupName="ViewToggle"
+                         Margin="5"/>
                 <RadioButton Content="Plot View"
-                             IsChecked="{Binding bPlotVis}"
-                             GroupName="ViewToggle"
-                             Margin="5"/>
+                         IsChecked="{Binding bPlotVis}"
+                         GroupName="ViewToggle"
+                         Margin="5"/>
             </StackPanel>
 
             <!-- Action Buttons -->
             <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button Content="Compute Dose" Command="{Binding ComputeCommand}"
-                        Width="110" Height="28" Margin="0,0,8,0"/>
+                    Width="110" Height="28" Margin="0,0,8,0"/>
                 <Button Content="Save CSV" Command="{Binding SaveCsvCommand}"
-                        Width="90" Height="28" Margin="0,0,8,0"/>
+                    Width="90" Height="28" Margin="0,0,8,0"/>
                 <Button Content="Show Plot"
-                        Command="{Binding ShowPlotCommand}"
-                        Margin="0,0,8,0"
-                        Padding="5,2"
-                        Width="90" Height="28"
-                        IsEnabled="{Binding CanExecuteShowPlot}"/>
+                    Command="{Binding ShowPlotCommand}"
+                    Margin="0,0,8,0"
+                    Padding="5,2"
+                    Width="90" Height="28"
+                    IsEnabled="{Binding CanExecuteShowPlot}"/>
                 <Button Content="Refresh Plot" 
-                        Command="{Binding RefreshPlotCommand}"
-                        Width="95" Height="28" Margin="0,0,0,0"
-                        Visibility="{Binding bPlotVis, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    Command="{Binding RefreshPlotCommand}"
+                    Width="95" Height="28" Margin="0,0,0,0"
+                    Visibility="{Binding bPlotVis, Converter={StaticResource BooleanToVisibilityConverter}}"/>
             </StackPanel>
         </Grid>
     </Grid>

@@ -320,6 +320,43 @@ namespace MAAS_SFRThelper.ViewModels
             }
         }
 
+        // Add these fields with your other private fields
+        private double _shellCV = 0;
+        private double _shellMeanDose = 0;
+        private double _shellMinDose = 0;
+        private double _shellMaxDose = 0;
+        private int _shellVoxelCount = 0;
+
+        // Add these public properties
+        public double ShellCV
+        {
+            get { return _shellCV; }
+            set { SetProperty(ref _shellCV, value); }
+        }
+
+        public double ShellMeanDose
+        {
+            get { return _shellMeanDose; }
+            set { SetProperty(ref _shellMeanDose, value); }
+        }
+
+        public double ShellMinDose
+        {
+            get { return _shellMinDose; }
+            set { SetProperty(ref _shellMinDose, value); }
+        }
+
+        public double ShellMaxDose
+        {
+            get { return _shellMaxDose; }
+            set { SetProperty(ref _shellMaxDose, value); }
+        }
+
+        public int ShellVoxelCount
+        {
+            get { return _shellVoxelCount; }
+            set { SetProperty(ref _shellVoxelCount, value); }
+        }
         // Add property to control 2D vs 3D visualization
         public bool Show3DVisualization
         {
