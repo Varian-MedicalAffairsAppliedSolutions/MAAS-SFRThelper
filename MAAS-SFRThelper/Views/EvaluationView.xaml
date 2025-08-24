@@ -231,10 +231,10 @@
                             <!-- Camera setup -->
                             <!-- In your HelixViewport3D, update the camera -->
                             <helix:HelixViewport3D.Camera>
-                                <PerspectiveCamera Position="150,150,100" 
-                                      LookDirection="-1,-1,-0.5"
-                                      UpDirection="0,0,1"
-                                      FieldOfView="60"/>
+                                <PerspectiveCamera Position="150,100,150" 
+                                  LookDirection="-1,-0.7,-1" 
+                                  UpDirection="0,1,0" 
+                                  FieldOfView="60" />
                             </helix:HelixViewport3D.Camera>
 
                             <!-- Default lighting -->
@@ -246,6 +246,7 @@
                             <!-- Bind to our 3D model -->
                             <ModelVisual3D Content="{Binding Model3DGroup}"/>
                         </helix:HelixViewport3D>
+                        
                     </Grid>
 
 

@@ -160,6 +160,39 @@ namespace MAAS_SFRThelper.ViewModels
             set { SetProperty(ref _3dModelGroup, value); }
         }
 
+        private bool _showOnionLayers = false;
+        public bool ShowOnionLayers
+        {
+            get { return _showOnionLayers; }
+            set
+            {
+                if (SetProperty(ref _showOnionLayers, value))
+                {
+                    // Recreate visualization when toggled
+                    if (_is3DVisualizationReady)
+                    {
+                        Create3DVisualization();
+                    }
+                }
+            }
+        }
+
+        private double _onionLayerOpacity = 0.5;
+        public double OnionLayerOpacity
+        {
+            get { return _onionLayerOpacity; }
+            set
+            {
+                if (SetProperty(ref _onionLayerOpacity, value))
+                {
+                    // Recreate visualization when opacity changes
+                    if (_is3DVisualizationReady && _showOnionLayers)
+                    {
+                        Create3DVisualization();
+                    }
+                }
+            }
+        }
         // Add property to control 2D vs 3D visualization
         public bool Show3DVisualization
         {
@@ -3997,11 +4030,219 @@ namespace MAAS_SFRThelper.ViewModels
                 OutputLog += $"Error adding structure mesh: {ex.Message}\n";
             }
         }
+
+
+
+
+        // Add the 3D Legend method
+        //private void Add3DLegend(Model3DGroup modelGroup, double doseMin, double doseMax)
+        //{
+        //    try
+        //    {
+        //        OutputLog += "Adding 3D dose legend...\n";
+
+        //        // Position legend to the right side
+        //        double legendX = 70;
+        //        double legendY = -40;
+        //        double legendZ = 0;
+
+        //        // Create color bar
+        //        double barHeight = 80;
+        //        double barWidth = 8;
+        //        double barDepth = 2;
+        //        int colorSteps = 20;
+
+        //        for (int i = 0; i < colorSteps; i++)
+        //        {
+        //            double norm = i / (double)(colorSteps - 1);
+        //            Color color = GetImprovedDoseColor(norm);
+
+        //            double yPos = legendY + (i / (double)colorSteps) * barHeight;
+        //            double segmentHeight = barHeight / colorSteps * 1.1; // Slight overlap
+
+        //            // Create a colored segment
+        //            var mesh = new MeshGeometry3D();
+
+        //            // Create a small box for this color segment
+        //            mesh.Positions.Add(new Point3D(legendX, yPos, legendZ));
+        //            mesh.Positions.Add(new Point3D(legendX + barWidth, yPos, legendZ));
+        //            mesh.Positions.Add(new Point3D(legendX + barWidth, yPos + segmentHeight, legendZ));
+        //            mesh.Positions.Add(new Point3D(legendX, yPos + segmentHeight, legendZ));
+
+        //            mesh.Positions.Add(new Point3D(legendX, yPos, legendZ + barDepth));
+        //            mesh.Positions.Add(new Point3D(legendX + barWidth, yPos, legendZ + barDepth));
+        //            mesh.Positions.Add(new Point3D(legendX + barWidth, yPos + segmentHeight, legendZ + barDepth));
+        //            mesh.Positions.Add(new Point3D(legendX, yPos + segmentHeight, legendZ + barDepth));
+
+        //            // Front face
+        //            mesh.TriangleIndices.Add(0); mesh.TriangleIndices.Add(1); mesh.TriangleIndices.Add(2);
+        //            mesh.TriangleIndices.Add(0); mesh.TriangleIndices.Add(2); mesh.TriangleIndices.Add(3);
+
+        //            // Back face
+        //            mesh.TriangleIndices.Add(4); mesh.TriangleIndices.Add(6); mesh.TriangleIndices.Add(5);
+        //            mesh.TriangleIndices.Add(4); mesh.TriangleIndices.Add(7); mesh.TriangleIndices.Add(6);
+
+        //            var material = new DiffuseMaterial(new SolidColorBrush(color));
+        //            modelGroup.Children.Add(new GeometryModel3D(mesh, material));
+        //        }
+
+        //        // Add tick marks at key positions
+        //        var tickPositions = new[]
+        //        {
+        //    new { pos = 0.0, label = $"{doseMin:F0}" },
+        //    new { pos = 0.25, label = $"{doseMin + 0.25*(doseMax-doseMin):F0}" },
+        //    new { pos = 0.5, label = $"{doseMin + 0.5*(doseMax-doseMin):F0}" },
+        //    new { pos = 0.75, label = $"{doseMin + 0.75*(doseMax-doseMin):F0}" },
+        //    new { pos = 1.0, label = $"{doseMax:F0}" }
+        //};
+
+        //        foreach (var tick in tickPositions)
+        //        {
+        //            double yPos = legendY + tick.pos * barHeight;
+
+        //            // Add a small tick mark
+        //            var tickLine = CreateLine(
+        //                new Point3D(legendX + barWidth, yPos, legendZ),
+        //                new Point3D(legendX + barWidth + 3, yPos, legendZ),
+        //                0.5
+        //            );
+        //            modelGroup.Children.Add(new GeometryModel3D(tickLine,
+        //                new DiffuseMaterial(new SolidColorBrush(Colors.White))));
+        //        }
+
+        //        // Add "Dose (Gy)" label as a marker
+        //        var labelMarker = CreateLine(
+        //            new Point3D(legendX + barWidth / 2, legendY + barHeight + 5, legendZ),
+        //            new Point3D(legendX + barWidth / 2, legendY + barHeight + 6, legendZ),
+        //            2
+        //        );
+        //        modelGroup.Children.Add(new GeometryModel3D(labelMarker,
+        //            new DiffuseMaterial(new SolidColorBrush(Colors.White))));
+
+        //        OutputLog += $"Legend added showing range: {doseMin:F1} - {doseMax:F1} Gy\n";
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        OutputLog += $"Error adding legend: {ex.Message}\n";
+        //    }
+        //}
+
+        private void CreateOnionLayers(Model3DGroup modelGroup, double doseMin, double doseMax,
+                               double centerX, double centerY, double centerZ,
+                               double xScale, double yScale, double zScale)
+        {
+            try
+            {
+                OutputLog += "\n=== Creating Onion Layer (Isodose) Visualization ===\n";
+
+                // Define isodose levels
+                var isodoseLevels = new[]
+                {
+            new { level = 0.95, color = Color.FromArgb(100, 255, 0, 0), name = "95%" },
+            new { level = 0.80, color = Color.FromArgb(80, 255, 128, 0), name = "80%" },
+            new { level = 0.60, color = Color.FromArgb(60, 255, 255, 0), name = "60%" },
+            new { level = 0.40, color = Color.FromArgb(40, 0, 255, 0), name = "40%" },
+            new { level = 0.20, color = Color.FromArgb(30, 0, 128, 255), name = "20%" }
+        };
+
+                foreach (var isoLevel in isodoseLevels)
+                {
+                    double targetDose = doseMin + isoLevel.level * (doseMax - doseMin);
+                    var surfaceMesh = new MeshGeometry3D();
+
+                    OutputLog += $"Creating {isoLevel.name} isodose surface at {targetDose:F1} Gy...\n";
+
+                    var surfacePoints = new List<Point3D>();
+
+                    // Sample through slices to find isodose contours
+                    for (int sliceIdx = 0; sliceIdx < _doseSlices.Count; sliceIdx += 2) // Skip every other for performance
+                    {
+                        var doseSlice = _doseSlices[sliceIdx];
+                        var structSlice = _structSlices[sliceIdx];
+                        var uGrid = _uGridSlices[sliceIdx];
+                        var vGrid = _vGridSlices[sliceIdx];
+                        var (nX, nY) = _sliceDimensions[sliceIdx];
+
+                        double originalY = _depthValues[sliceIdx];
+                        double scaledY = (originalY - centerY) * yScale;
+
+                        // Find contour at this dose level
+                        for (int i = 1; i < nX - 1; i += 2) // Skip for performance
+                        {
+                            for (int j = 1; j < nY - 1; j += 2)
+                            {
+                                if (!structSlice[i, j]) continue;
+
+                                double dose = doseSlice[i, j];
+                                if (double.IsNaN(dose)) continue;
+
+                                // Check if near the isodose level
+                                double diff = Math.Abs(dose - targetDose);
+                                double tolerance = (doseMax - doseMin) * 0.02;
+
+                                if (diff < tolerance)
+                                {
+                                    double u = uGrid[i, j];
+                                    double v = vGrid[i, j];
+                                    double scaledX = (u - centerX) * xScale;
+                                    double scaledZ = (v - centerZ) * zScale;
+
+                                    surfacePoints.Add(new Point3D(scaledX, scaledY, scaledZ));
+                                }
+                            }
+                        }
+                    }
+
+                    // Create mesh from surface points
+                    if (surfacePoints.Count > 3)
+                    {
+                        // Limit points for performance
+                        int maxPoints = Math.Min(surfacePoints.Count, 500);
+                        double pointSize = 3.0;
+
+                        for (int i = 0; i < maxPoints; i++)
+                        {
+                            var point = surfacePoints[i];
+                            int baseIdx = surfaceMesh.Positions.Count;
+
+                            // Add a small quad at this position
+                            surfaceMesh.Positions.Add(new Point3D(point.X - pointSize, point.Y, point.Z - pointSize));
+                            surfaceMesh.Positions.Add(new Point3D(point.X + pointSize, point.Y, point.Z - pointSize));
+                            surfaceMesh.Positions.Add(new Point3D(point.X + pointSize, point.Y, point.Z + pointSize));
+                            surfaceMesh.Positions.Add(new Point3D(point.X - pointSize, point.Y, point.Z + pointSize));
+
+                            surfaceMesh.TriangleIndices.Add(baseIdx);
+                            surfaceMesh.TriangleIndices.Add(baseIdx + 1);
+                            surfaceMesh.TriangleIndices.Add(baseIdx + 2);
+
+                            surfaceMesh.TriangleIndices.Add(baseIdx);
+                            surfaceMesh.TriangleIndices.Add(baseIdx + 2);
+                            surfaceMesh.TriangleIndices.Add(baseIdx + 3);
+                        }
+
+                        // Create semi-transparent material
+                        var material = new DiffuseMaterial(new SolidColorBrush(isoLevel.color));
+                        var geoModel = new GeometryModel3D(surfaceMesh, material);
+                        geoModel.BackMaterial = material;
+
+                        modelGroup.Children.Add(geoModel);
+                        OutputLog += $"  Added {maxPoints} points to {isoLevel.name} surface\n";
+                    }
+                }
+
+                OutputLog += "Onion layer visualization complete\n";
+            }
+            catch (Exception ex)
+            {
+                OutputLog += $"Error creating onion layers: {ex.Message}\n";
+            }
+        }
+        // Improved color mapping with more gradations
         private void Create3DVisualization()
         {
             try
             {
-                OutputLog += "\n=== Starting 3D Slice Stack Visualization ===\n";
+                OutputLog += "\n=== Starting Enhanced 3D Slice Stack Visualization ===\n";
 
                 if (_doseSlices == null || _doseSlices.Count == 0)
                 {
@@ -4057,7 +4298,7 @@ namespace MAAS_SFRThelper.ViewModels
                         }
                     }
 
-                    if (sliceIdx < 10 || sliceIdx % 10 == 0)  // Log first 10 and every 10th
+                    if (sliceIdx < 10 || sliceIdx % 10 == 0)
                         OutputLog += $"  Slice {sliceIdx + 1}: {pointsInSlice} dose points\n";
                 }
 
@@ -4085,7 +4326,7 @@ namespace MAAS_SFRThelper.ViewModels
 
                 allDoseValues.Sort();
 
-                // Calculate percentiles for better color mapping
+                // Helper function for percentiles
                 double GetPercentile(List<double> sortedValues, double percentile)
                 {
                     int index = (int)Math.Max(0, Math.Min(sortedValues.Count - 1,
@@ -4095,7 +4336,6 @@ namespace MAAS_SFRThelper.ViewModels
 
                 double absoluteMin = allDoseValues[0];
                 double absoluteMax = allDoseValues[allDoseValues.Count - 1];
-                double percentile1 = GetPercentile(allDoseValues, 1);
                 double percentile5 = GetPercentile(allDoseValues, 5);
                 double percentile10 = GetPercentile(allDoseValues, 10);
                 double percentile25 = GetPercentile(allDoseValues, 25);
@@ -4103,12 +4343,10 @@ namespace MAAS_SFRThelper.ViewModels
                 double percentile75 = GetPercentile(allDoseValues, 75);
                 double percentile90 = GetPercentile(allDoseValues, 90);
                 double percentile95 = GetPercentile(allDoseValues, 95);
-                double percentile99 = GetPercentile(allDoseValues, 99);
 
                 OutputLog += $"\n=== Dose Distribution Analysis ===\n";
                 OutputLog += $"Absolute: Min={absoluteMin:F2} Gy, Max={absoluteMax:F2} Gy\n";
                 OutputLog += $"Percentiles:\n";
-                OutputLog += $"  1%: {percentile1:F2} Gy\n";
                 OutputLog += $"  5%: {percentile5:F2} Gy\n";
                 OutputLog += $"  10%: {percentile10:F2} Gy\n";
                 OutputLog += $"  25%: {percentile25:F2} Gy\n";
@@ -4116,14 +4354,12 @@ namespace MAAS_SFRThelper.ViewModels
                 OutputLog += $"  75%: {percentile75:F2} Gy\n";
                 OutputLog += $"  90%: {percentile90:F2} Gy\n";
                 OutputLog += $"  95%: {percentile95:F2} Gy\n";
-                OutputLog += $"  99%: {percentile99:F2} Gy\n";
 
-                // USE PERCENTILE-BASED NORMALIZATION TO HANDLE OUTLIERS
-                double doseMin_forNormalization = percentile5;   // Ignore bottom 5% outliers
-                double doseMax_forNormalization = percentile95;  // Ignore top 5% outliers
+                // USE PERCENTILE-BASED NORMALIZATION
+                double doseMin_forNormalization = percentile5;
+                double doseMax_forNormalization = percentile95;
 
                 OutputLog += $"\nUsing percentile normalization: {doseMin_forNormalization:F2} - {doseMax_forNormalization:F2} Gy\n";
-                OutputLog += $"This ignores outliers below {percentile5:F2} and above {percentile95:F2} Gy\n";
 
                 // STEP 3: CALCULATE ADAPTIVE SCALING
                 const double TARGET_SIZE = 100.0;
@@ -4141,7 +4377,7 @@ namespace MAAS_SFRThelper.ViewModels
                 double zScale = baseScale;
 
                 // Boost thin dimensions
-                double minThreshold = maxDimension * 0.15;  // 15% threshold
+                double minThreshold = maxDimension * 0.15;
 
                 if (dataWidth > 0 && dataWidth < minThreshold)
                 {
@@ -4163,18 +4399,32 @@ namespace MAAS_SFRThelper.ViewModels
 
                 OutputLog += $"\nScale factors: X={xScale:F2}, Y={yScale:F2}, Z={zScale:F2}\n";
 
-                // STEP 4: CALCULATE APPROPRIATE DOWNSAMPLING
-                // Estimate total cells and determine downsampling
-                int avgCellsPerSlice = totalDosePoints / Math.Max(1, _doseSlices.Count);
-                int targetCellsPerSlice = 1500;  // Target for good quality
-                int maxTotalCells = 100000;      // Increased limit for full visualization
-
+                // STEP 4: IMPROVED ADAPTIVE DOWNSAMPLING
                 int downsampleStep = 1;
-                if (avgCellsPerSlice > targetCellsPerSlice)
+
+                // Progressive downsampling based on data size
+                if (totalDosePoints > 1000000)
                 {
-                    downsampleStep = (int)Math.Ceiling(Math.Sqrt((double)avgCellsPerSlice / targetCellsPerSlice));
-                    OutputLog += $"Downsampling by {downsampleStep}x (from ~{avgCellsPerSlice} to ~{avgCellsPerSlice / (downsampleStep * downsampleStep)} cells/slice)\n";
+                    downsampleStep = 4;
+                    OutputLog += "Very large dataset (>1M points) - using 4x downsampling for smooth visualization\n";
                 }
+                else if (totalDosePoints > 500000)
+                {
+                    downsampleStep = 3;
+                    OutputLog += "Large dataset (>500K points) - using 3x downsampling\n";
+                }
+                else if (totalDosePoints > 100000)
+                {
+                    downsampleStep = 2;
+                    OutputLog += "Medium dataset (>100K points) - using 2x downsampling\n";
+                }
+                else
+                {
+                    downsampleStep = 1;
+                    OutputLog += "Small dataset - no downsampling needed\n";
+                }
+
+                int maxTotalCells = 100000;  // Increased limit
 
                 // STEP 5: CREATE 3D VISUALIZATION
                 double centerX = (dataMinX + dataMaxX) / 2.0;
@@ -4185,10 +4435,11 @@ namespace MAAS_SFRThelper.ViewModels
 
                 int totalCellsCreated = 0;
                 int slicesProcessed = 0;
-                double sliceThickness = 1.0 * Math.Min(xScale, Math.Min(yScale, zScale));  // Adaptive thickness
+                double sliceThickness = 1.0 * Math.Min(xScale, Math.Min(yScale, zScale));
 
-                // Create a material cache for efficiency
+                // Material cache for efficiency
                 var materialCache = new Dictionary<Color, Material>();
+                bool useAdaptiveSampling = downsampleStep > 1;  // Enable adaptive sampling for downsampled data
 
                 for (int sliceIdx = 0; sliceIdx < _doseSlices.Count; sliceIdx++)
                 {
@@ -4198,15 +4449,13 @@ namespace MAAS_SFRThelper.ViewModels
                     var vGrid = _vGridSlices[sliceIdx];
                     var (nX, nY) = _sliceDimensions[sliceIdx];
 
-                    // Calculate scaled Y position
                     double originalY = _depthValues[sliceIdx];
                     double scaledY = (originalY - centerY) * yScale;
 
-                    // Group cells by color
                     var colorMeshes = new Dictionary<Color, MeshGeometry3D>();
                     int cellsInSlice = 0;
 
-                    // Process cells with downsampling
+                    // Process cells with improved downsampling
                     for (int i = 0; i < nX; i += downsampleStep)
                     {
                         for (int j = 0; j < nY; j += downsampleStep)
@@ -4218,62 +4467,79 @@ namespace MAAS_SFRThelper.ViewModels
                             if (double.IsNaN(dose) || dose <= 0)
                                 continue;
 
-                            // Early termination check (but with much higher limit)
                             if (totalCellsCreated >= maxTotalCells)
                             {
                                 OutputLog += $"  Reached cell limit ({maxTotalCells}) at slice {sliceIdx + 1}\n";
                                 goto FinishSlices;
                             }
 
-                            // Get coordinates and scale
+                            // Adaptive sampling: check if near boundary for smoother edges
+                            bool nearBoundary = false;
+                            if (useAdaptiveSampling)
+                            {
+                                // Check neighbors
+                                for (int di = -1; di <= 1 && !nearBoundary; di++)
+                                {
+                                    for (int dj = -1; dj <= 1 && !nearBoundary; dj++)
+                                    {
+                                        int ni = i + di;
+                                        int nj = j + dj;
+                                        if (ni >= 0 && ni < nX && nj >= 0 && nj < nY)
+                                        {
+                                            if (!structSlice[ni, nj])
+                                            {
+                                                nearBoundary = true;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Use finer resolution near boundaries
+                            double cellSizeFactor = nearBoundary ? 0.5 : 1.0;
+
                             double u = uGrid[i, j];
                             double v = vGrid[i, j];
                             double scaledX = (u - centerX) * xScale;
                             double scaledZ = (v - centerZ) * zScale;
 
-                            // Calculate cell size
+                            // Calculate adaptive cell size
                             double cellWidth = 2.0 * xScale;
                             double cellHeight = 2.0 * zScale;
 
-                            if (i + downsampleStep < nX && !double.IsNaN(uGrid[i + downsampleStep, j]))
-                                cellWidth = Math.Abs(uGrid[i + downsampleStep, j] - u) * xScale;
-                            if (j + downsampleStep < nY && !double.IsNaN(vGrid[i, j + downsampleStep]))
-                                cellHeight = Math.Abs(vGrid[i, j + downsampleStep] - v) * zScale;
+                            if (i + 1 < nX && !double.IsNaN(uGrid[i + 1, j]))
+                                cellWidth = Math.Abs(uGrid[i + 1, j] - u) * xScale;
+                            if (j + 1 < nY && !double.IsNaN(vGrid[i, j + 1]))
+                                cellHeight = Math.Abs(vGrid[i, j + 1] - v) * zScale;
 
-                            // Account for downsampling
-                            cellWidth *= downsampleStep * 1.05;  // Slight overlap
-                            cellHeight *= downsampleStep * 1.05;
+                            // Apply downsampling and boundary adjustment
+                            cellWidth *= downsampleStep * 1.05 * cellSizeFactor;
+                            cellHeight *= downsampleStep * 1.05 * cellSizeFactor;
 
-                            // PERCENTILE-BASED COLOR NORMALIZATION
+                            // Percentile-based color normalization
                             double normalizedDose = (dose - doseMin_forNormalization) /
                                                   (doseMax_forNormalization - doseMin_forNormalization);
-                            normalizedDose = Math.Max(0, Math.Min(1, normalizedDose));  // Clamp to 0-1
+                            normalizedDose = Math.Max(0, Math.Min(1, normalizedDose));
 
-                            // Get color using improved mapping
                             Color cellColor = GetImprovedDoseColor(normalizedDose);
 
-                            // Get or create mesh for this color
                             if (!colorMeshes.ContainsKey(cellColor))
                                 colorMeshes[cellColor] = new MeshGeometry3D();
 
                             var mesh = colorMeshes[cellColor];
-
-                            // Create thin box (6 faces, 8 vertices)
                             int baseIndex = mesh.Positions.Count;
 
-                            // Bottom face vertices
+                            // Create thin box
                             mesh.Positions.Add(new Point3D(scaledX - cellWidth / 2, scaledY - sliceThickness / 2, scaledZ - cellHeight / 2));
                             mesh.Positions.Add(new Point3D(scaledX + cellWidth / 2, scaledY - sliceThickness / 2, scaledZ - cellHeight / 2));
                             mesh.Positions.Add(new Point3D(scaledX + cellWidth / 2, scaledY - sliceThickness / 2, scaledZ + cellHeight / 2));
                             mesh.Positions.Add(new Point3D(scaledX - cellWidth / 2, scaledY - sliceThickness / 2, scaledZ + cellHeight / 2));
 
-                            // Top face vertices
                             mesh.Positions.Add(new Point3D(scaledX - cellWidth / 2, scaledY + sliceThickness / 2, scaledZ - cellHeight / 2));
                             mesh.Positions.Add(new Point3D(scaledX + cellWidth / 2, scaledY + sliceThickness / 2, scaledZ - cellHeight / 2));
                             mesh.Positions.Add(new Point3D(scaledX + cellWidth / 2, scaledY + sliceThickness / 2, scaledZ + cellHeight / 2));
                             mesh.Positions.Add(new Point3D(scaledX - cellWidth / 2, scaledY + sliceThickness / 2, scaledZ + cellHeight / 2));
 
-                            // Add triangles for visible faces (top and bottom)
                             // Top face
                             mesh.TriangleIndices.Add(baseIndex + 4);
                             mesh.TriangleIndices.Add(baseIndex + 5);
@@ -4300,14 +4566,12 @@ namespace MAAS_SFRThelper.ViewModels
                     {
                         if (kvp.Value.Positions.Count > 0)
                         {
-                            // Get or create material from cache
                             if (!materialCache.ContainsKey(kvp.Key))
                             {
                                 var material = new MaterialGroup();
                                 material.Children.Add(new DiffuseMaterial(new SolidColorBrush(kvp.Key)));
 
-                                // Add emissive for high dose regions
-                                if (kvp.Key == Colors.Red || kvp.Key == Colors.OrangeRed || kvp.Key == Colors.Orange)
+                                if (kvp.Key == Colors.Red || kvp.Key == Colors.OrangeRed || kvp.Key == Colors.DarkRed)
                                 {
                                     material.Children.Add(new EmissiveMaterial(
                                         new SolidColorBrush(Color.FromArgb(40, kvp.Key.R, kvp.Key.G, kvp.Key.B))));
@@ -4316,14 +4580,13 @@ namespace MAAS_SFRThelper.ViewModels
                             }
 
                             var geoModel = new GeometryModel3D(kvp.Value, materialCache[kvp.Key]);
-                            geoModel.BackMaterial = materialCache[kvp.Key];  // Double-sided
+                            geoModel.BackMaterial = materialCache[kvp.Key];
                             modelGroup.Children.Add(geoModel);
                         }
                     }
 
                     slicesProcessed++;
 
-                    // Log progress for large datasets
                     if (sliceIdx == 0 || (sliceIdx + 1) % 10 == 0 || sliceIdx == _doseSlices.Count - 1)
                     {
                         OutputLog += $"  Processed slice {sliceIdx + 1}/{_doseSlices.Count}: {cellsInSlice} cells\n";
@@ -4332,10 +4595,12 @@ namespace MAAS_SFRThelper.ViewModels
 
             FinishSlices:
 
-                // STEP 6: ADD REFERENCE GEOMETRY
+                // STEP 6: ADD 3D LEGEND
+                Add3DLegend(modelGroup, doseMin_forNormalization, doseMax_forNormalization);
+
+                // STEP 7: ADD REFERENCE GEOMETRY
                 OutputLog += "\nAdding reference geometry...\n";
 
-                // Add coordinate axes
                 double axisLength = TARGET_SIZE * 0.6;
 
                 // X-axis (Red)
@@ -4359,7 +4624,15 @@ namespace MAAS_SFRThelper.ViewModels
                 zMaterial.Children.Add(new EmissiveMaterial(new SolidColorBrush(Color.FromRgb(0, 0, 50))));
                 modelGroup.Children.Add(new GeometryModel3D(zAxis, zMaterial));
 
-                // STEP 7: FINAL STATISTICS
+                // STEP 8: OPTIONALLY ADD ONION LAYERS (if you have a ShowOnionLayers property)
+                // Uncomment this if you want onion layers:
+                if (ShowOnionLayers)
+                {
+                    CreateOnionLayers(modelGroup, doseMin_forNormalization, doseMax_forNormalization,
+                                     centerX, centerY, centerZ, xScale, yScale, zScale);
+                }
+
+                // STEP 9: FINAL STATISTICS
                 OutputLog += $"\n=== Visualization Statistics ===\n";
                 OutputLog += $"Slices processed: {slicesProcessed}/{_doseSlices.Count}\n";
                 OutputLog += $"Total cells created: {totalCellsCreated}\n";
@@ -4389,7 +4662,8 @@ namespace MAAS_SFRThelper.ViewModels
                 OutputLog += "\n=== Visualization Complete ===\n";
                 OutputLog += $"Visual size: {dataWidth * xScale:F1} x {dataThickness * yScale:F1} x {dataHeight * zScale:F1} units\n";
                 OutputLog += $"Actual size: {dataWidth:F1} x {dataThickness:F1} x {dataHeight:F1} mm\n";
-                OutputLog += $"Dose normalization: {doseMin_forNormalization:F2} - {doseMax_forNormalization:F2} Gy\n";
+                OutputLog += $"Dose range: {doseMin_forNormalization:F2} - {doseMax_forNormalization:F2} Gy\n";
+                OutputLog += "Legend added on right side\n";
                 OutputLog += "Use mouse to rotate/zoom/pan the view\n";
             }
             catch (Exception ex)
@@ -4398,34 +4672,124 @@ namespace MAAS_SFRThelper.ViewModels
                 OutputLog += $"Stack trace: {ex.StackTrace}\n";
             }
         }
+        // Add the 3D Legend method
+        private void Add3DLegend(Model3DGroup modelGroup, double doseMin, double doseMax)
+        {
+            try
+            {
+                OutputLog += "Adding 3D dose legend...\n";
 
-        // Improved color mapping with more gradations
+                // Position legend to the right side
+                double legendX = 70;
+                double legendY = -40;
+                double legendZ = 0;
+
+                // Create color bar
+                double barHeight = 80;
+                double barWidth = 8;
+                double barDepth = 2;
+                int colorSteps = 20;
+
+                for (int i = 0; i < colorSteps; i++)
+                {
+                    double norm = i / (double)(colorSteps - 1);
+                    Color color = GetImprovedDoseColor(norm);
+
+                    double yPos = legendY + (i / (double)colorSteps) * barHeight;
+                    double segmentHeight = barHeight / colorSteps * 1.1; // Slight overlap
+
+                    // Create a colored segment
+                    var mesh = new MeshGeometry3D();
+
+                    // Create a small box for this color segment
+                    mesh.Positions.Add(new Point3D(legendX, yPos, legendZ));
+                    mesh.Positions.Add(new Point3D(legendX + barWidth, yPos, legendZ));
+                    mesh.Positions.Add(new Point3D(legendX + barWidth, yPos + segmentHeight, legendZ));
+                    mesh.Positions.Add(new Point3D(legendX, yPos + segmentHeight, legendZ));
+
+                    mesh.Positions.Add(new Point3D(legendX, yPos, legendZ + barDepth));
+                    mesh.Positions.Add(new Point3D(legendX + barWidth, yPos, legendZ + barDepth));
+                    mesh.Positions.Add(new Point3D(legendX + barWidth, yPos + segmentHeight, legendZ + barDepth));
+                    mesh.Positions.Add(new Point3D(legendX, yPos + segmentHeight, legendZ + barDepth));
+
+                    // Front face
+                    mesh.TriangleIndices.Add(0); mesh.TriangleIndices.Add(1); mesh.TriangleIndices.Add(2);
+                    mesh.TriangleIndices.Add(0); mesh.TriangleIndices.Add(2); mesh.TriangleIndices.Add(3);
+
+                    // Back face
+                    mesh.TriangleIndices.Add(4); mesh.TriangleIndices.Add(6); mesh.TriangleIndices.Add(5);
+                    mesh.TriangleIndices.Add(4); mesh.TriangleIndices.Add(7); mesh.TriangleIndices.Add(6);
+
+                    var material = new DiffuseMaterial(new SolidColorBrush(color));
+                    modelGroup.Children.Add(new GeometryModel3D(mesh, material));
+                }
+
+                // Add tick marks at key positions
+                var tickPositions = new[]
+                {
+            new { pos = 0.0, label = $"{doseMin:F0}" },
+            new { pos = 0.25, label = $"{doseMin + 0.25*(doseMax-doseMin):F0}" },
+            new { pos = 0.5, label = $"{doseMin + 0.5*(doseMax-doseMin):F0}" },
+            new { pos = 0.75, label = $"{doseMin + 0.75*(doseMax-doseMin):F0}" },
+            new { pos = 1.0, label = $"{doseMax:F0}" }
+        };
+
+                foreach (var tick in tickPositions)
+                {
+                    double yPos = legendY + tick.pos * barHeight;
+
+                    // Add a small tick mark
+                    var tickLine = CreateLine(
+                        new Point3D(legendX + barWidth, yPos, legendZ),
+                        new Point3D(legendX + barWidth + 3, yPos, legendZ),
+                        0.5
+                    );
+                    modelGroup.Children.Add(new GeometryModel3D(tickLine,
+                        new DiffuseMaterial(new SolidColorBrush(Colors.White))));
+                }
+
+                // Add "Dose (Gy)" label as a marker
+                var labelMarker = CreateLine(
+                    new Point3D(legendX + barWidth / 2, legendY + barHeight + 5, legendZ),
+                    new Point3D(legendX + barWidth / 2, legendY + barHeight + 6, legendZ),
+                    2
+                );
+                modelGroup.Children.Add(new GeometryModel3D(labelMarker,
+                    new DiffuseMaterial(new SolidColorBrush(Colors.White))));
+
+                OutputLog += $"Legend added showing range: {doseMin:F1} - {doseMax:F1} Gy\n";
+            }
+            catch (Exception ex)
+            {
+                OutputLog += $"Error adding legend: {ex.Message}\n";
+            }
+        }
+
+        // Keep your existing GetImprovedDoseColor method
         private Color GetImprovedDoseColor(double normalizedDose)
         {
-            // Ensure value is in 0-1 range
             normalizedDose = Math.Max(0, Math.Min(1, normalizedDose));
 
-            // More gradual color transitions for better visualization
-            if (normalizedDose >= 0.95) return Colors.DarkRed;        // Top 5%
-            if (normalizedDose >= 0.90) return Colors.Red;            // 90-95%
-            if (normalizedDose >= 0.85) return Colors.OrangeRed;      // 85-90%
-            if (normalizedDose >= 0.80) return Colors.DarkOrange;     // 80-85%
-            if (normalizedDose >= 0.75) return Colors.Orange;         // 75-80%
-            if (normalizedDose >= 0.70) return Colors.Gold;           // 70-75%
-            if (normalizedDose >= 0.65) return Colors.Goldenrod;      // 65-70%
-            if (normalizedDose >= 0.60) return Colors.Yellow;         // 60-65%
-            if (normalizedDose >= 0.55) return Colors.GreenYellow;    // 55-60%
-            if (normalizedDose >= 0.50) return Colors.LawnGreen;      // 50-55%
-            if (normalizedDose >= 0.45) return Colors.LightGreen;     // 45-50%
-            if (normalizedDose >= 0.40) return Colors.MediumSeaGreen; // 40-45%
-            if (normalizedDose >= 0.35) return Colors.SeaGreen;       // 35-40%
-            if (normalizedDose >= 0.30) return Colors.DarkSeaGreen;   // 30-35%
-            if (normalizedDose >= 0.25) return Colors.CadetBlue;      // 25-30%
-            if (normalizedDose >= 0.20) return Colors.LightBlue;      // 20-25%
-            if (normalizedDose >= 0.15) return Colors.SkyBlue;        // 15-20%
-            if (normalizedDose >= 0.10) return Colors.DeepSkyBlue;    // 10-15%
-            if (normalizedDose >= 0.05) return Colors.DodgerBlue;     // 5-10%
-            return Colors.Blue;                                        // Bottom 5%
+            if (normalizedDose >= 0.95) return Colors.DarkRed;
+            if (normalizedDose >= 0.90) return Colors.Red;
+            if (normalizedDose >= 0.85) return Colors.OrangeRed;
+            if (normalizedDose >= 0.80) return Colors.DarkOrange;
+            if (normalizedDose >= 0.75) return Colors.Orange;
+            if (normalizedDose >= 0.70) return Colors.Gold;
+            if (normalizedDose >= 0.65) return Colors.Goldenrod;
+            if (normalizedDose >= 0.60) return Colors.Yellow;
+            if (normalizedDose >= 0.55) return Colors.GreenYellow;
+            if (normalizedDose >= 0.50) return Colors.LawnGreen;
+            if (normalizedDose >= 0.45) return Colors.LightGreen;
+            if (normalizedDose >= 0.40) return Colors.MediumSeaGreen;
+            if (normalizedDose >= 0.35) return Colors.SeaGreen;
+            if (normalizedDose >= 0.30) return Colors.DarkSeaGreen;
+            if (normalizedDose >= 0.25) return Colors.CadetBlue;
+            if (normalizedDose >= 0.20) return Colors.LightBlue;
+            if (normalizedDose >= 0.15) return Colors.SkyBlue;
+            if (normalizedDose >= 0.10) return Colors.DeepSkyBlue;
+            if (normalizedDose >= 0.05) return Colors.DodgerBlue;
+            return Colors.Blue;
         }
         // Simple sphere helper
         private MeshGeometry3D CreateSimpleSphere(double cx, double cy, double cz, double radius)
@@ -4682,70 +5046,6 @@ namespace MAAS_SFRThelper.ViewModels
             return mesh;
         }
 
-        // Simplified sphere creation without VVector
-        //private MeshGeometry3D CreateSimpleSphere(double cx, double cy, double cz, double radius)
-        //{
-        //    var mesh = new MeshGeometry3D();
-        //    int divisions = 6; // Even fewer divisions for performance
-
-        //    // Create vertices
-        //    for (int lat = 0; lat <= divisions; lat++)
-        //    {
-        //        double theta = lat * Math.PI / divisions;
-        //        double sinTheta = Math.Sin(theta);
-        //        double cosTheta = Math.Cos(theta);
-
-        //        for (int lon = 0; lon <= divisions; lon++)
-        //        {
-        //            double phi = lon * 2 * Math.PI / divisions;
-        //            double sinPhi = Math.Sin(phi);
-        //            double cosPhi = Math.Cos(phi);
-
-        //            double x = cx + radius * sinTheta * cosPhi;
-        //            double y = cy + radius * sinTheta * sinPhi;
-        //            double z = cz + radius * cosTheta;
-
-        //            mesh.Positions.Add(new Point3D(x, y, z));
-        //        }
-        //    }
-
-        //    // Create triangles
-        //    for (int lat = 0; lat < divisions; lat++)
-        //    {
-        //        for (int lon = 0; lon < divisions; lon++)
-        //        {
-        //            int first = lat * (divisions + 1) + lon;
-        //            int second = first + divisions + 1;
-
-        //            // Two triangles per quad
-        //            mesh.TriangleIndices.Add(first);
-        //            mesh.TriangleIndices.Add(second);
-        //            mesh.TriangleIndices.Add(first + 1);
-
-        //            mesh.TriangleIndices.Add(second);
-        //            mesh.TriangleIndices.Add(second + 1);
-        //            mesh.TriangleIndices.Add(first + 1);
-        //        }
-        //    }
-
-        //    return mesh;
-        //}
-        // Color helper
-        //private Color GetDoseColor(double normalizedDose)
-        //{
-        //    // Use more gradual transitions for better visualization
-        //    if (normalizedDose > 0.95) return Colors.Red;
-        //    if (normalizedDose > 0.85) return Colors.OrangeRed;
-        //    if (normalizedDose > 0.75) return Colors.Orange;
-        //    if (normalizedDose > 0.65) return Colors.Gold;
-        //    if (normalizedDose > 0.55) return Colors.Yellow;
-        //    if (normalizedDose > 0.45) return Colors.GreenYellow;
-        //    if (normalizedDose > 0.35) return Colors.LightGreen;
-        //    if (normalizedDose > 0.25) return Colors.MediumSeaGreen;
-        //    if (normalizedDose > 0.15) return Colors.LightBlue;
-        //    if (normalizedDose > 0.05) return Colors.SkyBlue;
-        //    return Colors.Blue;
-        //}
 
         // Helper method to create a cube mesh
         private MeshGeometry3D CreateCube(VVector center, double size)
