@@ -391,37 +391,73 @@
 
             <!-- Onion Layer Controls -->
             <CheckBox Content="Show Onion Layers" 
-                      IsChecked="{Binding ShowOnionLayers}"
-                      VerticalAlignment="Center" Margin="5"/>
+              IsChecked="{Binding ShowOnionLayers}"
+              VerticalAlignment="Center" Margin="5"/>
 
-            <Label Content="Opacity:" VerticalAlignment="Center" Margin="5,0,0,0"
-                   Visibility="{Binding ShowOnionLayers, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+            <!-- Shell Selection Controls - Only visible when ShowOnionLayers is true -->
+            <StackPanel Orientation="Horizontal" 
+                Visibility="{Binding ShowOnionLayers, Converter={StaticResource BooleanToVisibilityConverter}}">
 
-            <Slider Width="100" Minimum="0.1" Maximum="1.0" 
-                    Value="{Binding OnionLayerOpacity}"
-                    VerticalAlignment="Center" Margin="5"
-                    Visibility="{Binding ShowOnionLayers, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                <Separator Margin="10,0" Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}"/>
 
-            <TextBlock Text="{Binding OnionLayerOpacity, StringFormat={}{0:P0}}"
-                       VerticalAlignment="Center" Width="40" Margin="0,0,10,0"
-                       Visibility="{Binding ShowOnionLayers, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                <Label Content="Shell Depth:" VerticalAlignment="Center" Margin="5,0,0,0"/>
+
+                <Button Content="◄" Command="{Binding PreviousShellCommand}" 
+                Padding="6,4" Margin="2" Width="30"
+                ToolTip="Previous Shell"/>
+
+                <Slider Width="150" 
+                Minimum="0" Maximum="{Binding MaxShellIndex}"
+                Value="{Binding CurrentShellIndex}"
+                TickFrequency="1" IsSnapToTickEnabled="True"
+                VerticalAlignment="Center" Margin="5"/>
+
+                <Button Content="►" Command="{Binding NextShellCommand}"
+                Padding="6,4" Margin="2" Width="30"
+                ToolTip="Next Shell"/>
+
+                <TextBlock Text="{Binding ShellDisplayText}"
+                   VerticalAlignment="Center" 
+                   FontWeight="Bold" Margin="10,0"/>
+            </StackPanel>
 
             <Separator Margin="10,0" Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}"/>
 
             <!-- View Control Buttons -->
             <Button Content="Reset View" Click="ResetView_Click" 
-                    ToolTip="Reset camera to default (Home key)" 
-                    Padding="8,3" Margin="5"/>
+            ToolTip="Reset camera to default (Home key)" 
+            Padding="8,3" Margin="5"/>
 
             <Button Content="Fit View" 
-                Click="FitView_Click"
-                ToolTip="Zoom to fit all content (F key)" 
-                Padding="8,3" Margin="5"/>
+            Click="FitView_Click"
+            ToolTip="Zoom to fit all content (F key)" 
+            Padding="8,3" Margin="5"/>
 
             <Button Content="Export 3D" Click="Export3D_Click" 
-                    ToolTip="Save 3D view as image" 
-                    Padding="8,3" Margin="5"/>
+            ToolTip="Save 3D view as image" 
+            Padding="8,3" Margin="5"/>
         </StackPanel>
+
+        <!-- Heterogeneity display - Row 5 -->
+        <TextBlock Grid.Row="5" Text="{Binding ShellHeterogeneityText}"
+           HorizontalAlignment="Center"
+           FontStyle="Italic" Margin="0,2,0,5">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding Is3DInterpolationSelected}" Value="True"/>
+                                <Condition Binding="{Binding bPlotVis}" Value="True"/>
+                                <Condition Binding="{Binding ShowOnionLayers}" Value="True"/>
+                            </MultiDataTrigger.Conditions>
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </MultiDataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
 
         <!-- View Toggle and Action Buttons (Row 6) -->
         <Grid Grid.Row="6" Margin="0,0,0,0">
