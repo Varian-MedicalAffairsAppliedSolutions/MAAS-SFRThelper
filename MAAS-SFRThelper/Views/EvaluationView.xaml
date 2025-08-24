@@ -6,9 +6,12 @@
              xmlns:local="clr-namespace:MAAS_SFRThelper.Views"
              xmlns:viewmodels="clr-namespace:MAAS_SFRThelper.ViewModels"
              xmlns:system="clr-namespace:System;assembly=mscorlib"
-             
+             xmlns:helix="http://helix-toolkit.org/wpf"
              mc:Ignorable="d"
-             d:DesignHeight="650" d:DesignWidth="900" Background="GhostWhite">
+             d:DesignHeight="650" d:DesignWidth="900" 
+             Background="GhostWhite"
+             PreviewKeyDown="UserControl_PreviewKeyDown"
+             Focusable="True">
 
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
@@ -24,9 +27,12 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <!-- Row 2 - we'll use this for 3D buttons -->
             <RowDefinition Height="*"/>
+            <RowDefinition Height="10"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="10"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
@@ -58,19 +64,15 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <!-- *** CHANGED: Added disable triggers for 3D modes *** -->
             <!-- Evaluation Mode Selection -->
             <StackPanel Grid.Column="0" Margin="0,0,10,0">
-                <!-- This Style section controls enable/disable behavior -->
                 <StackPanel.Style>
                     <Style TargetType="StackPanel">
                         <Style.Triggers>
-                            <!-- Disable when 3D Dose Metrics is selected -->
                             <DataTrigger Binding="{Binding Is3DEvaluationSelected}" Value="True">
                                 <Setter Property="Opacity" Value="0.3"/>
                                 <Setter Property="IsEnabled" Value="False"/>
                             </DataTrigger>
-                            <!-- Disable when 3D P/V Interpolation is selected -->
                             <DataTrigger Binding="{Binding Is3DInterpolationSelected}" Value="True">
                                 <Setter Property="Opacity" Value="0.3"/>
                                 <Setter Property="IsEnabled" Value="False"/>
@@ -98,15 +100,29 @@
                           Margin="0,0,0,10"/>
             </StackPanel>
 
-            <!-- *** CHANGED: Added Is3DInterpolationSelected trigger *** -->
             <!-- Beam Dropdown -->
             <StackPanel Grid.Column="2" Margin="10,0,0,0">
+                <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Is3DEvaluationSelected}" Value="True">
+                                <Setter Property="Opacity" Value="0.3"/>
+                                <Setter Property="IsEnabled" Value="False"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Is3DInterpolationSelected}" Value="True">
+                                <Setter Property="Opacity" Value="0.3"/>
+                                <Setter Property="IsEnabled" Value="False"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
+
                 <CheckBox x:Name="CacheAllBeamsCheckBox" 
-                            Content="Cache All Beams" 
-                            IsChecked="{Binding CacheAllBeams}"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Top"
-                            Margin="0,0,5,5"/>
+                          Content="Cache All Beams" 
+                          IsChecked="{Binding CacheAllBeams}"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Top"
+                          Margin="0,0,5,5"/>
                 <TextBlock Text="Select Treatment Beam:"
                            FontWeight="SemiBold"
                            Margin="0,0,0,5"
@@ -115,23 +131,40 @@
                           SelectedItem="{Binding SelectedBeamId}"
                           Width="180"
                           Margin="0,0,0,10"/>
-                <StackPanel.Style>
-                    <Style TargetType="StackPanel">
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding Is3DEvaluationSelected}" Value="True">
-                                <Setter Property="Opacity" Value="0.3"/>
-                                <Setter Property="IsEnabled" Value="False"/>
-                            </DataTrigger>
-                            <!-- NEW TRIGGER for 3D P/V Interpolation -->
-                            <DataTrigger Binding="{Binding Is3DInterpolationSelected}" Value="True">
-                                <Setter Property="Opacity" Value="0.3"/>
-                                <Setter Property="IsEnabled" Value="False"/>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </StackPanel.Style>
             </StackPanel>
         </Grid>
+
+        <!-- 3D View Control Buttons - Row 2 (NEW LOCATION) -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,5,0,10">
+            <StackPanel.Style>
+                <Style TargetType="StackPanel">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding Is3DInterpolationSelected}" Value="True"/>
+                                <Condition Binding="{Binding bPlotVis}" Value="True"/>
+                            </MultiDataTrigger.Conditions>
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </MultiDataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </StackPanel.Style>
+
+            <Button Content="Reset View" Click="ResetView_Click" 
+         ToolTip="Reset camera to default (Home key)" 
+         Padding="8,3" Margin="5"/>
+
+            <Button Content="Fit View" 
+         Click="FitView_Click"
+         ToolTip="Zoom to fit all content (F key)" 
+         Padding="8,3" Margin="5"/>
+
+            <Button Content="Export 3D" Click="Export3D_Click" 
+         ToolTip="Save 3D view as image" 
+         Padding="8,3" Margin="5"/>
+        </StackPanel>
+
 
         <!-- Output Log and Plot Area -->
         <Border Grid.Row="3" BorderBrush="LightGray" BorderThickness="1" Margin="0,0,0,10" Height="370" Padding="5">
@@ -175,6 +208,7 @@
                     </TabControl>
                 </ScrollViewer>
 
+                
                 <!-- Plot View with Canvas and Vertical Slider -->
                 <Grid Visibility="{Binding bPlotVis, Converter={StaticResource BooleanToVisibilityConverter}}"
                       Panel.ZIndex="0">
@@ -183,15 +217,143 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Plot Canvas with proper margins for axis labels -->
+                    <!-- Plot area that can show either 2D or 3D -->
                     <Grid Grid.Column="0" Margin="10,10,5,40">
+                        <!-- 2D Canvas (shown for 1D and 2D modes) -->
                         <Canvas x:Name="PlotCanvas"
                                 Background="White"
                                 HorizontalAlignment="Stretch"
-                                VerticalAlignment="Stretch"/>
+                                VerticalAlignment="Stretch">
+                            <Canvas.Style>
+                                <Style TargetType="Canvas">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Style.Triggers>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding Is3DInterpolationSelected}" Value="True"/>
+                                                <Condition Binding="{Binding bPlotVis}" Value="True"/>
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Canvas.Style>
+                        </Canvas>
+
+                        <!-- 3D Viewport (shown for 3D P/V mode) -->
+                        <helix:HelixViewport3D x:Name="Viewport3D"
+                       Background="WhiteSmoke"
+                       ShowFrameRate="False"
+                       ShowCoordinateSystem="True"
+                       ShowCameraInfo="False"
+                       IsHeadLightEnabled="True"
+                       ZoomSensitivity="1.0"
+                       RotationSensitivity="1.0">
+                            <helix:HelixViewport3D.Style>
+                                <Style TargetType="helix:HelixViewport3D">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding Is3DInterpolationSelected}" Value="True"/>
+                                                <Condition Binding="{Binding bPlotVis}" Value="True"/>
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </helix:HelixViewport3D.Style>
+
+                            <!-- Better camera angle -->
+                            <helix:HelixViewport3D.Camera>
+                                <PerspectiveCamera Position="120,80,120" 
+                                                  LookDirection="-1,-0.6,-1" 
+                                                  UpDirection="0,1,0" 
+                                                  FieldOfView="60" />
+                            </helix:HelixViewport3D.Camera>
+
+                            <!-- Lighting -->
+                            <helix:DefaultLights/>
+
+                            <!-- Grid for reference (smaller, more subtle) -->
+                            <helix:GridLinesVisual3D Width="200" Length="200" 
+                                                    MinorDistance="10" MajorDistance="50" 
+                                                    Thickness="0.1" Fill="LightGray"/>
+
+                            <!-- 3D model content -->
+                            <ModelVisual3D Content="{Binding Model3DGroup}"/>
+                        </helix:HelixViewport3D>
+
+                        <!-- Legend Canvas - only visible in 3D mode -->
+                        <Canvas x:Name="LegendCanvas" IsHitTestVisible="False" 
+                                HorizontalAlignment="Right" VerticalAlignment="Center"
+                                Width="120" Height="250" Margin="0,0,10,0">
+                            <Canvas.Style>
+                                <Style TargetType="Canvas">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding Is3DInterpolationSelected}" Value="True"/>
+                                                <Condition Binding="{Binding bPlotVis}" Value="True"/>
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Canvas.Style>
+
+                            <!-- Legend background -->
+                            <Border Background="White" Opacity="0.8" 
+                                    BorderBrush="Gray" BorderThickness="1"
+                                    Width="110" Height="240"
+                                    Canvas.Left="5" Canvas.Top="5"
+                                    CornerRadius="3"/>
+
+                            <!-- Legend Title -->
+                            <TextBlock Text="Dose (Gy)" FontWeight="Bold" FontSize="12"
+                                       Canvas.Left="35" Canvas.Top="10"/>
+
+                            <!-- Legend color bar placeholder -->
+                            <Rectangle Width="20" Height="180"
+                                       Canvas.Left="20" Canvas.Top="35">
+                                <Rectangle.Fill>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                        <GradientStop Color="DarkRed" Offset="0"/>
+                                        <GradientStop Color="Red" Offset="0.1"/>
+                                        <GradientStop Color="Orange" Offset="0.3"/>
+                                        <GradientStop Color="Yellow" Offset="0.5"/>
+                                        <GradientStop Color="LightGreen" Offset="0.7"/>
+                                        <GradientStop Color="LightBlue" Offset="0.9"/>
+                                        <GradientStop Color="Blue" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Rectangle.Fill>
+                            </Rectangle>
+
+                            <!-- Legend Labels with tick marks -->
+                            <Line X1="40" Y1="35" X2="45" Y2="35" Stroke="Black" StrokeThickness="1"/>
+                            <TextBlock Text="{Binding LegendMaxText}" FontSize="10"
+                                       Canvas.Left="48" Canvas.Top="30"/>
+
+                            <Line X1="40" Y1="80" X2="45" Y2="80" Stroke="Black" StrokeThickness="1"/>
+                            <TextBlock Text="{Binding Legend75Text}" FontSize="10"
+                                       Canvas.Left="48" Canvas.Top="75"/>
+
+                            <Line X1="40" Y1="125" X2="45" Y2="125" Stroke="Black" StrokeThickness="1"/>
+                            <TextBlock Text="{Binding Legend50Text}" FontSize="10"
+                                       Canvas.Left="48" Canvas.Top="120"/>
+
+                            <Line X1="40" Y1="170" X2="45" Y2="170" Stroke="Black" StrokeThickness="1"/>
+                            <TextBlock Text="{Binding Legend25Text}" FontSize="10"
+                                       Canvas.Left="48" Canvas.Top="165"/>
+
+                            <Line X1="40" Y1="215" X2="45" Y2="215" Stroke="Black" StrokeThickness="1"/>
+                            <TextBlock Text="{Binding LegendMinText}" FontSize="10"
+                                       Canvas.Left="48" Canvas.Top="210"/>
+                        </Canvas>
                     </Grid>
 
-                    <!-- Vertical Depth Controls on the right -->
+                    <!-- Vertical Depth Controls for 2D mode (right side) -->
                     <StackPanel Grid.Column="1" 
                                 Orientation="Vertical" 
                                 Margin="0,30,10,50"
@@ -208,23 +370,13 @@
                             </Style>
                         </StackPanel.Style>
 
-                        <!-- Entry label at top -->
-                        <TextBlock Text="Entry" 
-                                   HorizontalAlignment="Center" 
-                                   FontSize="11" 
-                                   Margin="0,0,0,5"/>
+                        <TextBlock Text="Entry" HorizontalAlignment="Center" FontSize="11" Margin="0,0,0,5"/>
 
-                        <!-- Up navigation button -->
-                        <Button Content="▲" 
-                                Margin="0,0,0,5" 
-                                Padding="6,4" 
-                                FontSize="10"
+                        <Button Content="▲" Margin="0,0,0,5" Padding="6,4" FontSize="10"
                                 Command="{Binding PreviousDepthCommand}" 
                                 IsEnabled="{Binding CanGoToPreviousDepth}"
-                                ToolTip="Previous Slice"
-                                Width="30"/>
+                                ToolTip="Previous Slice" Width="30"/>
 
-                        <!-- Vertical Slider -->
                         <Slider Orientation="Vertical"
                                 Minimum="0" 
                                 Maximum="{Binding MaxDepthIndex}"
@@ -237,80 +389,131 @@
                                 IsDirectionReversed="True"
                                 ToolTip="{Binding DepthDisplayText}"/>
 
-                        <!-- Down navigation button -->
-                        <Button Content="▼" 
-                                Margin="0,5,0,0" 
-                                Padding="6,4" 
-                                FontSize="10"
+                        <Button Content="▼" Margin="0,5,0,0" Padding="6,4" FontSize="10"
                                 Command="{Binding NextDepthCommand}" 
                                 IsEnabled="{Binding CanGoToNextDepth}"
-                                ToolTip="Next Slice"
-                                Width="30"/>
+                                ToolTip="Next Slice" Width="30"/>
 
-                        <!-- Exit label at bottom -->
-                        <TextBlock Text="Exit" 
-                                   HorizontalAlignment="Center" 
-                                   FontSize="11" 
-                                   Margin="0,5,0,0"/>
+                        <TextBlock Text="Exit" HorizontalAlignment="Center" FontSize="11" Margin="0,5,0,0"/>
 
-                        <!-- Depth display - more prominent -->
-                        <Border Background="LightGray" 
-                                CornerRadius="3" 
-                                Padding="3,2" 
-                                Margin="0,10,0,0"
-                                HorizontalAlignment="Center">
+                        <Border Background="LightGray" CornerRadius="3" Padding="3,2" 
+                                Margin="0,10,0,0" HorizontalAlignment="Center">
                             <TextBlock Text="{Binding DepthDisplayText}" 
                                        HorizontalAlignment="Center"
-                                       FontSize="10" 
-                                       FontWeight="Bold"
-                                       TextWrapping="Wrap"
-                                       MaxWidth="70"/>
+                                       FontSize="10" FontWeight="Bold"
+                                       TextWrapping="Wrap" MaxWidth="70"/>
                         </Border>
                     </StackPanel>
                 </Grid>
             </Grid>
         </Border>
 
-        <!-- Empty rows for spacing -->
-        <!-- Rows 4 and 5 are intentionally left empty for spacing -->
+        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,5,0,5">
+            <StackPanel.Style>
+                <Style TargetType="StackPanel">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding Is3DInterpolationSelected}" Value="True"/>
+                                <Condition Binding="{Binding bPlotVis}" Value="True"/>
+                            </MultiDataTrigger.Conditions>
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </MultiDataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </StackPanel.Style>
 
-        <!-- View Toggle and Action Buttons in Row 6 -->
-        <Grid Grid.Row="6" Margin="0,0,0,0">
+            <!-- Onion Layer Controls -->
+            <CheckBox Content="Show Onion Layers" 
+                  IsChecked="{Binding ShowOnionLayers}"
+                  VerticalAlignment="Center" Margin="5"/>
+
+            <!-- Shell Selection Controls - Only visible when ShowOnionLayers is true -->
+            <StackPanel Orientation="Horizontal" 
+                    Visibility="{Binding ShowOnionLayers, Converter={StaticResource BooleanToVisibilityConverter}}">
+
+                <Separator Margin="10,0" Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}"/>
+
+                <Label Content="Shell Depth:" VerticalAlignment="Center" Margin="5,0,0,0"/>
+
+                <Button Content="◄" Command="{Binding PreviousShellCommand}" 
+                    Padding="6,4" Margin="2" Width="30"
+                    ToolTip="Previous Shell"/>
+
+                <Slider Width="150" 
+                    Minimum="0" Maximum="{Binding MaxShellIndex}"
+                    Value="{Binding CurrentShellIndex}"
+                    TickFrequency="1" IsSnapToTickEnabled="True"
+                    VerticalAlignment="Center" Margin="5"/>
+
+                <Button Content="►" Command="{Binding NextShellCommand}"
+                    Padding="6,4" Margin="2" Width="30"
+                    ToolTip="Next Shell"/>
+
+                <TextBlock Text="{Binding ShellDisplayText}"
+                       VerticalAlignment="Center" 
+                       FontWeight="Bold" Margin="10,0"/>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Heterogeneity display - Row 5 -->
+        <TextBlock Grid.Row="6" Text="{Binding ShellHeterogeneityText}"
+               HorizontalAlignment="Center"
+               FontStyle="Italic" Margin="0,2,0,5">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding Is3DInterpolationSelected}" Value="True"/>
+                                <Condition Binding="{Binding bPlotVis}" Value="True"/>
+                                <Condition Binding="{Binding ShowOnionLayers}" Value="True"/>
+                            </MultiDataTrigger.Conditions>
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </MultiDataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+      
+
+        <!-- View Toggle and Action Buttons (Now Row 7) -->
+        <Grid Grid.Row="8" Margin="0,0,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- View Toggle Radio Buttons on the left -->
+            <!-- View Toggle Radio Buttons -->
             <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
                 <RadioButton Content="Text View"
-                             IsChecked="{Binding bTextVis}"
-                             GroupName="ViewToggle"
-                             Margin="5"/>
-
+                         IsChecked="{Binding bTextVis}"
+                         GroupName="ViewToggle"
+                         Margin="5"/>
                 <RadioButton Content="Plot View"
-                             IsChecked="{Binding bPlotVis}"
-                             GroupName="ViewToggle"
-                             Margin="5"/>
+                         IsChecked="{Binding bPlotVis}"
+                         GroupName="ViewToggle"
+                         Margin="5"/>
             </StackPanel>
 
-            <!-- Action Buttons on the right -->
+            <!-- Action Buttons -->
             <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button Content="Compute Dose" Command="{Binding ComputeCommand}"
-                        Width="110" Height="28" Margin="0,0,8,0"/>
+                    Width="110" Height="28" Margin="0,0,8,0"/>
                 <Button Content="Save CSV" Command="{Binding SaveCsvCommand}"
-                        Width="90" Height="28" Margin="0,0,8,0"/>
+                    Width="90" Height="28" Margin="0,0,8,0"/>
                 <Button Content="Show Plot"
-                        Command="{Binding ShowPlotCommand}"
-                        Margin="0,0,8,0"
-                        Padding="5,2"
-                        Width="90" Height="28"
-                        IsEnabled="{Binding CanExecuteShowPlot}"/>
-                <!-- Optional Refresh Plot button for debugging -->
+                    Command="{Binding ShowPlotCommand}"
+                    Margin="0,0,8,0"
+                    Padding="5,2"
+                    Width="90" Height="28"
+                    IsEnabled="{Binding CanExecuteShowPlot}"/>
                 <Button Content="Refresh Plot" 
-                        Command="{Binding RefreshPlotCommand}"
-                        Width="95" Height="28" Margin="0,0,0,0"
-                        Visibility="{Binding bPlotVis, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    Command="{Binding RefreshPlotCommand}"
+                    Width="95" Height="28" Margin="0,0,0,0"
+                    Visibility="{Binding bPlotVis, Converter={StaticResource BooleanToVisibilityConverter}}"/>
             </StackPanel>
         </Grid>
     </Grid>
