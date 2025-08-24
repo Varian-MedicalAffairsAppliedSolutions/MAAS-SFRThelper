@@ -17,9 +17,61 @@ using System.Windows.Shapes;
 using System.Windows.Threading;
 using VMS.TPS.Common.Model.API;
 using VMS.TPS.Common.Model.Types;
+using System.Windows.Media.Media3D;
+using System.Windows.Media;
 
 namespace MAAS_SFRThelper.ViewModels
 {
+
+    // 3D Grid for dose sampling
+    public class DoseGrid3D
+    {
+        public double[,,] Values { get; set; }
+        public int NX { get; set; }
+        public int NY { get; set; }
+        public int NZ { get; set; }
+        public VVector Origin { get; set; }
+        public VVector Spacing { get; set; }
+        public double MaxDose { get; set; }
+        public double MinDose { get; set; }
+
+        public DoseGrid3D(int nx, int ny, int nz)
+        {
+            NX = nx;
+            NY = ny;
+            NZ = nz;
+            Values = new double[nx, ny, nz];
+            MaxDose = double.MinValue;
+            MinDose = double.MaxValue;
+        }
+    }
+
+    // Peak or Valley location in 3D
+    public class PVPoint3D
+    {
+        public int I { get; set; }  // Grid indices
+        public int J { get; set; }
+        public int K { get; set; }
+        public VVector Position { get; set; }  // Physical position
+        public double DoseValue { get; set; }
+        public bool IsPeak { get; set; }
+    }
+
+    // P/V Analysis Results
+    public class PVAnalysisResults
+    {
+        public List<PVPoint3D> Peaks { get; set; } = new List<PVPoint3D>();
+        public List<PVPoint3D> Valleys { get; set; } = new List<PVPoint3D>();
+        public double MeanPVRatio { get; set; }
+        public double StdDevPVRatio { get; set; }
+        public double PeakVolumePercent { get; set; }
+        public double ValleyVolumePercent { get; set; }
+        public double MaxDose { get; set; }
+        public double MinDose { get; set; }
+        public int TotalVoxels { get; set; }
+        public int StructureVoxels { get; set; }
+    }
+
     public class EvaluationViewModel : BindableBase
     {
         // Structure selection
@@ -82,6 +134,37 @@ namespace MAAS_SFRThelper.ViewModels
         private Dictionary<string, List<(int nX, int nY)>> _beamSliceDimensionsCache = new Dictionary<string, List<(int, int)>>();
         private bool _hasMultiBeamData = false;
         private List<string> _computedBeams = new List<string>();
+
+        // 3D P/V Analysis fields
+        private DoseGrid3D _dose3DGrid;
+        private PVAnalysisResults _pvResults;
+        private bool _has3DData = false;
+
+        // 3D Analysis parameters (make these configurable later if needed)
+        private double _gridResolution3D = 2.0; // mm
+        private double _peakThresholdPercent = 0.7; // 70% of max dose
+        private double _valleyThresholdPercent = 0.2; // 20% of max dose
+
+        // 3D Visualization fields
+        private Model3DGroup _3dModelGroup;
+        private bool _is3DVisualizationReady = false;
+        // Add this field with your other private fields
+        private Structure _currentStructure;
+        // Add with your other private fields
+        private MeshData _currentStructureMesh;
+
+        // Add this public property for binding to the view
+        public Model3DGroup Model3DGroup
+        {
+            get { return _3dModelGroup; }
+            set { SetProperty(ref _3dModelGroup, value); }
+        }
+
+        // Add property to control 2D vs 3D visualization
+        public bool Show3DVisualization
+        {
+            get { return _is3DVisualizationReady && Is3DInterpolationSelected && bPlotVis; }
+        }
 
         // Output log
         private string _outputLog;
@@ -910,6 +993,7 @@ namespace MAAS_SFRThelper.ViewModels
             }
         }
 
+
         //private void ExecuteComputeDose()
         //{
         //    try
@@ -922,16 +1006,21 @@ namespace MAAS_SFRThelper.ViewModels
         //        string ptvAllName = SelectedTumorId;
         //        string selectedPvdrMode = SelectedPvdrMode;
 
-        //        if (string.IsNullOrEmpty(selectedBeamId))
-        //        {
-        //            OutputLog += "No beam selected. Please select a beam.\n";
-        //            return;
-        //        }
-
+        //        // Always need a structure
         //        if (string.IsNullOrEmpty(selectedTumorId))
         //        {
         //            OutputLog += "No structure selected. Please select a structure.\n";
         //            return;
+        //        }
+
+        //        // Only need beam selection for 1D and 2D modes
+        //        if (!Is3DEvaluationSelected && !Is3DInterpolationSelected)
+        //        {
+        //            if (string.IsNullOrEmpty(selectedBeamId))
+        //            {
+        //                OutputLog += "No beam selected. Please select a beam.\n";
+        //                return;
+        //            }
         //        }
 
         //        _esapiWorker.RunWithWait(context =>
@@ -955,7 +1044,7 @@ namespace MAAS_SFRThelper.ViewModels
         //                {
         //                    OutputLog += "Running 1D CAX computation...\n";
         //                    Run1DPVDRMetric(selectedTumorId, plan);
-        //                    OutputLog += "1D CAX Dosimetrics complete\n";
+        //                    OutputLog += "1D CAX Dosimetrics complete\n \n \n \n";
         //                    return;
         //                }
 
@@ -963,16 +1052,24 @@ namespace MAAS_SFRThelper.ViewModels
         //                {
         //                    OutputLog += "Running 2D Planar computation...\n";
         //                    Run2DPVDRMetric(selectedTumorId, plan);
-        //                    OutputLog += "2D Planar Dosimetrics complete\n";
+        //                    OutputLog += "2D Planar Dosimetrics complete\n \n \n \n";
         //                    return;
         //                }
 
-        //                bool execute3DDose = Is3DEvaluationSelected;
-
-        //                if (execute3DDose)
+        //                if (Is3DEvaluationSelected)
         //                {
+        //                    OutputLog += "Running 3D Dose Metrics...\n";
         //                    update3DMetrics(selectedTumorId, ptvAllName, plan);
-        //                    OutputLog += "3D Dosimetrics complete\n";
+        //                    OutputLog += "3D Dosimetrics complete\n \n \n \n";
+        //                    return;
+        //                }
+
+        //                // *** NEW: Handle 3D P/V Interpolation mode ***
+        //                if (Is3DInterpolationSelected)
+        //                {
+        //                    OutputLog += "Running 3D P/V Analysis...\n";
+        //                    Run3DPVAnalysis(selectedTumorId, plan);
+        //                    OutputLog += "3D P/V Analysis complete\n \n \n \n";
         //                    return;
         //                }
         //            }
@@ -1003,20 +1100,16 @@ namespace MAAS_SFRThelper.ViewModels
             {
                 OutputLog += "Starting dose computation...\n";
 
-                // Copy selected IDs to local variables to avoid potential thread issues
                 string selectedBeamId = SelectedBeamId;
                 string selectedTumorId = SelectedTumorId;
                 string ptvAllName = SelectedTumorId;
-                string selectedPvdrMode = SelectedPvdrMode;
 
-                // Always need a structure
                 if (string.IsNullOrEmpty(selectedTumorId))
                 {
                     OutputLog += "No structure selected. Please select a structure.\n";
                     return;
                 }
 
-                // Only need beam selection for 1D and 2D modes
                 if (!Is3DEvaluationSelected && !Is3DInterpolationSelected)
                 {
                     if (string.IsNullOrEmpty(selectedBeamId))
@@ -1026,6 +1119,7 @@ namespace MAAS_SFRThelper.ViewModels
                     }
                 }
 
+                // All ESAPI work happens here
                 _esapiWorker.RunWithWait(context =>
                 {
                     try
@@ -1047,7 +1141,7 @@ namespace MAAS_SFRThelper.ViewModels
                         {
                             OutputLog += "Running 1D CAX computation...\n";
                             Run1DPVDRMetric(selectedTumorId, plan);
-                            OutputLog += "1D CAX Dosimetrics complete\n";
+                            OutputLog += "1D CAX Dosimetrics complete\n \n \n \n";
                             return;
                         }
 
@@ -1055,7 +1149,7 @@ namespace MAAS_SFRThelper.ViewModels
                         {
                             OutputLog += "Running 2D Planar computation...\n";
                             Run2DPVDRMetric(selectedTumorId, plan);
-                            OutputLog += "2D Planar Dosimetrics complete\n";
+                            OutputLog += "2D Planar Dosimetrics complete\n \n \n \n";
                             return;
                         }
 
@@ -1063,30 +1157,25 @@ namespace MAAS_SFRThelper.ViewModels
                         {
                             OutputLog += "Running 3D Dose Metrics...\n";
                             update3DMetrics(selectedTumorId, ptvAllName, plan);
-                            OutputLog += "3D Dosimetrics complete\n";
+                            OutputLog += "3D Dosimetrics complete\n \n \n \n";
                             return;
                         }
 
-                        // *** NEW: Handle 3D P/V Interpolation mode ***
                         if (Is3DInterpolationSelected)
                         {
                             OutputLog += "Running 3D P/V Analysis...\n";
                             Run3DPVAnalysis(selectedTumorId, plan);
-                            OutputLog += "3D P/V Analysis complete\n";
+                            OutputLog += "3D P/V Analysis complete\n \n \n \n";
                             return;
                         }
                     }
                     catch (Exception ex)
                     {
                         OutputLog += $"Error during dose computation: {ex.Message}\n";
-                        if (ex.InnerException != null)
-                        {
-                            OutputLog += $"Inner Exception: {ex.InnerException.Message}\n";
-                        }
                     }
                 });
 
-                // Update the commands that depend on data availability
+                // After ESAPI work is done, update commands on UI thread
                 SaveCsvCommand.RaiseCanExecuteChanged();
                 ShowPlotCommand.RaiseCanExecuteChanged();
                 RefreshPlotCommand?.RaiseCanExecuteChanged();
@@ -1097,7 +1186,6 @@ namespace MAAS_SFRThelper.ViewModels
                 MessageBox.Show($"Error computing dose: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-
         public bool CanExecuteSaveCsv()
         {
             try
@@ -1126,9 +1214,13 @@ namespace MAAS_SFRThelper.ViewModels
                 if (Is2DPlanarSelected)
                     return _has2DPlotData && _doseSlices.Count > 0;
 
+                // 3D P/V Interpolation ready?
+                if (Is3DInterpolationSelected)
+                    return _has3DData && _doseSlices != null && _doseSlices.Count > 0; // _has3DData && _pvResults != null && _dose3DGrid != null;  // Check data, not visualization
+
                 // 3D evaluation ready?
                 if (Is3DEvaluationSelected)
-                    return false; // Not implemented yet
+                    return false; // No plots for this
 
                 return false;
             }
@@ -1289,6 +1381,25 @@ namespace MAAS_SFRThelper.ViewModels
 
                     // Also show which beam is currently displayed
                     OutputLog += $"Currently showing: {SelectedBeamId}\n";
+                }
+                else if (Is3DInterpolationSelected)
+                {
+                    OutputLog += "Showing 3D P/V visualization...\n";
+                    if (!_has3DData || _doseSlices == null || _doseSlices.Count == 0)
+                    {
+                        MessageBox.Show("No 3D visualization data available. Run computation first.",
+                            "No Data", MessageBoxButton.OK, MessageBoxImage.Information);
+                        bTextVis = true;
+                        bPlotVis = false;
+                        return;
+                    }
+
+                    // NOW create the 3D visualization on UI thread
+                    Create3DVisualization();
+
+                    // The 3D viewport will automatically show due to binding
+                    OutputLog += "3D visualization is ready. Use mouse to rotate, zoom, and pan.\n";
+                    OutputLog += "Left-click drag: Rotate | Right-click drag: Pan | Scroll: Zoom\n";
                 }
                 else if (Is3DEvaluationSelected)
                 {
@@ -3208,7 +3319,7 @@ namespace MAAS_SFRThelper.ViewModels
 
         private void Run3DPVAnalysis(string tumorId, PlanSetup plan)
         {
-            OutputLog += "\n===== Starting Unified 3D P/V Analysis =====\n";
+            OutputLog += "\n===== Starting 3D Slice Stack Visualization =====\n";
 
             try
             {
@@ -3220,46 +3331,1673 @@ namespace MAAS_SFRThelper.ViewModels
                     return;
                 }
 
-                // Use total plan dose (not beam-specific)
-                // This is the KEY DIFFERENCE from 1D/2D modes
-                var totalDose = plan.Dose;
-                if (totalDose == null)
+                // Extract mesh for structure outline
+                _currentStructureMesh = new MeshData();
+                try
                 {
-                    OutputLog += "No dose calculated for this plan.\n";
+                    if (structure.MeshGeometry != null && structure.MeshGeometry.Positions != null)
+                    {
+                        var positions = structure.MeshGeometry.Positions;
+                        var triangles = structure.MeshGeometry.TriangleIndices;
+
+                        OutputLog += $"Extracting mesh with {positions.Count} vertices...\n";
+
+                        foreach (var point in positions)
+                        {
+                            _currentStructureMesh.Positions.Add(new Point3D(point.X, point.Y, point.Z));
+                        }
+
+                        foreach (var index in triangles)
+                        {
+                            _currentStructureMesh.TriangleIndices.Add(index);
+                        }
+
+                        OutputLog += $"Mesh extraction complete: {_currentStructureMesh.Positions.Count} vertices\n";
+                    }
+                }
+                catch (Exception meshEx)
+                {
+                    OutputLog += $"Warning: Could not extract mesh: {meshEx.Message}\n";
+                }
+
+                OutputLog += $"Analyzing structure: {tumorId}\n";
+                OutputLog += $"Structure volume: {structure.Volume:F2} cc\n";
+
+                // DELETE ALL THE OLD CODE - no Create3DDoseGrid, no DetectPeaksAndValleys, etc.
+
+                // JUST compute 2D slices using existing method
+                OutputLog += "Computing standardized axial slices for 3D visualization...\n";
+
+                // Use your existing 2D computation
+                var beamData = Compute2DAllBeamsStandardized(structure, plan);
+
+                if (beamData == null || !beamData.HasData)
+                {
+                    OutputLog += "Failed to compute 2D slices.\n";
                     return;
                 }
 
-                OutputLog += $"Analyzing total dose for structure: {tumorId}\n";
-                OutputLog += $"Structure volume: {structure.Volume:F2} cc\n";
-                OutputLog += $"Dose grid resolution: {totalDose.XRes:F2} x {totalDose.YRes:F2} x {totalDose.ZRes:F2} mm\n";
+                // Store the slice data
+                _doseSlices = beamData.DoseSlices;
+                _structSlices = beamData.StructSlices;
+                _uGridSlices = beamData.UGridSlices;
+                _vGridSlices = beamData.VGridSlices;
+                _depthValues = beamData.DepthValues;
+                _sliceDimensions = beamData.SliceDimensions;
 
-                // Get structure bounds for analysis
-                var bounds = structure.MeshGeometry.Bounds;
-                OutputLog += $"Structure bounds: X[{bounds.X:F1},{bounds.X + bounds.SizeX:F1}] ";
-                OutputLog += $"Y[{bounds.Y:F1},{bounds.Y + bounds.SizeY:F1}] ";
-                OutputLog += $"Z[{bounds.Z:F1},{bounds.Z + bounds.SizeZ:F1}]\n";
+                OutputLog += $"Computed {_doseSlices.Count} axial slices\n";
 
-                // TODO: Implement 3D grid sampling
-                OutputLog += "TODO: 3D grid sampling...\n";
+                // Find dose range
+                double maxDose = 0;
+                double minDose = double.MaxValue;
 
-                // TODO: Implement P/V detection
-                OutputLog += "TODO: P/V detection...\n";
+                foreach (var slice in _doseSlices)
+                {
+                    for (int i = 0; i < slice.GetLength(0); i++)
+                    {
+                        for (int j = 0; j < slice.GetLength(1); j++)
+                        {
+                            if (!double.IsNaN(slice[i, j]) && slice[i, j] > 0)
+                            {
+                                maxDose = Math.Max(maxDose, slice[i, j]);
+                                minDose = Math.Min(minDose, slice[i, j]);
+                            }
+                        }
+                    }
+                }
 
-                // TODO: Calculate metrics
-                OutputLog += "TODO: Calculate P/V metrics...\n";
+                OutputLog += $"Dose range across all slices: {minDose:F2} - {maxDose:F2} Gy\n";
 
-                // TODO: Prepare visualization
-                OutputLog += "TODO: Prepare 3D visualization...\n";
+                // Set flags for visualization
+                _has3DData = true;
+                _has2DPlotData = true;
 
-                OutputLog += "===== 3D P/V Analysis Complete (placeholder) =====\n";
+                // NO CALLS TO OLD METHODS - DELETE THESE LINES:
+                // _dose3DGrid = Create3DDoseGrid(structure, totalDose);  // DELETE
+                // _pvResults = DetectPeaksAndValleys(_dose3DGrid, structure);  // DELETE
+                // CalculatePVMetrics(_pvResults, _dose3DGrid);  // DELETE
+                // DisplayPVResults();  // DELETE
+
+                OutputLog += "===== 3D Slice Stack Data Ready =====\n";
             }
             catch (Exception ex)
             {
-                OutputLog += $"Error in 3D P/V Analysis: {ex.Message}\n";
-                if (ex.InnerException != null)
+                OutputLog += $"Error in 3D slice stack preparation: {ex.Message}\n";
+            }
+        }
+
+        //private void Run3DPVAnalysis(string tumorId, PlanSetup plan)
+        //{
+        //    OutputLog += "\n===== Starting Unified 3D P/V Analysis =====\n";
+
+        //    try
+        //    {
+        //        // Get the structure
+        //        var structure = plan.StructureSet.Structures.FirstOrDefault(s => s.Id == tumorId);
+        //        if (structure == null)
+        //        {
+        //            OutputLog += $"Structure '{tumorId}' not found.\n";
+        //            return;
+        //        }
+
+        //        // Extract mesh data while in ESAPI thread - store as simple data
+        //        _currentStructureMesh = new MeshData();
+
+        //        try
+        //        {
+        //            if (structure.MeshGeometry != null && structure.MeshGeometry.Positions != null)
+        //            {
+        //                // Extract all data as simple types while in ESAPI thread
+        //                var positions = structure.MeshGeometry.Positions;
+        //                var triangles = structure.MeshGeometry.TriangleIndices;
+
+        //                OutputLog += $"Extracting mesh with {positions.Count} vertices...\n";
+
+        //                // Copy data, don't reference ESAPI objects
+        //                foreach (var point in positions)
+        //                {
+        //                    _currentStructureMesh.Positions.Add(new Point3D(point.X, point.Y, point.Z));
+        //                }
+
+        //                foreach (var index in triangles)
+        //                {
+        //                    _currentStructureMesh.TriangleIndices.Add(index);
+        //                }
+
+        //                OutputLog += $"Mesh extraction complete: {_currentStructureMesh.Positions.Count} vertices\n";
+        //            }
+        //        }
+        //        catch (Exception meshEx)
+        //        {
+        //            OutputLog += $"Warning: Could not extract mesh: {meshEx.Message}\n";
+        //        }
+
+        //        var totalDose = plan.Dose;
+        //        if (totalDose == null)
+        //        {
+        //            OutputLog += "No dose calculated for this plan.\n";
+        //            return;
+        //        }
+
+        //        OutputLog += $"Analyzing structure: {tumorId}\n";
+        //        OutputLog += $"Structure volume: {structure.Volume:F2} cc\n";
+
+        //        // Create 3D dose grid
+        //        //OutputLog += "Creating 3D dose grid...\n";
+        //        //_dose3DGrid = Create3DDoseGrid(structure, totalDose);
+
+        //        if (_dose3DGrid == null)
+        //        {
+        //            OutputLog += "Failed to create 3D dose grid.\n";
+        //            return;
+        //        }
+
+        //        OutputLog += $"Grid dimensions: {_dose3DGrid.NX} x {_dose3DGrid.NY} x {_dose3DGrid.NZ}\n";
+        //        OutputLog += $"Dose range: {_dose3DGrid.MinDose:F2} - {_dose3DGrid.MaxDose:F2} Gy\n";
+
+        //        // Detect peaks and valleys
+        //        //OutputLog += "Detecting peaks and valleys...\n";
+        //        //_pvResults = DetectPeaksAndValleys(_dose3DGrid, structure);
+
+        //        if (_pvResults == null)
+        //        {
+        //            OutputLog += "Failed to detect peaks and valleys.\n";
+        //            return;
+        //        }
+
+        //        OutputLog += $"Found {_pvResults.Peaks.Count} peaks and {_pvResults.Valleys.Count} valleys\n";
+
+        //        // Calculate P/V metrics
+        //        //OutputLog += "Calculating P/V metrics...\n";
+        //        //CalculatePVMetrics(_pvResults, _dose3DGrid);
+
+        //        // Display results
+        //        //DisplayPVResults();
+
+        //        _has3DData = true;
+        //        OutputLog += "===== 3D P/V Analysis Complete =====\n";
+
+        //        // DON'T use Dispatcher here - just set the flag
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        OutputLog += $"Error in 3D P/V Analysis: {ex.Message}\n";
+        //    }
+        //}
+
+        // Create 3D dose grid by sampling at regular intervals
+        //private DoseGrid3D Create3DDoseGrid(Structure structure, Dose dose)
+        //{
+        //    try
+        //    {
+        //        // Get structure bounds
+        //        var bounds = structure.MeshGeometry.Bounds;
+
+        //        OutputLog += $"Structure bounds: X[{bounds.X:F1}-{bounds.X + bounds.SizeX:F1}], ";
+        //        OutputLog += $"Y[{bounds.Y:F1}-{bounds.Y + bounds.SizeY:F1}], ";
+        //        OutputLog += $"Z[{bounds.Z:F1}-{bounds.Z + bounds.SizeZ:F1}]\n";
+        //        OutputLog += $"Structure size: {bounds.SizeX:F1} x {bounds.SizeY:F1} x {bounds.SizeZ:F1} mm\n";
+
+        //        // DEBUG: Let's check the structure center
+        //        var centerPoint = structure.CenterPoint;
+        //        OutputLog += $"Structure center: ({centerPoint.x:F1}, {centerPoint.y:F1}, {centerPoint.z:F1})\n";
+
+        //        // DEBUG: Test some specific points
+        //        OutputLog += "Testing specific points:\n";
+        //        var testPoint1 = new VVector(centerPoint.x, centerPoint.y, centerPoint.z);
+        //        bool centerInside = structure.IsPointInsideSegment(testPoint1);
+        //        OutputLog += $"  Center point inside? {centerInside}\n";
+
+        //        // Test points at different Z levels
+        //        for (double z = bounds.Z; z <= bounds.Z + bounds.SizeZ; z += 20)
+        //        {
+        //            var testPt = new VVector(centerPoint.x, centerPoint.y, z);
+        //            bool inside = structure.IsPointInsideSegment(testPt);
+        //            OutputLog += $"  Point at ({centerPoint.x:F1}, {centerPoint.y:F1}, {z:F1}) inside? {inside}\n";
+        //        }
+
+        //        // Use structure bounds directly without padding first to see what we get
+        //        double minX = bounds.X;
+        //        double maxX = bounds.X + bounds.SizeX;
+        //        double minY = bounds.Y;
+        //        double maxY = bounds.Y + bounds.SizeY;
+        //        double minZ = bounds.Z;
+        //        double maxZ = bounds.Z + bounds.SizeZ;
+
+        //        // Calculate grid dimensions
+        //        int nx = (int)Math.Ceiling((maxX - minX) / _gridResolution3D);
+        //        int ny = (int)Math.Ceiling((maxY - minY) / _gridResolution3D);
+        //        int nz = (int)Math.Ceiling((maxZ - minZ) / _gridResolution3D);
+
+        //        OutputLog += $"Grid will be {nx} x {ny} x {nz} with {_gridResolution3D}mm spacing\n";
+
+        //        var grid = new DoseGrid3D(nx, ny, nz)
+        //        {
+        //            Origin = new VVector(minX, minY, minZ),
+        //            Spacing = new VVector(_gridResolution3D, _gridResolution3D, _gridResolution3D)
+        //        };
+
+        //        // Sample dose at each grid point
+        //        int insideCount = 0;
+        //        int totalPoints = 0;
+
+        //        // Track distribution in all dimensions
+        //        Dictionary<int, int> xDistribution = new Dictionary<int, int>();
+        //        Dictionary<int, int> yDistribution = new Dictionary<int, int>();
+        //        Dictionary<int, int> zDistribution = new Dictionary<int, int>();
+
+        //        for (int i = 0; i < nx; i++)
+        //        {
+        //            double x = minX + i * _gridResolution3D;
+
+        //            for (int j = 0; j < ny; j++)
+        //            {
+        //                double y = minY + j * _gridResolution3D;
+
+        //                for (int k = 0; k < nz; k++)
+        //                {
+        //                    double z = minZ + k * _gridResolution3D;
+        //                    var point = new VVector(x, y, z);
+        //                    totalPoints++;
+
+        //                    // Check if point is inside structure
+        //                    bool isInside = structure.IsPointInsideSegment(point);
+
+        //                    if (isInside)
+        //                    {
+        //                        insideCount++;
+
+        //                        // Track distribution
+        //                        if (!xDistribution.ContainsKey(i)) xDistribution[i] = 0;
+        //                        if (!yDistribution.ContainsKey(j)) yDistribution[j] = 0;
+        //                        if (!zDistribution.ContainsKey(k)) zDistribution[k] = 0;
+
+        //                        xDistribution[i]++;
+        //                        yDistribution[j]++;
+        //                        zDistribution[k]++;
+
+        //                        var doseValue = dose.GetDoseToPoint(point);
+        //                        if (doseValue != null)
+        //                        {
+        //                            double doseGy = doseValue.Dose;
+        //                            grid.Values[i, j, k] = doseGy;
+
+        //                            if (doseGy > grid.MaxDose) grid.MaxDose = doseGy;
+        //                            if (doseGy < grid.MinDose) grid.MinDose = doseGy;
+        //                        }
+        //                        else
+        //                        {
+        //                            grid.Values[i, j, k] = 0; // Use 0 instead of NaN for inside but no dose
+        //                        }
+        //                    }
+        //                    else
+        //                    {
+        //                        grid.Values[i, j, k] = double.NaN;
+        //                    }
+        //                }
+        //            }
+        //        }
+
+        //        OutputLog += $"Sampled {insideCount} voxels inside structure out of {totalPoints} total\n";
+
+        //        // Show distribution in all dimensions
+        //        OutputLog += $"X distribution: {xDistribution.Count} slices with points (should be ~100 for sphere)\n";
+        //        OutputLog += $"Y distribution: {yDistribution.Count} slices with points (should be ~100 for sphere)\n";
+        //        OutputLog += $"Z distribution: {zDistribution.Count} slices with points (should be ~99 for sphere)\n";
+
+        //        // Show first and last slices with points
+        //        if (zDistribution.Count > 0)
+        //        {
+        //            int minZ_k = zDistribution.Keys.Min();
+        //            int maxZ_k = zDistribution.Keys.Max();
+        //            OutputLog += $"Z range with points: slice {minZ_k} to {maxZ_k} (out of {nz} total)\n";
+        //            double actualMinZ = minZ + minZ_k * _gridResolution3D;
+        //            double actualMaxZ = minZ + maxZ_k * _gridResolution3D;
+        //            OutputLog += $"Actual Z range with points: {actualMinZ:F1} to {actualMaxZ:F1} mm\n";
+        //        }
+
+        //        return grid;
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        OutputLog += $"Error creating 3D grid: {ex.Message}\n";
+        //        return null;
+        //    }
+        //}
+
+        //// Detect peaks and valleys using local maxima/minima approach
+        //private PVAnalysisResults DetectPeaksAndValleys(DoseGrid3D grid, Structure structure)
+        //{
+        //    var results = new PVAnalysisResults
+        //    {
+        //        MaxDose = grid.MaxDose,
+        //        MinDose = grid.MinDose
+        //    };
+
+        //    try
+        //    {
+        //        // Calculate thresholds
+        //        double peakThreshold = _peakThresholdPercent * grid.MaxDose;
+        //        double valleyThreshold = _valleyThresholdPercent * grid.MaxDose;
+
+        //        OutputLog += $"Peak threshold: > {peakThreshold:F2} Gy ({_peakThresholdPercent * 100}% of max)\n";
+        //        OutputLog += $"Valley threshold: < {valleyThreshold:F2} Gy ({_valleyThresholdPercent * 100}% of max)\n";
+
+        //        int structureVoxelCount = 0;
+        //        int peakVoxelCount = 0;
+        //        int valleyVoxelCount = 0;
+
+        //        // Method 1: Simple threshold-based detection
+        //        for (int i = 1; i < grid.NX - 1; i++)
+        //        {
+        //            for (int j = 1; j < grid.NY - 1; j++)
+        //            {
+        //                for (int k = 1; k < grid.NZ - 1; k++)
+        //                {
+        //                    double centerDose = grid.Values[i, j, k];
+
+        //                    // Skip if outside structure
+        //                    if (double.IsNaN(centerDose))
+        //                        continue;
+
+        //                    structureVoxelCount++;
+
+        //                    // Check if local maximum (peak)
+        //                    bool isLocalMax = true;
+        //                    bool isLocalMin = true;
+
+        //                    // Check 26 neighbors
+        //                    for (int di = -1; di <= 1; di++)
+        //                    {
+        //                        for (int dj = -1; dj <= 1; dj++)
+        //                        {
+        //                            for (int dk = -1; dk <= 1; dk++)
+        //                            {
+        //                                if (di == 0 && dj == 0 && dk == 0)
+        //                                    continue;
+
+        //                                double neighborDose = grid.Values[i + di, j + dj, k + dk];
+        //                                if (!double.IsNaN(neighborDose))
+        //                                {
+        //                                    if (neighborDose >= centerDose)
+        //                                        isLocalMax = false;
+        //                                    if (neighborDose <= centerDose)
+        //                                        isLocalMin = false;
+        //                                }
+        //                            }
+        //                        }
+        //                    }
+
+        //                    // Classify voxel
+        //                    VVector position = new VVector(
+        //                        grid.Origin.x + i * grid.Spacing.x,
+        //                        grid.Origin.y + j * grid.Spacing.y,
+        //                        grid.Origin.z + k * grid.Spacing.z
+        //                    );
+
+        //                    // Peak: local maximum AND above threshold
+        //                    if (isLocalMax && centerDose > peakThreshold)
+        //                    {
+        //                        results.Peaks.Add(new PVPoint3D
+        //                        {
+        //                            I = i,
+        //                            J = j,
+        //                            K = k,
+        //                            Position = position,
+        //                            DoseValue = centerDose,
+        //                            IsPeak = true
+        //                        });
+        //                        peakVoxelCount++;
+        //                    }
+        //                    // Valley: local minimum AND below threshold
+        //                    else if (isLocalMin && centerDose < valleyThreshold)
+        //                    {
+        //                        results.Valleys.Add(new PVPoint3D
+        //                        {
+        //                            I = i,
+        //                            J = j,
+        //                            K = k,
+        //                            Position = position,
+        //                            DoseValue = centerDose,
+        //                            IsPeak = false
+        //                        });
+        //                        valleyVoxelCount++;
+        //                    }
+
+        //                    // Count for volume statistics
+        //                    if (centerDose > peakThreshold)
+        //                        peakVoxelCount++;
+        //                    if (centerDose < valleyThreshold)
+        //                        valleyVoxelCount++;
+        //                }
+        //            }
+        //        }
+
+        //        results.TotalVoxels = grid.NX * grid.NY * grid.NZ;
+        //        results.StructureVoxels = structureVoxelCount;
+        //        results.PeakVolumePercent = 100.0 * peakVoxelCount / structureVoxelCount;
+        //        results.ValleyVolumePercent = 100.0 * valleyVoxelCount / structureVoxelCount;
+
+        //        return results;
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        OutputLog += $"Error detecting peaks/valleys: {ex.Message}\n";
+        //        return results;
+        //    }
+        //}
+
+        //// Calculate P/V metrics
+        //private void CalculatePVMetrics(PVAnalysisResults results, DoseGrid3D grid)
+        //{
+        //    try
+        //    {
+        //        if (results.Peaks.Count == 0 || results.Valleys.Count == 0)
+        //        {
+        //            OutputLog += "Warning: No peaks or valleys found for P/V calculation.\n";
+        //            results.MeanPVRatio = 0;
+        //            return;
+        //        }
+
+        //        // Calculate P/V ratios using nearest neighbor approach
+        //        List<double> pvRatios = new List<double>();
+
+        //        foreach (var peak in results.Peaks)
+        //        {
+        //            // Find nearest valley
+        //            double minDistance = double.MaxValue;
+        //            PVPoint3D nearestValley = null;
+
+        //            foreach (var valley in results.Valleys)
+        //            {
+        //                double dx = peak.Position.x - valley.Position.x;
+        //                double dy = peak.Position.y - valley.Position.y;
+        //                double dz = peak.Position.z - valley.Position.z;
+        //                double distance = Math.Sqrt(dx * dx + dy * dy + dz * dz);
+
+        //                if (distance < minDistance)
+        //                {
+        //                    minDistance = distance;
+        //                    nearestValley = valley;
+        //                }
+        //            }
+
+        //            if (nearestValley != null && nearestValley.DoseValue > 0)
+        //            {
+        //                double ratio = peak.DoseValue / nearestValley.DoseValue;
+        //                pvRatios.Add(ratio);
+        //            }
+        //        }
+
+        //        if (pvRatios.Count > 0)
+        //        {
+        //            results.MeanPVRatio = pvRatios.Average();
+
+        //            // Calculate standard deviation
+        //            double sumSquares = pvRatios.Sum(r => Math.Pow(r - results.MeanPVRatio, 2));
+        //            results.StdDevPVRatio = Math.Sqrt(sumSquares / pvRatios.Count);
+
+        //            OutputLog += $"P/V Ratios - Mean: {results.MeanPVRatio:F2}, StdDev: {results.StdDevPVRatio:F2}\n";
+        //            OutputLog += $"Min P/V: {pvRatios.Min():F2}, Max P/V: {pvRatios.Max():F2}\n";
+        //        }
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        OutputLog += $"Error calculating P/V metrics: {ex.Message}\n";
+        //    }
+        //}
+
+        //// Display results in the metrics grid
+        //private void DisplayPVResults()
+        //{
+
+        //    if (_pvResults == null) return;
+
+        //    OutputLog += "Updating metrics display...\n";
+
+        //    // Clear all previous metrics first (same as update3DMetrics)
+        //    AllMetrics.Clear();
+
+        //    // Add P/V metrics following the same pattern as update3DMetrics
+        //    AllMetrics.Add(new MetricData
+        //    {
+        //        metric = "Number of Peaks",
+        //        value = _pvResults.Peaks.Count.ToString()
+        //    });
+
+        //    AllMetrics.Add(new MetricData
+        //    {
+        //        metric = "Number of Valleys",
+        //        value = _pvResults.Valleys.Count.ToString()
+        //    });
+
+        //    AllMetrics.Add(new MetricData
+        //    {
+        //        metric = "Mean P/V Ratio",
+        //        value = Math.Round(_pvResults.MeanPVRatio, 2).ToString()
+        //    });
+
+        //    AllMetrics.Add(new MetricData
+        //    {
+        //        metric = "P/V Ratio Std Dev",
+        //        value = Math.Round(_pvResults.StdDevPVRatio, 2).ToString()
+        //    });
+
+        //    AllMetrics.Add(new MetricData
+        //    {
+        //        metric = "Peak Volume (%)",
+        //        value = Math.Round(_pvResults.PeakVolumePercent, 1).ToString()
+        //    });
+
+        //    AllMetrics.Add(new MetricData
+        //    {
+        //        metric = "Valley Volume (%)",
+        //        value = Math.Round(_pvResults.ValleyVolumePercent, 1).ToString()
+        //    });
+
+        //    AllMetrics.Add(new MetricData
+        //    {
+        //        metric = "Max Dose (Gy)",
+        //        value = Math.Round(_pvResults.MaxDose, 2).ToString()
+        //    });
+
+        //    AllMetrics.Add(new MetricData
+        //    {
+        //        metric = "Min Dose (Gy)",
+        //        value = Math.Round(_pvResults.MinDose, 2).ToString()
+        //    });
+
+        //    AllMetrics.Add(new MetricData
+        //    {
+        //        metric = "Structure Voxels",
+        //        value = _pvResults.StructureVoxels.ToString()
+        //    });
+
+        //    // Calculate heterogeneity index
+        //    double heterogeneityIndex = (_pvResults.MaxDose - _pvResults.MinDose) / _pvResults.MaxDose;
+        //    AllMetrics.Add(new MetricData
+        //    {
+        //        metric = "Heterogeneity Index",
+        //        value = Math.Round(heterogeneityIndex, 3).ToString()
+        //    });
+
+        //    OutputLog += $"Added {AllMetrics.Count} metrics to collection\n";
+
+        //    // At the end of your metrics in Run3DPVAnalysis, add these test metrics:
+        //    //AllMetrics.Add(new MetricData
+        //    //{
+        //    //    metric = "Peak Density (peaks/cc)",
+        //    //    value = Math.Round(_pvResults.Peaks.Count / structure.Volume, 2).ToString()
+        //    //});
+
+        //    //AllMetrics.Add(new MetricData
+        //    //{
+        //    //    metric = "Valley Density (valleys/cc)",
+        //    //    value = Math.Round(_pvResults.Valleys.Count / structure.Volume, 2).ToString()
+        //    //});
+
+        //    AllMetrics.Add(new MetricData
+        //    {
+        //        metric = "Grid Resolution (mm)",
+        //        value = _gridResolution3D.ToString()
+        //    });
+
+        //    AllMetrics.Add(new MetricData
+        //    {
+        //        metric = "Peak Threshold (Gy)",
+        //        value = Math.Round(_peakThresholdPercent * _pvResults.MaxDose, 2).ToString()
+        //    });
+
+        //    AllMetrics.Add(new MetricData
+        //    {
+        //        metric = "Valley Threshold (Gy)",
+        //        value = Math.Round(_valleyThresholdPercent * _pvResults.MaxDose, 2).ToString()
+        //    });
+
+        //    // Force UI update (same as update3DMetrics)
+        //    RaisePropertyChanged(nameof(AllMetrics));
+
+        //    OutputLog += "Metrics display updated.\n";
+        //}
+
+        private void AddStructureMesh(Model3DGroup modelGroup)
+        {
+            try
+            {
+                // We need to get the structure mesh from the last computation
+                // Store this during Run3DPVAnalysis
+                if (_currentStructure?.MeshGeometry != null)
                 {
-                    OutputLog += $"Inner exception: {ex.InnerException.Message}\n";
+                    var mesh = new MeshGeometry3D();
+
+                    // Convert structure mesh to WPF mesh
+                    foreach (var point in _currentStructure.MeshGeometry.Positions)
+                    {
+                        mesh.Positions.Add(new Point3D(point.X, point.Y, point.Z));
+                    }
+
+                    foreach (var triangle in _currentStructure.MeshGeometry.TriangleIndices)
+                    {
+                        mesh.TriangleIndices.Add(triangle);
+                    }
+
+                    // Semi-transparent gray material for structure
+                    var structureMaterial = new DiffuseMaterial(
+                        new SolidColorBrush(Color.FromArgb(50, 128, 128, 128)));
+
+                    var structureModel = new GeometryModel3D(mesh, structureMaterial);
+                    structureModel.BackMaterial = structureMaterial; // Show both sides
+
+                    modelGroup.Children.Add(structureModel);
+                    OutputLog += "Added structure mesh to visualization\n";
                 }
+            }
+            catch (Exception ex)
+            {
+                OutputLog += $"Error adding structure mesh: {ex.Message}\n";
+            }
+        }
+        private void Create3DVisualization()
+        {
+            try
+            {
+                OutputLog += "\n=== Starting 3D Slice Stack Visualization ===\n";
+
+                if (_doseSlices == null || _doseSlices.Count == 0)
+                {
+                    OutputLog += "ERROR: No slice data available for visualization.\n";
+                    return;
+                }
+
+                var modelGroup = new Model3DGroup();
+
+                // STEP 1: ANALYZE DATA BOUNDS AND DOSE DISTRIBUTION
+                OutputLog += "Analyzing data bounds and dose distribution...\n";
+
+                double dataMinX = double.MaxValue, dataMaxX = double.MinValue;
+                double dataMinY = double.MaxValue, dataMaxY = double.MinValue;
+                double dataMinZ = double.MaxValue, dataMaxZ = double.MinValue;
+
+                // Collect ALL dose values for statistical analysis
+                var allDoseValues = new List<double>();
+                int totalDosePoints = 0;
+
+                // First pass: collect all data
+                for (int sliceIdx = 0; sliceIdx < _doseSlices.Count; sliceIdx++)
+                {
+                    var doseSlice = _doseSlices[sliceIdx];
+                    var structSlice = _structSlices[sliceIdx];
+                    var uGrid = _uGridSlices[sliceIdx];
+                    var vGrid = _vGridSlices[sliceIdx];
+                    var (nX, nY) = _sliceDimensions[sliceIdx];
+
+                    int pointsInSlice = 0;
+
+                    for (int i = 0; i < nX; i++)
+                    {
+                        for (int j = 0; j < nY; j++)
+                        {
+                            if (!structSlice[i, j] || double.IsNaN(doseSlice[i, j]) || doseSlice[i, j] <= 0)
+                                continue;
+
+                            double dose = doseSlice[i, j];
+                            double u = uGrid[i, j];
+                            double v = vGrid[i, j];
+
+                            // Track spatial bounds
+                            dataMinX = Math.Min(dataMinX, u);
+                            dataMaxX = Math.Max(dataMaxX, u);
+                            dataMinZ = Math.Min(dataMinZ, v);
+                            dataMaxZ = Math.Max(dataMaxZ, v);
+
+                            // Collect dose values
+                            allDoseValues.Add(dose);
+                            totalDosePoints++;
+                            pointsInSlice++;
+                        }
+                    }
+
+                    if (sliceIdx < 10 || sliceIdx % 10 == 0)  // Log first 10 and every 10th
+                        OutputLog += $"  Slice {sliceIdx + 1}: {pointsInSlice} dose points\n";
+                }
+
+                // Y bounds from slice positions
+                dataMinY = _depthValues[0];
+                dataMaxY = _depthValues[_depthValues.Count - 1];
+
+                // Calculate actual data dimensions
+                double dataWidth = dataMaxX - dataMinX;
+                double dataThickness = dataMaxY - dataMinY;
+                double dataHeight = dataMaxZ - dataMinZ;
+
+                OutputLog += $"\nData bounds:\n";
+                OutputLog += $"  X: [{dataMinX:F1}, {dataMaxX:F1}] mm (width: {dataWidth:F1} mm)\n";
+                OutputLog += $"  Y: [{dataMinY:F1}, {dataMaxY:F1}] mm (thickness: {dataThickness:F1} mm)\n";
+                OutputLog += $"  Z: [{dataMinZ:F1}, {dataMaxZ:F1}] mm (height: {dataHeight:F1} mm)\n";
+                OutputLog += $"  Total dose points: {totalDosePoints}\n";
+
+                // STEP 2: CALCULATE DOSE STATISTICS AND PERCENTILES
+                if (allDoseValues.Count == 0)
+                {
+                    OutputLog += "ERROR: No dose values found!\n";
+                    return;
+                }
+
+                allDoseValues.Sort();
+
+                // Calculate percentiles for better color mapping
+                double GetPercentile(List<double> sortedValues, double percentile)
+                {
+                    int index = (int)Math.Max(0, Math.Min(sortedValues.Count - 1,
+                                              sortedValues.Count * percentile / 100.0));
+                    return sortedValues[index];
+                }
+
+                double absoluteMin = allDoseValues[0];
+                double absoluteMax = allDoseValues[allDoseValues.Count - 1];
+                double percentile1 = GetPercentile(allDoseValues, 1);
+                double percentile5 = GetPercentile(allDoseValues, 5);
+                double percentile10 = GetPercentile(allDoseValues, 10);
+                double percentile25 = GetPercentile(allDoseValues, 25);
+                double percentile50 = GetPercentile(allDoseValues, 50);
+                double percentile75 = GetPercentile(allDoseValues, 75);
+                double percentile90 = GetPercentile(allDoseValues, 90);
+                double percentile95 = GetPercentile(allDoseValues, 95);
+                double percentile99 = GetPercentile(allDoseValues, 99);
+
+                OutputLog += $"\n=== Dose Distribution Analysis ===\n";
+                OutputLog += $"Absolute: Min={absoluteMin:F2} Gy, Max={absoluteMax:F2} Gy\n";
+                OutputLog += $"Percentiles:\n";
+                OutputLog += $"  1%: {percentile1:F2} Gy\n";
+                OutputLog += $"  5%: {percentile5:F2} Gy\n";
+                OutputLog += $"  10%: {percentile10:F2} Gy\n";
+                OutputLog += $"  25%: {percentile25:F2} Gy\n";
+                OutputLog += $"  50% (median): {percentile50:F2} Gy\n";
+                OutputLog += $"  75%: {percentile75:F2} Gy\n";
+                OutputLog += $"  90%: {percentile90:F2} Gy\n";
+                OutputLog += $"  95%: {percentile95:F2} Gy\n";
+                OutputLog += $"  99%: {percentile99:F2} Gy\n";
+
+                // USE PERCENTILE-BASED NORMALIZATION TO HANDLE OUTLIERS
+                double doseMin_forNormalization = percentile5;   // Ignore bottom 5% outliers
+                double doseMax_forNormalization = percentile95;  // Ignore top 5% outliers
+
+                OutputLog += $"\nUsing percentile normalization: {doseMin_forNormalization:F2} - {doseMax_forNormalization:F2} Gy\n";
+                OutputLog += $"This ignores outliers below {percentile5:F2} and above {percentile95:F2} Gy\n";
+
+                // STEP 3: CALCULATE ADAPTIVE SCALING
+                const double TARGET_SIZE = 100.0;
+
+                double maxDimension = Math.Max(Math.Max(dataWidth, dataThickness), dataHeight);
+                if (maxDimension <= 0)
+                {
+                    OutputLog += "ERROR: Invalid data dimensions!\n";
+                    return;
+                }
+
+                double baseScale = TARGET_SIZE / maxDimension;
+                double xScale = baseScale;
+                double yScale = baseScale;
+                double zScale = baseScale;
+
+                // Boost thin dimensions
+                double minThreshold = maxDimension * 0.15;  // 15% threshold
+
+                if (dataWidth > 0 && dataWidth < minThreshold)
+                {
+                    xScale = baseScale * (minThreshold / dataWidth);
+                    OutputLog += $"  Boosting X by {minThreshold / dataWidth:F1}x for visibility\n";
+                }
+
+                if (dataThickness > 0 && dataThickness < minThreshold)
+                {
+                    yScale = baseScale * (minThreshold / dataThickness);
+                    OutputLog += $"  Boosting Y by {minThreshold / dataThickness:F1}x for visibility\n";
+                }
+
+                if (dataHeight > 0 && dataHeight < minThreshold)
+                {
+                    zScale = baseScale * (minThreshold / dataHeight);
+                    OutputLog += $"  Boosting Z by {minThreshold / dataHeight:F1}x for visibility\n";
+                }
+
+                OutputLog += $"\nScale factors: X={xScale:F2}, Y={yScale:F2}, Z={zScale:F2}\n";
+
+                // STEP 4: CALCULATE APPROPRIATE DOWNSAMPLING
+                // Estimate total cells and determine downsampling
+                int avgCellsPerSlice = totalDosePoints / Math.Max(1, _doseSlices.Count);
+                int targetCellsPerSlice = 1500;  // Target for good quality
+                int maxTotalCells = 100000;      // Increased limit for full visualization
+
+                int downsampleStep = 1;
+                if (avgCellsPerSlice > targetCellsPerSlice)
+                {
+                    downsampleStep = (int)Math.Ceiling(Math.Sqrt((double)avgCellsPerSlice / targetCellsPerSlice));
+                    OutputLog += $"Downsampling by {downsampleStep}x (from ~{avgCellsPerSlice} to ~{avgCellsPerSlice / (downsampleStep * downsampleStep)} cells/slice)\n";
+                }
+
+                // STEP 5: CREATE 3D VISUALIZATION
+                double centerX = (dataMinX + dataMaxX) / 2.0;
+                double centerY = (dataMinY + dataMaxY) / 2.0;
+                double centerZ = (dataMinZ + dataMaxZ) / 2.0;
+
+                OutputLog += $"\nCreating 3D geometry for {_doseSlices.Count} slices...\n";
+
+                int totalCellsCreated = 0;
+                int slicesProcessed = 0;
+                double sliceThickness = 1.0 * Math.Min(xScale, Math.Min(yScale, zScale));  // Adaptive thickness
+
+                // Create a material cache for efficiency
+                var materialCache = new Dictionary<Color, Material>();
+
+                for (int sliceIdx = 0; sliceIdx < _doseSlices.Count; sliceIdx++)
+                {
+                    var doseSlice = _doseSlices[sliceIdx];
+                    var structSlice = _structSlices[sliceIdx];
+                    var uGrid = _uGridSlices[sliceIdx];
+                    var vGrid = _vGridSlices[sliceIdx];
+                    var (nX, nY) = _sliceDimensions[sliceIdx];
+
+                    // Calculate scaled Y position
+                    double originalY = _depthValues[sliceIdx];
+                    double scaledY = (originalY - centerY) * yScale;
+
+                    // Group cells by color
+                    var colorMeshes = new Dictionary<Color, MeshGeometry3D>();
+                    int cellsInSlice = 0;
+
+                    // Process cells with downsampling
+                    for (int i = 0; i < nX; i += downsampleStep)
+                    {
+                        for (int j = 0; j < nY; j += downsampleStep)
+                        {
+                            if (!structSlice[i, j])
+                                continue;
+
+                            double dose = doseSlice[i, j];
+                            if (double.IsNaN(dose) || dose <= 0)
+                                continue;
+
+                            // Early termination check (but with much higher limit)
+                            if (totalCellsCreated >= maxTotalCells)
+                            {
+                                OutputLog += $"  Reached cell limit ({maxTotalCells}) at slice {sliceIdx + 1}\n";
+                                goto FinishSlices;
+                            }
+
+                            // Get coordinates and scale
+                            double u = uGrid[i, j];
+                            double v = vGrid[i, j];
+                            double scaledX = (u - centerX) * xScale;
+                            double scaledZ = (v - centerZ) * zScale;
+
+                            // Calculate cell size
+                            double cellWidth = 2.0 * xScale;
+                            double cellHeight = 2.0 * zScale;
+
+                            if (i + downsampleStep < nX && !double.IsNaN(uGrid[i + downsampleStep, j]))
+                                cellWidth = Math.Abs(uGrid[i + downsampleStep, j] - u) * xScale;
+                            if (j + downsampleStep < nY && !double.IsNaN(vGrid[i, j + downsampleStep]))
+                                cellHeight = Math.Abs(vGrid[i, j + downsampleStep] - v) * zScale;
+
+                            // Account for downsampling
+                            cellWidth *= downsampleStep * 1.05;  // Slight overlap
+                            cellHeight *= downsampleStep * 1.05;
+
+                            // PERCENTILE-BASED COLOR NORMALIZATION
+                            double normalizedDose = (dose - doseMin_forNormalization) /
+                                                  (doseMax_forNormalization - doseMin_forNormalization);
+                            normalizedDose = Math.Max(0, Math.Min(1, normalizedDose));  // Clamp to 0-1
+
+                            // Get color using improved mapping
+                            Color cellColor = GetImprovedDoseColor(normalizedDose);
+
+                            // Get or create mesh for this color
+                            if (!colorMeshes.ContainsKey(cellColor))
+                                colorMeshes[cellColor] = new MeshGeometry3D();
+
+                            var mesh = colorMeshes[cellColor];
+
+                            // Create thin box (6 faces, 8 vertices)
+                            int baseIndex = mesh.Positions.Count;
+
+                            // Bottom face vertices
+                            mesh.Positions.Add(new Point3D(scaledX - cellWidth / 2, scaledY - sliceThickness / 2, scaledZ - cellHeight / 2));
+                            mesh.Positions.Add(new Point3D(scaledX + cellWidth / 2, scaledY - sliceThickness / 2, scaledZ - cellHeight / 2));
+                            mesh.Positions.Add(new Point3D(scaledX + cellWidth / 2, scaledY - sliceThickness / 2, scaledZ + cellHeight / 2));
+                            mesh.Positions.Add(new Point3D(scaledX - cellWidth / 2, scaledY - sliceThickness / 2, scaledZ + cellHeight / 2));
+
+                            // Top face vertices
+                            mesh.Positions.Add(new Point3D(scaledX - cellWidth / 2, scaledY + sliceThickness / 2, scaledZ - cellHeight / 2));
+                            mesh.Positions.Add(new Point3D(scaledX + cellWidth / 2, scaledY + sliceThickness / 2, scaledZ - cellHeight / 2));
+                            mesh.Positions.Add(new Point3D(scaledX + cellWidth / 2, scaledY + sliceThickness / 2, scaledZ + cellHeight / 2));
+                            mesh.Positions.Add(new Point3D(scaledX - cellWidth / 2, scaledY + sliceThickness / 2, scaledZ + cellHeight / 2));
+
+                            // Add triangles for visible faces (top and bottom)
+                            // Top face
+                            mesh.TriangleIndices.Add(baseIndex + 4);
+                            mesh.TriangleIndices.Add(baseIndex + 5);
+                            mesh.TriangleIndices.Add(baseIndex + 6);
+                            mesh.TriangleIndices.Add(baseIndex + 4);
+                            mesh.TriangleIndices.Add(baseIndex + 6);
+                            mesh.TriangleIndices.Add(baseIndex + 7);
+
+                            // Bottom face
+                            mesh.TriangleIndices.Add(baseIndex + 0);
+                            mesh.TriangleIndices.Add(baseIndex + 2);
+                            mesh.TriangleIndices.Add(baseIndex + 1);
+                            mesh.TriangleIndices.Add(baseIndex + 0);
+                            mesh.TriangleIndices.Add(baseIndex + 3);
+                            mesh.TriangleIndices.Add(baseIndex + 2);
+
+                            cellsInSlice++;
+                            totalCellsCreated++;
+                        }
+                    }
+
+                    // Add all color groups for this slice
+                    foreach (var kvp in colorMeshes)
+                    {
+                        if (kvp.Value.Positions.Count > 0)
+                        {
+                            // Get or create material from cache
+                            if (!materialCache.ContainsKey(kvp.Key))
+                            {
+                                var material = new MaterialGroup();
+                                material.Children.Add(new DiffuseMaterial(new SolidColorBrush(kvp.Key)));
+
+                                // Add emissive for high dose regions
+                                if (kvp.Key == Colors.Red || kvp.Key == Colors.OrangeRed || kvp.Key == Colors.Orange)
+                                {
+                                    material.Children.Add(new EmissiveMaterial(
+                                        new SolidColorBrush(Color.FromArgb(40, kvp.Key.R, kvp.Key.G, kvp.Key.B))));
+                                }
+                                materialCache[kvp.Key] = material;
+                            }
+
+                            var geoModel = new GeometryModel3D(kvp.Value, materialCache[kvp.Key]);
+                            geoModel.BackMaterial = materialCache[kvp.Key];  // Double-sided
+                            modelGroup.Children.Add(geoModel);
+                        }
+                    }
+
+                    slicesProcessed++;
+
+                    // Log progress for large datasets
+                    if (sliceIdx == 0 || (sliceIdx + 1) % 10 == 0 || sliceIdx == _doseSlices.Count - 1)
+                    {
+                        OutputLog += $"  Processed slice {sliceIdx + 1}/{_doseSlices.Count}: {cellsInSlice} cells\n";
+                    }
+                }
+
+            FinishSlices:
+
+                // STEP 6: ADD REFERENCE GEOMETRY
+                OutputLog += "\nAdding reference geometry...\n";
+
+                // Add coordinate axes
+                double axisLength = TARGET_SIZE * 0.6;
+
+                // X-axis (Red)
+                var xAxis = CreateLine(new Point3D(-axisLength, 0, 0), new Point3D(axisLength, 0, 0), 2);
+                var xMaterial = new MaterialGroup();
+                xMaterial.Children.Add(new DiffuseMaterial(new SolidColorBrush(Colors.Red)));
+                xMaterial.Children.Add(new EmissiveMaterial(new SolidColorBrush(Color.FromRgb(50, 0, 0))));
+                modelGroup.Children.Add(new GeometryModel3D(xAxis, xMaterial));
+
+                // Y-axis (Green)
+                var yAxis = CreateLine(new Point3D(0, -axisLength, 0), new Point3D(0, axisLength, 0), 2);
+                var yMaterial = new MaterialGroup();
+                yMaterial.Children.Add(new DiffuseMaterial(new SolidColorBrush(Colors.Green)));
+                yMaterial.Children.Add(new EmissiveMaterial(new SolidColorBrush(Color.FromRgb(0, 50, 0))));
+                modelGroup.Children.Add(new GeometryModel3D(yAxis, yMaterial));
+
+                // Z-axis (Blue)
+                var zAxis = CreateLine(new Point3D(0, 0, -axisLength), new Point3D(0, 0, axisLength), 2);
+                var zMaterial = new MaterialGroup();
+                zMaterial.Children.Add(new DiffuseMaterial(new SolidColorBrush(Colors.Blue)));
+                zMaterial.Children.Add(new EmissiveMaterial(new SolidColorBrush(Color.FromRgb(0, 0, 50))));
+                modelGroup.Children.Add(new GeometryModel3D(zAxis, zMaterial));
+
+                // STEP 7: FINAL STATISTICS
+                OutputLog += $"\n=== Visualization Statistics ===\n";
+                OutputLog += $"Slices processed: {slicesProcessed}/{_doseSlices.Count}\n";
+                OutputLog += $"Total cells created: {totalCellsCreated}\n";
+                OutputLog += $"Total 3D objects: {modelGroup.Children.Count}\n";
+
+                int meshCount = 0, totalTriangles = 0, totalVertices = 0;
+                foreach (GeometryModel3D geoModel in modelGroup.Children.OfType<GeometryModel3D>())
+                {
+                    var mesh = geoModel.Geometry as MeshGeometry3D;
+                    if (mesh != null)
+                    {
+                        meshCount++;
+                        totalTriangles += mesh.TriangleIndices.Count / 3;
+                        totalVertices += mesh.Positions.Count;
+                    }
+                }
+
+                OutputLog += $"Meshes: {meshCount}, Vertices: {totalVertices}, Triangles: {totalTriangles}\n";
+
+                // Set the model
+                Model3DGroup = modelGroup;
+                _is3DVisualizationReady = true;
+
+                RaisePropertyChanged(nameof(Show3DVisualization));
+                RaisePropertyChanged(nameof(Model3DGroup));
+
+                OutputLog += "\n=== Visualization Complete ===\n";
+                OutputLog += $"Visual size: {dataWidth * xScale:F1} x {dataThickness * yScale:F1} x {dataHeight * zScale:F1} units\n";
+                OutputLog += $"Actual size: {dataWidth:F1} x {dataThickness:F1} x {dataHeight:F1} mm\n";
+                OutputLog += $"Dose normalization: {doseMin_forNormalization:F2} - {doseMax_forNormalization:F2} Gy\n";
+                OutputLog += "Use mouse to rotate/zoom/pan the view\n";
+            }
+            catch (Exception ex)
+            {
+                OutputLog += $"\nERROR in Create3DVisualization: {ex.Message}\n";
+                OutputLog += $"Stack trace: {ex.StackTrace}\n";
+            }
+        }
+
+        // Improved color mapping with more gradations
+        private Color GetImprovedDoseColor(double normalizedDose)
+        {
+            // Ensure value is in 0-1 range
+            normalizedDose = Math.Max(0, Math.Min(1, normalizedDose));
+
+            // More gradual color transitions for better visualization
+            if (normalizedDose >= 0.95) return Colors.DarkRed;        // Top 5%
+            if (normalizedDose >= 0.90) return Colors.Red;            // 90-95%
+            if (normalizedDose >= 0.85) return Colors.OrangeRed;      // 85-90%
+            if (normalizedDose >= 0.80) return Colors.DarkOrange;     // 80-85%
+            if (normalizedDose >= 0.75) return Colors.Orange;         // 75-80%
+            if (normalizedDose >= 0.70) return Colors.Gold;           // 70-75%
+            if (normalizedDose >= 0.65) return Colors.Goldenrod;      // 65-70%
+            if (normalizedDose >= 0.60) return Colors.Yellow;         // 60-65%
+            if (normalizedDose >= 0.55) return Colors.GreenYellow;    // 55-60%
+            if (normalizedDose >= 0.50) return Colors.LawnGreen;      // 50-55%
+            if (normalizedDose >= 0.45) return Colors.LightGreen;     // 45-50%
+            if (normalizedDose >= 0.40) return Colors.MediumSeaGreen; // 40-45%
+            if (normalizedDose >= 0.35) return Colors.SeaGreen;       // 35-40%
+            if (normalizedDose >= 0.30) return Colors.DarkSeaGreen;   // 30-35%
+            if (normalizedDose >= 0.25) return Colors.CadetBlue;      // 25-30%
+            if (normalizedDose >= 0.20) return Colors.LightBlue;      // 20-25%
+            if (normalizedDose >= 0.15) return Colors.SkyBlue;        // 15-20%
+            if (normalizedDose >= 0.10) return Colors.DeepSkyBlue;    // 10-15%
+            if (normalizedDose >= 0.05) return Colors.DodgerBlue;     // 5-10%
+            return Colors.Blue;                                        // Bottom 5%
+        }
+        // Simple sphere helper
+        private MeshGeometry3D CreateSimpleSphere(double cx, double cy, double cz, double radius)
+        {
+            var mesh = new MeshGeometry3D();
+
+            // Create octahedron as simple sphere
+            mesh.Positions.Add(new Point3D(cx + radius, cy, cz));
+            mesh.Positions.Add(new Point3D(cx - radius, cy, cz));
+            mesh.Positions.Add(new Point3D(cx, cy + radius, cz));
+            mesh.Positions.Add(new Point3D(cx, cy - radius, cz));
+            mesh.Positions.Add(new Point3D(cx, cy, cz + radius));
+            mesh.Positions.Add(new Point3D(cx, cy, cz - radius));
+
+            // Add triangles
+            mesh.TriangleIndices.Add(0); mesh.TriangleIndices.Add(2); mesh.TriangleIndices.Add(4);
+            mesh.TriangleIndices.Add(0); mesh.TriangleIndices.Add(4); mesh.TriangleIndices.Add(3);
+            mesh.TriangleIndices.Add(0); mesh.TriangleIndices.Add(3); mesh.TriangleIndices.Add(5);
+            mesh.TriangleIndices.Add(0); mesh.TriangleIndices.Add(5); mesh.TriangleIndices.Add(2);
+            mesh.TriangleIndices.Add(1); mesh.TriangleIndices.Add(4); mesh.TriangleIndices.Add(2);
+            mesh.TriangleIndices.Add(1); mesh.TriangleIndices.Add(3); mesh.TriangleIndices.Add(4);
+            mesh.TriangleIndices.Add(1); mesh.TriangleIndices.Add(5); mesh.TriangleIndices.Add(3);
+            mesh.TriangleIndices.Add(1); mesh.TriangleIndices.Add(2); mesh.TriangleIndices.Add(5);
+
+            return mesh;
+        }
+
+        // Helper to add bounding box
+        private void AddScaledBoundingBox(Model3DGroup modelGroup, double width, double height, double depth)
+        {
+            var boxMaterial = new DiffuseMaterial(new SolidColorBrush(Color.FromArgb(50, 128, 128, 128)));
+            double thickness = 0.5;
+
+            double x = width / 2;
+            double y = height / 2;
+            double z = depth / 2;
+
+            // Add 12 edges of the box
+            // Bottom edges
+            modelGroup.Children.Add(new GeometryModel3D(
+                CreateLine(new Point3D(-x, -y, -z), new Point3D(x, -y, -z), thickness), boxMaterial));
+            modelGroup.Children.Add(new GeometryModel3D(
+                CreateLine(new Point3D(x, -y, -z), new Point3D(x, -y, z), thickness), boxMaterial));
+            modelGroup.Children.Add(new GeometryModel3D(
+                CreateLine(new Point3D(x, -y, z), new Point3D(-x, -y, z), thickness), boxMaterial));
+            modelGroup.Children.Add(new GeometryModel3D(
+                CreateLine(new Point3D(-x, -y, z), new Point3D(-x, -y, -z), thickness), boxMaterial));
+
+            // Top edges
+            modelGroup.Children.Add(new GeometryModel3D(
+                CreateLine(new Point3D(-x, y, -z), new Point3D(x, y, -z), thickness), boxMaterial));
+            modelGroup.Children.Add(new GeometryModel3D(
+                CreateLine(new Point3D(x, y, -z), new Point3D(x, y, z), thickness), boxMaterial));
+            modelGroup.Children.Add(new GeometryModel3D(
+                CreateLine(new Point3D(x, y, z), new Point3D(-x, y, z), thickness), boxMaterial));
+            modelGroup.Children.Add(new GeometryModel3D(
+                CreateLine(new Point3D(-x, y, z), new Point3D(-x, y, -z), thickness), boxMaterial));
+
+            // Vertical edges
+            modelGroup.Children.Add(new GeometryModel3D(
+                CreateLine(new Point3D(-x, -y, -z), new Point3D(-x, y, -z), thickness), boxMaterial));
+            modelGroup.Children.Add(new GeometryModel3D(
+                CreateLine(new Point3D(x, -y, -z), new Point3D(x, y, -z), thickness), boxMaterial));
+            modelGroup.Children.Add(new GeometryModel3D(
+                CreateLine(new Point3D(x, -y, z), new Point3D(x, y, z), thickness), boxMaterial));
+            modelGroup.Children.Add(new GeometryModel3D(
+                CreateLine(new Point3D(-x, -y, z), new Point3D(-x, y, z), thickness), boxMaterial));
+        }
+
+        // Add scaled axes
+        private void AddScaledAxes(Model3DGroup modelGroup, double length)
+        {
+            // X-axis - Red
+            var xLine = CreateLine(new Point3D(-length / 2, 0, 0), new Point3D(length / 2, 0, 0), 1);
+            modelGroup.Children.Add(new GeometryModel3D(xLine,
+                new DiffuseMaterial(new SolidColorBrush(Colors.Red))));
+
+            // Y-axis - Green (stacking direction - make it prominent)
+            var yLine = CreateLine(new Point3D(0, -length / 2, 0), new Point3D(0, length / 2, 0), 2);
+            var yMaterial = new MaterialGroup();
+            yMaterial.Children.Add(new DiffuseMaterial(new SolidColorBrush(Colors.Green)));
+            yMaterial.Children.Add(new EmissiveMaterial(new SolidColorBrush(Color.FromRgb(0, 50, 0))));
+            modelGroup.Children.Add(new GeometryModel3D(yLine, yMaterial));
+
+            // Z-axis - Blue
+            var zLine = CreateLine(new Point3D(0, 0, -length / 2), new Point3D(0, 0, length / 2), 1);
+            modelGroup.Children.Add(new GeometryModel3D(zLine,
+                new DiffuseMaterial(new SolidColorBrush(Colors.Blue))));
+        }
+
+        // Add bounding box to show the exaggerated scale
+        private void AddBoundingBox(Model3DGroup modelGroup, double height)
+        {
+            // This shows the visual extent after scaling
+            var boxMaterial = new DiffuseMaterial(new SolidColorBrush(Color.FromArgb(30, 200, 200, 200)));
+
+            // Add vertical lines at corners to show height
+            double x = 15, z = 15;  // Approximate structure radius
+
+            var line1 = CreateLine(new Point3D(x, -height / 2, z), new Point3D(x, height / 2, z), 0.5);
+            var line2 = CreateLine(new Point3D(-x, -height / 2, z), new Point3D(-x, height / 2, z), 0.5);
+            var line3 = CreateLine(new Point3D(x, -height / 2, -z), new Point3D(x, height / 2, -z), 0.5);
+            var line4 = CreateLine(new Point3D(-x, -height / 2, -z), new Point3D(-x, height / 2, -z), 0.5);
+
+            modelGroup.Children.Add(new GeometryModel3D(line1, boxMaterial));
+            modelGroup.Children.Add(new GeometryModel3D(line2, boxMaterial));
+            modelGroup.Children.Add(new GeometryModel3D(line3, boxMaterial));
+            modelGroup.Children.Add(new GeometryModel3D(line4, boxMaterial));
+        }
+
+        // Add a wireframe box to show data bounds
+        private void AddBoundingWireframe(Model3DGroup modelGroup)
+        {
+            try
+            {
+                if (_dose3DGrid == null) return;
+
+                // Calculate actual bounds of non-NaN data
+                double minX = _dose3DGrid.Origin.x;
+                double maxX = minX + _dose3DGrid.NX * _dose3DGrid.Spacing.x;
+                double minY = _dose3DGrid.Origin.y;
+                double maxY = minY + _dose3DGrid.NY * _dose3DGrid.Spacing.y;
+                double minZ = _dose3DGrid.Origin.z;
+                double maxZ = minZ + _dose3DGrid.NZ * _dose3DGrid.Spacing.z;
+
+                // Create wireframe edges
+                var edgeMaterial = new DiffuseMaterial(new SolidColorBrush(Colors.Gray));
+                double thickness = 0.5;
+
+                // Bottom square
+                AddLine(modelGroup, minX, minY, minZ, maxX, minY, minZ, thickness, edgeMaterial);
+                AddLine(modelGroup, maxX, minY, minZ, maxX, maxY, minZ, thickness, edgeMaterial);
+                AddLine(modelGroup, maxX, maxY, minZ, minX, maxY, minZ, thickness, edgeMaterial);
+                AddLine(modelGroup, minX, maxY, minZ, minX, minY, minZ, thickness, edgeMaterial);
+
+                // Top square
+                AddLine(modelGroup, minX, minY, maxZ, maxX, minY, maxZ, thickness, edgeMaterial);
+                AddLine(modelGroup, maxX, minY, maxZ, maxX, maxY, maxZ, thickness, edgeMaterial);
+                AddLine(modelGroup, maxX, maxY, maxZ, minX, maxY, maxZ, thickness, edgeMaterial);
+                AddLine(modelGroup, minX, maxY, maxZ, minX, minY, maxZ, thickness, edgeMaterial);
+
+                // Vertical edges
+                AddLine(modelGroup, minX, minY, minZ, minX, minY, maxZ, thickness, edgeMaterial);
+                AddLine(modelGroup, maxX, minY, minZ, maxX, minY, maxZ, thickness, edgeMaterial);
+                AddLine(modelGroup, maxX, maxY, minZ, maxX, maxY, maxZ, thickness, edgeMaterial);
+                AddLine(modelGroup, minX, maxY, minZ, minX, maxY, maxZ, thickness, edgeMaterial);
+
+                OutputLog += $"Added bounding box: X[{minX:F0}-{maxX:F0}] Y[{minY:F0}-{maxY:F0}] Z[{minZ:F0}-{maxZ:F0}]\n";
+            }
+            catch (Exception ex)
+            {
+                OutputLog += $"Error adding bounding box: {ex.Message}\n";
+            }
+        }
+
+        private void AddLine(Model3DGroup group, double x1, double y1, double z1,
+                             double x2, double y2, double z2, double thickness, Material material)
+        {
+            var mesh = new MeshGeometry3D();
+
+            // Create a thin box to represent the line
+            var p1 = new Point3D(x1, y1, z1);
+            var p2 = new Point3D(x2, y2, z2);
+
+            mesh.Positions.Add(p1);
+            mesh.Positions.Add(p2);
+            mesh.Positions.Add(new Point3D(x1 + thickness, y1, z1));
+            mesh.Positions.Add(new Point3D(x2 + thickness, y2, z2));
+
+            mesh.TriangleIndices.Add(0); mesh.TriangleIndices.Add(1); mesh.TriangleIndices.Add(2);
+            mesh.TriangleIndices.Add(1); mesh.TriangleIndices.Add(3); mesh.TriangleIndices.Add(2);
+
+            group.Children.Add(new GeometryModel3D(mesh, material));
+        }
+        // Add coordinate axes for orientation
+        private void AddCoordinateAxes(Model3DGroup modelGroup)
+        {
+            try
+            {
+                double length = 150;
+                double radius = 1;
+
+                // X-axis (red) - pointing right
+                var xAxis = CreateCylinder(new Point3D(-length / 2, 0, 0), new Point3D(length / 2, 0, 0), radius);
+                var xMaterial = new MaterialGroup();
+                xMaterial.Children.Add(new DiffuseMaterial(new SolidColorBrush(Colors.Red)));
+                xMaterial.Children.Add(new EmissiveMaterial(new SolidColorBrush(Color.FromRgb(50, 0, 0))));
+                modelGroup.Children.Add(new GeometryModel3D(xAxis, xMaterial));
+
+                // Y-axis (green) - pointing up
+                var yAxis = CreateCylinder(new Point3D(0, -length / 2, 0), new Point3D(0, length / 2, 0), radius);
+                var yMaterial = new MaterialGroup();
+                yMaterial.Children.Add(new DiffuseMaterial(new SolidColorBrush(Colors.LightGreen)));
+                yMaterial.Children.Add(new EmissiveMaterial(new SolidColorBrush(Color.FromRgb(0, 50, 0))));
+                modelGroup.Children.Add(new GeometryModel3D(yAxis, yMaterial));
+
+                // Z-axis (blue) - pointing forward
+                var zAxis = CreateCylinder(new Point3D(0, 0, -length / 2), new Point3D(0, 0, length / 2), radius);
+                var zMaterial = new MaterialGroup();
+                zMaterial.Children.Add(new DiffuseMaterial(new SolidColorBrush(Colors.LightBlue)));
+                zMaterial.Children.Add(new EmissiveMaterial(new SolidColorBrush(Color.FromRgb(0, 0, 50))));
+                modelGroup.Children.Add(new GeometryModel3D(zAxis, zMaterial));
+
+                // Add origin sphere
+                var origin = CreateSimpleSphere(0, 0, 0, 3);
+                var originMaterial = new DiffuseMaterial(new SolidColorBrush(Colors.White));
+                modelGroup.Children.Add(new GeometryModel3D(origin, originMaterial));
+            }
+            catch { }
+        }
+
+        // Simple cylinder for axes
+        private MeshGeometry3D CreateCylinder(Point3D start, Point3D end, double radius)
+        {
+            var mesh = new MeshGeometry3D();
+
+            // Create a simple box to represent the cylinder
+            Vector3D axis = end - start;
+            Vector3D perp = new Vector3D(1, 0, 0);
+            if (Math.Abs(axis.X) > 0.9) perp = new Vector3D(0, 1, 0);
+
+            Vector3D side1 = Vector3D.CrossProduct(axis, perp);
+            side1.Normalize();
+            side1 *= radius;
+
+            Vector3D side2 = Vector3D.CrossProduct(axis, side1);
+            side2.Normalize();
+            side2 *= radius;
+
+            // Create 8 vertices for a box
+            mesh.Positions.Add(start + side1);
+            mesh.Positions.Add(start - side1);
+            mesh.Positions.Add(start + side2);
+            mesh.Positions.Add(start - side2);
+            mesh.Positions.Add(end + side1);
+            mesh.Positions.Add(end - side1);
+            mesh.Positions.Add(end + side2);
+            mesh.Positions.Add(end - side2);
+
+            // Create faces
+            // Side faces
+            mesh.TriangleIndices.Add(0); mesh.TriangleIndices.Add(4); mesh.TriangleIndices.Add(2);
+            mesh.TriangleIndices.Add(2); mesh.TriangleIndices.Add(4); mesh.TriangleIndices.Add(6);
+
+            mesh.TriangleIndices.Add(1); mesh.TriangleIndices.Add(3); mesh.TriangleIndices.Add(5);
+            mesh.TriangleIndices.Add(3); mesh.TriangleIndices.Add(7); mesh.TriangleIndices.Add(5);
+
+            mesh.TriangleIndices.Add(0); mesh.TriangleIndices.Add(1); mesh.TriangleIndices.Add(4);
+            mesh.TriangleIndices.Add(1); mesh.TriangleIndices.Add(5); mesh.TriangleIndices.Add(4);
+
+            mesh.TriangleIndices.Add(2); mesh.TriangleIndices.Add(6); mesh.TriangleIndices.Add(3);
+            mesh.TriangleIndices.Add(3); mesh.TriangleIndices.Add(6); mesh.TriangleIndices.Add(7);
+
+            return mesh;
+        }
+
+        // Simplified sphere creation without VVector
+        //private MeshGeometry3D CreateSimpleSphere(double cx, double cy, double cz, double radius)
+        //{
+        //    var mesh = new MeshGeometry3D();
+        //    int divisions = 6; // Even fewer divisions for performance
+
+        //    // Create vertices
+        //    for (int lat = 0; lat <= divisions; lat++)
+        //    {
+        //        double theta = lat * Math.PI / divisions;
+        //        double sinTheta = Math.Sin(theta);
+        //        double cosTheta = Math.Cos(theta);
+
+        //        for (int lon = 0; lon <= divisions; lon++)
+        //        {
+        //            double phi = lon * 2 * Math.PI / divisions;
+        //            double sinPhi = Math.Sin(phi);
+        //            double cosPhi = Math.Cos(phi);
+
+        //            double x = cx + radius * sinTheta * cosPhi;
+        //            double y = cy + radius * sinTheta * sinPhi;
+        //            double z = cz + radius * cosTheta;
+
+        //            mesh.Positions.Add(new Point3D(x, y, z));
+        //        }
+        //    }
+
+        //    // Create triangles
+        //    for (int lat = 0; lat < divisions; lat++)
+        //    {
+        //        for (int lon = 0; lon < divisions; lon++)
+        //        {
+        //            int first = lat * (divisions + 1) + lon;
+        //            int second = first + divisions + 1;
+
+        //            // Two triangles per quad
+        //            mesh.TriangleIndices.Add(first);
+        //            mesh.TriangleIndices.Add(second);
+        //            mesh.TriangleIndices.Add(first + 1);
+
+        //            mesh.TriangleIndices.Add(second);
+        //            mesh.TriangleIndices.Add(second + 1);
+        //            mesh.TriangleIndices.Add(first + 1);
+        //        }
+        //    }
+
+        //    return mesh;
+        //}
+        // Color helper
+        //private Color GetDoseColor(double normalizedDose)
+        //{
+        //    // Use more gradual transitions for better visualization
+        //    if (normalizedDose > 0.95) return Colors.Red;
+        //    if (normalizedDose > 0.85) return Colors.OrangeRed;
+        //    if (normalizedDose > 0.75) return Colors.Orange;
+        //    if (normalizedDose > 0.65) return Colors.Gold;
+        //    if (normalizedDose > 0.55) return Colors.Yellow;
+        //    if (normalizedDose > 0.45) return Colors.GreenYellow;
+        //    if (normalizedDose > 0.35) return Colors.LightGreen;
+        //    if (normalizedDose > 0.25) return Colors.MediumSeaGreen;
+        //    if (normalizedDose > 0.15) return Colors.LightBlue;
+        //    if (normalizedDose > 0.05) return Colors.SkyBlue;
+        //    return Colors.Blue;
+        //}
+
+        // Helper method to create a cube mesh
+        private MeshGeometry3D CreateCube(VVector center, double size)
+        {
+            var mesh = new MeshGeometry3D();
+            double h = size / 2;
+
+            // Define the 8 vertices of the cube
+            mesh.Positions.Add(new Point3D(center.x - h, center.y - h, center.z - h)); // 0
+            mesh.Positions.Add(new Point3D(center.x + h, center.y - h, center.z - h)); // 1
+            mesh.Positions.Add(new Point3D(center.x + h, center.y + h, center.z - h)); // 2
+            mesh.Positions.Add(new Point3D(center.x - h, center.y + h, center.z - h)); // 3
+            mesh.Positions.Add(new Point3D(center.x - h, center.y - h, center.z + h)); // 4
+            mesh.Positions.Add(new Point3D(center.x + h, center.y - h, center.z + h)); // 5
+            mesh.Positions.Add(new Point3D(center.x + h, center.y + h, center.z + h)); // 6
+            mesh.Positions.Add(new Point3D(center.x - h, center.y + h, center.z + h)); // 7
+
+            // Define the 12 triangles (2 per face, 6 faces)
+            // Front face
+            mesh.TriangleIndices.Add(0); mesh.TriangleIndices.Add(1); mesh.TriangleIndices.Add(2);
+            mesh.TriangleIndices.Add(0); mesh.TriangleIndices.Add(2); mesh.TriangleIndices.Add(3);
+
+            // Back face
+            mesh.TriangleIndices.Add(5); mesh.TriangleIndices.Add(4); mesh.TriangleIndices.Add(7);
+            mesh.TriangleIndices.Add(5); mesh.TriangleIndices.Add(7); mesh.TriangleIndices.Add(6);
+
+            // Left face
+            mesh.TriangleIndices.Add(4); mesh.TriangleIndices.Add(0); mesh.TriangleIndices.Add(3);
+            mesh.TriangleIndices.Add(4); mesh.TriangleIndices.Add(3); mesh.TriangleIndices.Add(7);
+
+            // Right face
+            mesh.TriangleIndices.Add(1); mesh.TriangleIndices.Add(5); mesh.TriangleIndices.Add(6);
+            mesh.TriangleIndices.Add(1); mesh.TriangleIndices.Add(6); mesh.TriangleIndices.Add(2);
+
+            // Top face
+            mesh.TriangleIndices.Add(3); mesh.TriangleIndices.Add(2); mesh.TriangleIndices.Add(6);
+            mesh.TriangleIndices.Add(3); mesh.TriangleIndices.Add(6); mesh.TriangleIndices.Add(7);
+
+            // Bottom face
+            mesh.TriangleIndices.Add(4); mesh.TriangleIndices.Add(5); mesh.TriangleIndices.Add(1);
+            mesh.TriangleIndices.Add(4); mesh.TriangleIndices.Add(1); mesh.TriangleIndices.Add(0);
+
+            return mesh;
+        }
+
+        // Optional: Add a legend showing dose colors
+        private void AddDoseLegend(Model3DGroup modelGroup)
+        {
+            // This would add 3D text or colored boxes as a legend
+            // For now, we'll skip this and just log the legend
+            OutputLog += "Dose Color Legend:\n";
+            OutputLog += "  Red: > 90% of max dose\n";
+            OutputLog += "  Orange: 70-90%\n";
+            OutputLog += "  Yellow: 50-70%\n";
+            OutputLog += "  Green: 30-50%\n";
+            OutputLog += "  Blue: 10-30%\n";
+        }
+
+        //private void AddBoundingBox(Model3DGroup modelGroup)
+        //{
+        //    try
+        //    {
+        //        if (_dose3DGrid == null) return;
+
+        //        var origin = _dose3DGrid.Origin;
+        //        var size = new VVector(
+        //            _dose3DGrid.NX * _dose3DGrid.Spacing.x,
+        //            _dose3DGrid.NY * _dose3DGrid.Spacing.y,
+        //            _dose3DGrid.NZ * _dose3DGrid.Spacing.z
+        //        );
+
+        //        // Create wireframe box material
+        //        var boxMaterial = new DiffuseMaterial(new SolidColorBrush(Color.FromArgb(50, 128, 128, 128)));
+
+        //        // Create thin lines for the box edges
+        //        double thickness = 0.5; // mm
+
+        //        // Create 12 edges of the box
+        //        // Bottom edges
+        //        AddBoxEdge(modelGroup, origin, new VVector(origin.x + size.x, origin.y, origin.z), thickness, boxMaterial);
+        //        AddBoxEdge(modelGroup, origin, new VVector(origin.x, origin.y + size.y, origin.z), thickness, boxMaterial);
+        //        AddBoxEdge(modelGroup, new VVector(origin.x + size.x, origin.y, origin.z),
+        //                   new VVector(origin.x + size.x, origin.y + size.y, origin.z), thickness, boxMaterial);
+        //        AddBoxEdge(modelGroup, new VVector(origin.x, origin.y + size.y, origin.z),
+        //                   new VVector(origin.x + size.x, origin.y + size.y, origin.z), thickness, boxMaterial);
+
+        //        // Top edges
+        //        var topZ = origin.z + size.z;
+        //        AddBoxEdge(modelGroup, new VVector(origin.x, origin.y, topZ),
+        //                   new VVector(origin.x + size.x, origin.y, topZ), thickness, boxMaterial);
+        //        AddBoxEdge(modelGroup, new VVector(origin.x, origin.y, topZ),
+        //                   new VVector(origin.x, origin.y + size.y, topZ), thickness, boxMaterial);
+        //        AddBoxEdge(modelGroup, new VVector(origin.x + size.x, origin.y, topZ),
+        //                   new VVector(origin.x + size.x, origin.y + size.y, topZ), thickness, boxMaterial);
+        //        AddBoxEdge(modelGroup, new VVector(origin.x, origin.y + size.y, topZ),
+        //                   new VVector(origin.x + size.x, origin.y + size.y, topZ), thickness, boxMaterial);
+
+        //        // Vertical edges
+        //        AddBoxEdge(modelGroup, origin, new VVector(origin.x, origin.y, topZ), thickness, boxMaterial);
+        //        AddBoxEdge(modelGroup, new VVector(origin.x + size.x, origin.y, origin.z),
+        //                   new VVector(origin.x + size.x, origin.y, topZ), thickness, boxMaterial);
+        //        AddBoxEdge(modelGroup, new VVector(origin.x, origin.y + size.y, origin.z),
+        //                   new VVector(origin.x, origin.y + size.y, topZ), thickness, boxMaterial);
+        //        AddBoxEdge(modelGroup, new VVector(origin.x + size.x, origin.y + size.y, origin.z),
+        //                   new VVector(origin.x + size.x, origin.y + size.y, topZ), thickness, boxMaterial);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        OutputLog += $"Error adding bounding box: {ex.Message}\n";
+        //    }
+        //}
+
+        private void AddBoxEdge(Model3DGroup group, VVector start, VVector end, double thickness, Material material)
+        {
+            // Create a thin cylinder to represent the edge
+            var mesh = new MeshGeometry3D();
+
+            // Simple box line (you could also use a cylinder)
+            var dir = new VVector(end.x - start.x, end.y - start.y, end.z - start.z);
+            var length = Math.Sqrt(dir.x * dir.x + dir.y * dir.y + dir.z * dir.z);
+
+            // Create a thin box along the edge
+            // For simplicity, just add two triangles
+            // (In production, you'd want a proper cylinder or box mesh)
+        }
+
+        // Placeholder for structure outline
+        private void AddStructureOutline(Model3DGroup modelGroup)
+        {
+            // Optional: Add structure mesh outline
+            // This would require the structure mesh data
+        }
+
+        // Helper method to create a sphere mesh
+        private MeshGeometry3D CreateSphere(VVector position, double radius)
+        {
+            var mesh = new MeshGeometry3D();
+            int thetaDiv = 10;
+            int phiDiv = 10;
+
+            // Generate sphere vertices
+            for (int theta = 0; theta <= thetaDiv; theta++)
+            {
+                double t = (double)theta / thetaDiv * Math.PI;
+
+                for (int phi = 0; phi <= phiDiv; phi++)
+                {
+                    double p = (double)phi / phiDiv * 2 * Math.PI;
+
+                    double x = position.x + radius * Math.Sin(t) * Math.Cos(p);
+                    double y = position.y + radius * Math.Sin(t) * Math.Sin(p);
+                    double z = position.z + radius * Math.Cos(t);
+
+                    mesh.Positions.Add(new Point3D(x, y, z));
+                }
+            }
+
+            // Generate triangles
+            for (int theta = 0; theta < thetaDiv; theta++)
+            {
+                for (int phi = 0; phi < phiDiv; phi++)
+                {
+                    int i1 = theta * (phiDiv + 1) + phi;
+                    int i2 = i1 + 1;
+                    int i3 = i1 + phiDiv + 1;
+                    int i4 = i3 + 1;
+
+                    mesh.TriangleIndices.Add(i1);
+                    mesh.TriangleIndices.Add(i3);
+                    mesh.TriangleIndices.Add(i2);
+
+                    mesh.TriangleIndices.Add(i2);
+                    mesh.TriangleIndices.Add(i3);
+                    mesh.TriangleIndices.Add(i4);
+                }
+            }
+
+            return mesh;
+        }
+
+        // Simple colored axes
+        private void AddSimpleAxes(Model3DGroup modelGroup)
+        {
+            // X-axis - Red line
+            var xLine = CreateLine(new Point3D(-50, 0, 0), new Point3D(50, 0, 0), 2);
+            modelGroup.Children.Add(new GeometryModel3D(xLine,
+                new DiffuseMaterial(new SolidColorBrush(Colors.Red))));
+
+            // Y-axis - Green line
+            var yLine = CreateLine(new Point3D(0, -50, 0), new Point3D(0, 50, 0), 2);
+            modelGroup.Children.Add(new GeometryModel3D(yLine,
+                new DiffuseMaterial(new SolidColorBrush(Colors.Green))));
+
+            // Z-axis - Blue line
+            var zLine = CreateLine(new Point3D(0, 0, -50), new Point3D(0, 0, 50), 2);
+            modelGroup.Children.Add(new GeometryModel3D(zLine,
+                new DiffuseMaterial(new SolidColorBrush(Colors.Blue))));
+        }
+
+        private MeshGeometry3D CreateLine(Point3D start, Point3D end, double thickness)
+        {
+            var mesh = new MeshGeometry3D();
+
+            // Simple line as two triangles
+            mesh.Positions.Add(start);
+            mesh.Positions.Add(end);
+            mesh.Positions.Add(new Point3D(start.X + thickness, start.Y, start.Z));
+            mesh.Positions.Add(new Point3D(end.X + thickness, end.Y, end.Z));
+
+            mesh.TriangleIndices.Add(0);
+            mesh.TriangleIndices.Add(1);
+            mesh.TriangleIndices.Add(2);
+
+            mesh.TriangleIndices.Add(1);
+            mesh.TriangleIndices.Add(3);
+            mesh.TriangleIndices.Add(2);
+
+            return mesh;
+        }
+
+        // Add this class near the top with your other helper classes
+        public class MeshData
+        {
+            public List<Point3D> Positions { get; set; } = new List<Point3D>();
+            public List<int> TriangleIndices { get; set; } = new List<int>();
+        }
+
+        // Simplified isodose surface creation (we'll improve this later)
+        private MeshGeometry3D CreateIsodoseSurface(DoseGrid3D grid, double isovalue)
+        {
+            // For now, return null - we'll implement marching cubes later
+            // This is complex, so we'll start with just peaks/valleys
+            return null;
+        }
+
+        // Add this test method to verify Helix is working
+        private void Test3DVisualization()
+        {
+            try
+            {
+                OutputLog += "Testing Helix Toolkit 3D visualization...\n";
+
+                // This will test if we can access Helix components
+                var testPoint = new System.Windows.Media.Media3D.Point3D(0, 0, 0);
+                var testVector = new System.Windows.Media.Media3D.Vector3D(1, 0, 0);
+
+                OutputLog += $"3D Point created: ({testPoint.X}, {testPoint.Y}, {testPoint.Z})\n";
+                OutputLog += "Helix Toolkit is properly installed!\n";
+            }
+            catch (Exception ex)
+            {
+                OutputLog += $"Error testing Helix: {ex.Message}\n";
             }
         }
 

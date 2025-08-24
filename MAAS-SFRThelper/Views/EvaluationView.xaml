@@ -6,7 +6,7 @@
              xmlns:local="clr-namespace:MAAS_SFRThelper.Views"
              xmlns:viewmodels="clr-namespace:MAAS_SFRThelper.ViewModels"
              xmlns:system="clr-namespace:System;assembly=mscorlib"
-             
+             xmlns:helix="http://helix-toolkit.org/wpf"
              mc:Ignorable="d"
              d:DesignHeight="650" d:DesignWidth="900" Background="GhostWhite">
 
@@ -183,13 +183,71 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Plot Canvas with proper margins for axis labels -->
+                    <!-- Plot area that can show either 2D or 3D -->
                     <Grid Grid.Column="0" Margin="10,10,5,40">
+                        <!-- 2D Canvas (shown for 1D and 2D modes) -->
                         <Canvas x:Name="PlotCanvas"
-                                Background="White"
-                                HorizontalAlignment="Stretch"
-                                VerticalAlignment="Stretch"/>
+                Background="White"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch">
+                            <Canvas.Style>
+                                <Style TargetType="Canvas">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Style.Triggers>
+                                        <!-- Hide canvas when 3D P/V is selected and we're in plot view -->
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding Is3DInterpolationSelected}" Value="True"/>
+                                                <Condition Binding="{Binding bPlotVis}" Value="True"/>
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Canvas.Style>
+                        </Canvas>
+
+                        <!-- 3D Viewport (shown for 3D P/V mode) -->
+                        <helix:HelixViewport3D x:Name="Viewport3D"
+                               Background="WhiteSmoke"
+                               ShowFrameRate="True"
+                               ShowCoordinateSystem="True">
+                            <helix:HelixViewport3D.Style>
+                                <Style TargetType="helix:HelixViewport3D">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <!-- Show viewport when 3D P/V is selected and we're in plot view -->
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding Is3DInterpolationSelected}" Value="True"/>
+                                                <Condition Binding="{Binding bPlotVis}" Value="True"/>
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </helix:HelixViewport3D.Style>
+
+                            <!-- Camera setup -->
+                            <!-- In your HelixViewport3D, update the camera -->
+                            <helix:HelixViewport3D.Camera>
+                                <PerspectiveCamera Position="150,150,100" 
+                                      LookDirection="-1,-1,-0.5"
+                                      UpDirection="0,0,1"
+                                      FieldOfView="60"/>
+                            </helix:HelixViewport3D.Camera>
+
+                            <!-- Default lighting -->
+                            <helix:DefaultLights/>
+
+                            <!-- Grid and axes for reference -->
+                            <helix:GridLinesVisual3D Width="500" Length="500" MinorDistance="10" MajorDistance="50" Thickness="0.1"/>
+
+                            <!-- Bind to our 3D model -->
+                            <ModelVisual3D Content="{Binding Model3DGroup}"/>
+                        </helix:HelixViewport3D>
                     </Grid>
+
 
                     <!-- Vertical Depth Controls on the right -->
                     <StackPanel Grid.Column="1" 
