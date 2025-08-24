@@ -19,6 +19,7 @@ using VMS.TPS.Common.Model.API;
 using VMS.TPS.Common.Model.Types;
 using System.Windows.Media.Media3D;
 using System.Windows.Media;
+using System.Windows.Input;
 
 namespace MAAS_SFRThelper.ViewModels
 {
@@ -148,11 +149,15 @@ namespace MAAS_SFRThelper.ViewModels
         // 3D Visualization fields
         private Model3DGroup _3dModelGroup;
         private bool _is3DVisualizationReady = false;
+
         // Add this field with your other private fields
         private Structure _currentStructure;
+
         // Add with your other private fields
         private MeshData _currentStructureMesh;
 
+        // Add this field if needed (though it's not used after removing the mouse handlers)
+        private Point? _lastMousePosition;
         // Add this public property for binding to the view
         public Model3DGroup Model3DGroup
         {
@@ -160,6 +165,42 @@ namespace MAAS_SFRThelper.ViewModels
             set { SetProperty(ref _3dModelGroup, value); }
         }
 
+        // Legend text properties
+        private string _legendMaxText = "100";
+        private string _legendMinText = "0";
+        private string _legend75Text = "75";
+        private string _legend50Text = "50";
+        private string _legend25Text = "25";
+
+        public string LegendMaxText
+        {
+            get { return _legendMaxText; }
+            set { SetProperty(ref _legendMaxText, value); }
+        }
+
+        public string LegendMinText
+        {
+            get { return _legendMinText; }
+            set { SetProperty(ref _legendMinText, value); }
+        }
+
+        public string Legend75Text
+        {
+            get { return _legend75Text; }
+            set { SetProperty(ref _legend75Text, value); }
+        }
+
+        public string Legend50Text
+        {
+            get { return _legend50Text; }
+            set { SetProperty(ref _legend50Text, value); }
+        }
+
+        public string Legend25Text
+        {
+            get { return _legend25Text; }
+            set { SetProperty(ref _legend25Text, value); }
+        }
         private bool _showOnionLayers = false;
         public bool ShowOnionLayers
         {
@@ -4032,101 +4073,6 @@ namespace MAAS_SFRThelper.ViewModels
         }
 
 
-
-
-        // Add the 3D Legend method
-        //private void Add3DLegend(Model3DGroup modelGroup, double doseMin, double doseMax)
-        //{
-        //    try
-        //    {
-        //        OutputLog += "Adding 3D dose legend...\n";
-
-        //        // Position legend to the right side
-        //        double legendX = 70;
-        //        double legendY = -40;
-        //        double legendZ = 0;
-
-        //        // Create color bar
-        //        double barHeight = 80;
-        //        double barWidth = 8;
-        //        double barDepth = 2;
-        //        int colorSteps = 20;
-
-        //        for (int i = 0; i < colorSteps; i++)
-        //        {
-        //            double norm = i / (double)(colorSteps - 1);
-        //            Color color = GetImprovedDoseColor(norm);
-
-        //            double yPos = legendY + (i / (double)colorSteps) * barHeight;
-        //            double segmentHeight = barHeight / colorSteps * 1.1; // Slight overlap
-
-        //            // Create a colored segment
-        //            var mesh = new MeshGeometry3D();
-
-        //            // Create a small box for this color segment
-        //            mesh.Positions.Add(new Point3D(legendX, yPos, legendZ));
-        //            mesh.Positions.Add(new Point3D(legendX + barWidth, yPos, legendZ));
-        //            mesh.Positions.Add(new Point3D(legendX + barWidth, yPos + segmentHeight, legendZ));
-        //            mesh.Positions.Add(new Point3D(legendX, yPos + segmentHeight, legendZ));
-
-        //            mesh.Positions.Add(new Point3D(legendX, yPos, legendZ + barDepth));
-        //            mesh.Positions.Add(new Point3D(legendX + barWidth, yPos, legendZ + barDepth));
-        //            mesh.Positions.Add(new Point3D(legendX + barWidth, yPos + segmentHeight, legendZ + barDepth));
-        //            mesh.Positions.Add(new Point3D(legendX, yPos + segmentHeight, legendZ + barDepth));
-
-        //            // Front face
-        //            mesh.TriangleIndices.Add(0); mesh.TriangleIndices.Add(1); mesh.TriangleIndices.Add(2);
-        //            mesh.TriangleIndices.Add(0); mesh.TriangleIndices.Add(2); mesh.TriangleIndices.Add(3);
-
-        //            // Back face
-        //            mesh.TriangleIndices.Add(4); mesh.TriangleIndices.Add(6); mesh.TriangleIndices.Add(5);
-        //            mesh.TriangleIndices.Add(4); mesh.TriangleIndices.Add(7); mesh.TriangleIndices.Add(6);
-
-        //            var material = new DiffuseMaterial(new SolidColorBrush(color));
-        //            modelGroup.Children.Add(new GeometryModel3D(mesh, material));
-        //        }
-
-        //        // Add tick marks at key positions
-        //        var tickPositions = new[]
-        //        {
-        //    new { pos = 0.0, label = $"{doseMin:F0}" },
-        //    new { pos = 0.25, label = $"{doseMin + 0.25*(doseMax-doseMin):F0}" },
-        //    new { pos = 0.5, label = $"{doseMin + 0.5*(doseMax-doseMin):F0}" },
-        //    new { pos = 0.75, label = $"{doseMin + 0.75*(doseMax-doseMin):F0}" },
-        //    new { pos = 1.0, label = $"{doseMax:F0}" }
-        //};
-
-        //        foreach (var tick in tickPositions)
-        //        {
-        //            double yPos = legendY + tick.pos * barHeight;
-
-        //            // Add a small tick mark
-        //            var tickLine = CreateLine(
-        //                new Point3D(legendX + barWidth, yPos, legendZ),
-        //                new Point3D(legendX + barWidth + 3, yPos, legendZ),
-        //                0.5
-        //            );
-        //            modelGroup.Children.Add(new GeometryModel3D(tickLine,
-        //                new DiffuseMaterial(new SolidColorBrush(Colors.White))));
-        //        }
-
-        //        // Add "Dose (Gy)" label as a marker
-        //        var labelMarker = CreateLine(
-        //            new Point3D(legendX + barWidth / 2, legendY + barHeight + 5, legendZ),
-        //            new Point3D(legendX + barWidth / 2, legendY + barHeight + 6, legendZ),
-        //            2
-        //        );
-        //        modelGroup.Children.Add(new GeometryModel3D(labelMarker,
-        //            new DiffuseMaterial(new SolidColorBrush(Colors.White))));
-
-        //        OutputLog += $"Legend added showing range: {doseMin:F1} - {doseMax:F1} Gy\n";
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        OutputLog += $"Error adding legend: {ex.Message}\n";
-        //    }
-        //}
-
         private void CreateOnionLayers(Model3DGroup modelGroup, double doseMin, double doseMax,
                                double centerX, double centerY, double centerZ,
                                double xScale, double yScale, double zScale)
@@ -4596,7 +4542,13 @@ namespace MAAS_SFRThelper.ViewModels
             FinishSlices:
 
                 // STEP 6: ADD 3D LEGEND
-                Add3DLegend(modelGroup, doseMin_forNormalization, doseMax_forNormalization);
+                // Add3DLegend(modelGroup, doseMin_forNormalization, doseMax_forNormalization);
+                // Update legend text labels
+                LegendMaxText = $"{doseMax_forNormalization:F0}";
+                Legend75Text = $"{doseMin_forNormalization + 0.75 * (doseMax_forNormalization - doseMin_forNormalization):F0}";
+                Legend50Text = $"{doseMin_forNormalization + 0.50 * (doseMax_forNormalization - doseMin_forNormalization):F0}";
+                Legend25Text = $"{doseMin_forNormalization + 0.25 * (doseMax_forNormalization - doseMin_forNormalization):F0}";
+                LegendMinText = $"{doseMin_forNormalization:F0}";
 
                 // STEP 7: ADD REFERENCE GEOMETRY
                 OutputLog += "\nAdding reference geometry...\n";
@@ -4673,97 +4625,97 @@ namespace MAAS_SFRThelper.ViewModels
             }
         }
         // Add the 3D Legend method
-        private void Add3DLegend(Model3DGroup modelGroup, double doseMin, double doseMax)
-        {
-            try
-            {
-                OutputLog += "Adding 3D dose legend...\n";
+        //private void Add3DLegend(Model3DGroup modelGroup, double doseMin, double doseMax)
+        //{
+        //    try
+        //    {
+        //        OutputLog += "Adding 3D dose legend...\n";
 
-                // Position legend to the right side
-                double legendX = 70;
-                double legendY = -40;
-                double legendZ = 0;
+        //        // Position legend to the right side
+        //        double legendX = 70;
+        //        double legendY = -40;
+        //        double legendZ = 0;
 
-                // Create color bar
-                double barHeight = 80;
-                double barWidth = 8;
-                double barDepth = 2;
-                int colorSteps = 20;
+        //        // Create color bar
+        //        double barHeight = 80;
+        //        double barWidth = 8;
+        //        double barDepth = 2;
+        //        int colorSteps = 20;
 
-                for (int i = 0; i < colorSteps; i++)
-                {
-                    double norm = i / (double)(colorSteps - 1);
-                    Color color = GetImprovedDoseColor(norm);
+        //        for (int i = 0; i < colorSteps; i++)
+        //        {
+        //            double norm = i / (double)(colorSteps - 1);
+        //            Color color = GetImprovedDoseColor(norm);
 
-                    double yPos = legendY + (i / (double)colorSteps) * barHeight;
-                    double segmentHeight = barHeight / colorSteps * 1.1; // Slight overlap
+        //            double yPos = legendY + (i / (double)colorSteps) * barHeight;
+        //            double segmentHeight = barHeight / colorSteps * 1.1; // Slight overlap
 
-                    // Create a colored segment
-                    var mesh = new MeshGeometry3D();
+        //            // Create a colored segment
+        //            var mesh = new MeshGeometry3D();
 
-                    // Create a small box for this color segment
-                    mesh.Positions.Add(new Point3D(legendX, yPos, legendZ));
-                    mesh.Positions.Add(new Point3D(legendX + barWidth, yPos, legendZ));
-                    mesh.Positions.Add(new Point3D(legendX + barWidth, yPos + segmentHeight, legendZ));
-                    mesh.Positions.Add(new Point3D(legendX, yPos + segmentHeight, legendZ));
+        //            // Create a small box for this color segment
+        //            mesh.Positions.Add(new Point3D(legendX, yPos, legendZ));
+        //            mesh.Positions.Add(new Point3D(legendX + barWidth, yPos, legendZ));
+        //            mesh.Positions.Add(new Point3D(legendX + barWidth, yPos + segmentHeight, legendZ));
+        //            mesh.Positions.Add(new Point3D(legendX, yPos + segmentHeight, legendZ));
 
-                    mesh.Positions.Add(new Point3D(legendX, yPos, legendZ + barDepth));
-                    mesh.Positions.Add(new Point3D(legendX + barWidth, yPos, legendZ + barDepth));
-                    mesh.Positions.Add(new Point3D(legendX + barWidth, yPos + segmentHeight, legendZ + barDepth));
-                    mesh.Positions.Add(new Point3D(legendX, yPos + segmentHeight, legendZ + barDepth));
+        //            mesh.Positions.Add(new Point3D(legendX, yPos, legendZ + barDepth));
+        //            mesh.Positions.Add(new Point3D(legendX + barWidth, yPos, legendZ + barDepth));
+        //            mesh.Positions.Add(new Point3D(legendX + barWidth, yPos + segmentHeight, legendZ + barDepth));
+        //            mesh.Positions.Add(new Point3D(legendX, yPos + segmentHeight, legendZ + barDepth));
 
-                    // Front face
-                    mesh.TriangleIndices.Add(0); mesh.TriangleIndices.Add(1); mesh.TriangleIndices.Add(2);
-                    mesh.TriangleIndices.Add(0); mesh.TriangleIndices.Add(2); mesh.TriangleIndices.Add(3);
+        //            // Front face
+        //            mesh.TriangleIndices.Add(0); mesh.TriangleIndices.Add(1); mesh.TriangleIndices.Add(2);
+        //            mesh.TriangleIndices.Add(0); mesh.TriangleIndices.Add(2); mesh.TriangleIndices.Add(3);
 
-                    // Back face
-                    mesh.TriangleIndices.Add(4); mesh.TriangleIndices.Add(6); mesh.TriangleIndices.Add(5);
-                    mesh.TriangleIndices.Add(4); mesh.TriangleIndices.Add(7); mesh.TriangleIndices.Add(6);
+        //            // Back face
+        //            mesh.TriangleIndices.Add(4); mesh.TriangleIndices.Add(6); mesh.TriangleIndices.Add(5);
+        //            mesh.TriangleIndices.Add(4); mesh.TriangleIndices.Add(7); mesh.TriangleIndices.Add(6);
 
-                    var material = new DiffuseMaterial(new SolidColorBrush(color));
-                    modelGroup.Children.Add(new GeometryModel3D(mesh, material));
-                }
+        //            var material = new DiffuseMaterial(new SolidColorBrush(color));
+        //            modelGroup.Children.Add(new GeometryModel3D(mesh, material));
+        //        }
 
-                // Add tick marks at key positions
-                var tickPositions = new[]
-                {
-            new { pos = 0.0, label = $"{doseMin:F0}" },
-            new { pos = 0.25, label = $"{doseMin + 0.25*(doseMax-doseMin):F0}" },
-            new { pos = 0.5, label = $"{doseMin + 0.5*(doseMax-doseMin):F0}" },
-            new { pos = 0.75, label = $"{doseMin + 0.75*(doseMax-doseMin):F0}" },
-            new { pos = 1.0, label = $"{doseMax:F0}" }
-        };
+        //        // Add tick marks at key positions
+        //        var tickPositions = new[]
+        //        {
+        //    new { pos = 0.0, label = $"{doseMin:F0}" },
+        //    new { pos = 0.25, label = $"{doseMin + 0.25*(doseMax-doseMin):F0}" },
+        //    new { pos = 0.5, label = $"{doseMin + 0.5*(doseMax-doseMin):F0}" },
+        //    new { pos = 0.75, label = $"{doseMin + 0.75*(doseMax-doseMin):F0}" },
+        //    new { pos = 1.0, label = $"{doseMax:F0}" }
+        //};
 
-                foreach (var tick in tickPositions)
-                {
-                    double yPos = legendY + tick.pos * barHeight;
+        //        foreach (var tick in tickPositions)
+        //        {
+        //            double yPos = legendY + tick.pos * barHeight;
 
-                    // Add a small tick mark
-                    var tickLine = CreateLine(
-                        new Point3D(legendX + barWidth, yPos, legendZ),
-                        new Point3D(legendX + barWidth + 3, yPos, legendZ),
-                        0.5
-                    );
-                    modelGroup.Children.Add(new GeometryModel3D(tickLine,
-                        new DiffuseMaterial(new SolidColorBrush(Colors.White))));
-                }
+        //            // Add a small tick mark
+        //            var tickLine = CreateLine(
+        //                new Point3D(legendX + barWidth, yPos, legendZ),
+        //                new Point3D(legendX + barWidth + 3, yPos, legendZ),
+        //                0.5
+        //            );
+        //            modelGroup.Children.Add(new GeometryModel3D(tickLine,
+        //                new DiffuseMaterial(new SolidColorBrush(Colors.White))));
+        //        }
 
-                // Add "Dose (Gy)" label as a marker
-                var labelMarker = CreateLine(
-                    new Point3D(legendX + barWidth / 2, legendY + barHeight + 5, legendZ),
-                    new Point3D(legendX + barWidth / 2, legendY + barHeight + 6, legendZ),
-                    2
-                );
-                modelGroup.Children.Add(new GeometryModel3D(labelMarker,
-                    new DiffuseMaterial(new SolidColorBrush(Colors.White))));
+        //        // Add "Dose (Gy)" label as a marker
+        //        var labelMarker = CreateLine(
+        //            new Point3D(legendX + barWidth / 2, legendY + barHeight + 5, legendZ),
+        //            new Point3D(legendX + barWidth / 2, legendY + barHeight + 6, legendZ),
+        //            2
+        //        );
+        //        modelGroup.Children.Add(new GeometryModel3D(labelMarker,
+        //            new DiffuseMaterial(new SolidColorBrush(Colors.White))));
 
-                OutputLog += $"Legend added showing range: {doseMin:F1} - {doseMax:F1} Gy\n";
-            }
-            catch (Exception ex)
-            {
-                OutputLog += $"Error adding legend: {ex.Message}\n";
-            }
-        }
+        //        OutputLog += $"Legend added showing range: {doseMin:F1} - {doseMax:F1} Gy\n";
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        OutputLog += $"Error adding legend: {ex.Message}\n";
+        //    }
+        //}
 
         // Keep your existing GetImprovedDoseColor method
         private Color GetImprovedDoseColor(double normalizedDose)
@@ -5103,60 +5055,8 @@ namespace MAAS_SFRThelper.ViewModels
             OutputLog += "  Green: 30-50%\n";
             OutputLog += "  Blue: 10-30%\n";
         }
-
-        //private void AddBoundingBox(Model3DGroup modelGroup)
-        //{
-        //    try
-        //    {
-        //        if (_dose3DGrid == null) return;
-
-        //        var origin = _dose3DGrid.Origin;
-        //        var size = new VVector(
-        //            _dose3DGrid.NX * _dose3DGrid.Spacing.x,
-        //            _dose3DGrid.NY * _dose3DGrid.Spacing.y,
-        //            _dose3DGrid.NZ * _dose3DGrid.Spacing.z
-        //        );
-
-        //        // Create wireframe box material
-        //        var boxMaterial = new DiffuseMaterial(new SolidColorBrush(Color.FromArgb(50, 128, 128, 128)));
-
-        //        // Create thin lines for the box edges
-        //        double thickness = 0.5; // mm
-
-        //        // Create 12 edges of the box
-        //        // Bottom edges
-        //        AddBoxEdge(modelGroup, origin, new VVector(origin.x + size.x, origin.y, origin.z), thickness, boxMaterial);
-        //        AddBoxEdge(modelGroup, origin, new VVector(origin.x, origin.y + size.y, origin.z), thickness, boxMaterial);
-        //        AddBoxEdge(modelGroup, new VVector(origin.x + size.x, origin.y, origin.z),
-        //                   new VVector(origin.x + size.x, origin.y + size.y, origin.z), thickness, boxMaterial);
-        //        AddBoxEdge(modelGroup, new VVector(origin.x, origin.y + size.y, origin.z),
-        //                   new VVector(origin.x + size.x, origin.y + size.y, origin.z), thickness, boxMaterial);
-
-        //        // Top edges
-        //        var topZ = origin.z + size.z;
-        //        AddBoxEdge(modelGroup, new VVector(origin.x, origin.y, topZ),
-        //                   new VVector(origin.x + size.x, origin.y, topZ), thickness, boxMaterial);
-        //        AddBoxEdge(modelGroup, new VVector(origin.x, origin.y, topZ),
-        //                   new VVector(origin.x, origin.y + size.y, topZ), thickness, boxMaterial);
-        //        AddBoxEdge(modelGroup, new VVector(origin.x + size.x, origin.y, topZ),
-        //                   new VVector(origin.x + size.x, origin.y + size.y, topZ), thickness, boxMaterial);
-        //        AddBoxEdge(modelGroup, new VVector(origin.x, origin.y + size.y, topZ),
-        //                   new VVector(origin.x + size.x, origin.y + size.y, topZ), thickness, boxMaterial);
-
-        //        // Vertical edges
-        //        AddBoxEdge(modelGroup, origin, new VVector(origin.x, origin.y, topZ), thickness, boxMaterial);
-        //        AddBoxEdge(modelGroup, new VVector(origin.x + size.x, origin.y, origin.z),
-        //                   new VVector(origin.x + size.x, origin.y, topZ), thickness, boxMaterial);
-        //        AddBoxEdge(modelGroup, new VVector(origin.x, origin.y + size.y, origin.z),
-        //                   new VVector(origin.x, origin.y + size.y, topZ), thickness, boxMaterial);
-        //        AddBoxEdge(modelGroup, new VVector(origin.x + size.x, origin.y + size.y, origin.z),
-        //                   new VVector(origin.x + size.x, origin.y + size.y, topZ), thickness, boxMaterial);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        OutputLog += $"Error adding bounding box: {ex.Message}\n";
-        //    }
-        //}
+                        
+        
 
         private void AddBoxEdge(Model3DGroup group, VVector start, VVector end, double thickness, Material material)
         {
