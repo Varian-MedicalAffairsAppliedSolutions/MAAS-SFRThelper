@@ -24,6 +24,35 @@ using System.Windows.Input;
 namespace MAAS_SFRThelper.ViewModels
 {
 
+    public class PVCluster
+    {
+        public int Id { get; set; }
+        public bool IsPeak { get; set; }
+        public List<(int slice, int x, int y)> Voxels { get; set; } = new List<(int, int, int)>();
+        public double MeanDose { get; set; }
+        public double MaxDose { get; set; }
+        public double MinDose { get; set; }
+        public VVector Centroid { get; set; }
+        public double Volume { get; set; } // in cc
+    }
+
+    public class PVAnalysisResultsClustered
+    {
+        public List<PVCluster> Peaks { get; set; } = new List<PVCluster>();
+        public List<PVCluster> Valleys { get; set; } = new List<PVCluster>();
+        public double EffectivePVDR { get; set; } // Volume-weighted PVDR
+        public double MeanPeakDose { get; set; }
+        public double MeanValleyDose { get; set; }
+        public double PeakVolumePercent { get; set; }
+        public double ValleyVolumePercent { get; set; }
+        public double HeterogeneityIndex { get; set; }
+        public double CoefficientOfVariation { get; set; }
+        public double MeanPeakSeparation { get; set; } // mm
+        public int TotalVoxels { get; set; }
+        public double DosePercentile80 { get; set; }
+        public double DosePercentile20 { get; set; }
+    }
+
     // 3D Grid for dose sampling
     public class DoseGrid3D
     {
@@ -140,6 +169,7 @@ namespace MAAS_SFRThelper.ViewModels
         private DoseGrid3D _dose3DGrid;
         private PVAnalysisResults _pvResults;
         private bool _has3DData = false;
+        private PVAnalysisResultsClustered _pvClusterResults;
 
         // 3D Analysis parameters (make these configurable later if needed)
         private double _gridResolution3D = 2.0; // mm
@@ -1189,108 +1219,7 @@ namespace MAAS_SFRThelper.ViewModels
                 MessageBox.Show($"Error loading beams: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-
-
-        //private void ExecuteComputeDose()
-        //{
-        //    try
-        //    {
-        //        OutputLog += "Starting dose computation...\n";
-
-        //        // Copy selected IDs to local variables to avoid potential thread issues
-        //        string selectedBeamId = SelectedBeamId;
-        //        string selectedTumorId = SelectedTumorId;
-        //        string ptvAllName = SelectedTumorId;
-        //        string selectedPvdrMode = SelectedPvdrMode;
-
-        //        // Always need a structure
-        //        if (string.IsNullOrEmpty(selectedTumorId))
-        //        {
-        //            OutputLog += "No structure selected. Please select a structure.\n";
-        //            return;
-        //        }
-
-        //        // Only need beam selection for 1D and 2D modes
-        //        if (!Is3DEvaluationSelected && !Is3DInterpolationSelected)
-        //        {
-        //            if (string.IsNullOrEmpty(selectedBeamId))
-        //            {
-        //                OutputLog += "No beam selected. Please select a beam.\n";
-        //                return;
-        //            }
-        //        }
-
-        //        _esapiWorker.RunWithWait(context =>
-        //        {
-        //            try
-        //            {
-        //                var plan = _plan;
-        //                if (plan == null)
-        //                {
-        //                    OutputLog += "No plan available. Cannot compute dose.\n";
-        //                    return;
-        //                }
-
-        //                if (plan.Dose == null)
-        //                {
-        //                    OutputLog += "No 3D dose is calculated for this plan. Please calculate dose first.\n";
-        //                    return;
-        //                }
-
-        //                if (Is1DCAXSelected)
-        //                {
-        //                    OutputLog += "Running 1D CAX computation...\n";
-        //                    Run1DPVDRMetric(selectedTumorId, plan);
-        //                    OutputLog += "1D CAX Dosimetrics complete\n \n \n \n";
-        //                    return;
-        //                }
-
-        //                if (Is2DPlanarSelected)
-        //                {
-        //                    OutputLog += "Running 2D Planar computation...\n";
-        //                    Run2DPVDRMetric(selectedTumorId, plan);
-        //                    OutputLog += "2D Planar Dosimetrics complete\n \n \n \n";
-        //                    return;
-        //                }
-
-        //                if (Is3DEvaluationSelected)
-        //                {
-        //                    OutputLog += "Running 3D Dose Metrics...\n";
-        //                    update3DMetrics(selectedTumorId, ptvAllName, plan);
-        //                    OutputLog += "3D Dosimetrics complete\n \n \n \n";
-        //                    return;
-        //                }
-
-        //                // *** NEW: Handle 3D P/V Interpolation mode ***
-        //                if (Is3DInterpolationSelected)
-        //                {
-        //                    OutputLog += "Running 3D P/V Analysis...\n";
-        //                    Run3DPVAnalysis(selectedTumorId, plan);
-        //                    OutputLog += "3D P/V Analysis complete\n \n \n \n";
-        //                    return;
-        //                }
-        //            }
-        //            catch (Exception ex)
-        //            {
-        //                OutputLog += $"Error during dose computation: {ex.Message}\n";
-        //                if (ex.InnerException != null)
-        //                {
-        //                    OutputLog += $"Inner Exception: {ex.InnerException.Message}\n";
-        //                }
-        //            }
-        //        });
-
-        //        // Update the commands that depend on data availability
-        //        SaveCsvCommand.RaiseCanExecuteChanged();
-        //        ShowPlotCommand.RaiseCanExecuteChanged();
-        //        RefreshPlotCommand?.RaiseCanExecuteChanged();
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        OutputLog += $"Critical error in ExecuteComputeDose: {ex.Message}\n";
-        //        MessageBox.Show($"Error computing dose: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-        //    }
-        //}
+                
         private void ExecuteComputeDose()
         {
             try
@@ -1383,18 +1312,28 @@ namespace MAAS_SFRThelper.ViewModels
                 MessageBox.Show($"Error computing dose: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+        
+
         public bool CanExecuteSaveCsv()
         {
             try
             {
-                if (_distances == null)
-                    return false;
+                // Check for 1D data
+                if (Is1DCAXSelected && _distances != null && _distances.Count > 0)
+                    return true;
 
-                return _distances.Count > 0;
+                // Check for 2D data
+                if (Is2DPlanarSelected && _has2DPlotData && _doseSlices != null && _doseSlices.Count > 0)
+                    return true;
+
+                // Check for 3D metrics data (3D Evaluation or 3D P/V Interpolation)
+                if ((Is3DEvaluationSelected || Is3DInterpolationSelected) && AllMetrics != null && AllMetrics.Count > 0)
+                    return true;
+
+                return false;
             }
             catch
             {
-                // If there's any error accessing the collection, assume we can't save
                 return false;
             }
         }
@@ -1427,103 +1366,301 @@ namespace MAAS_SFRThelper.ViewModels
             }
         }
 
+       
         private void ExecuteSaveCsv()
         {
             try
             {
-                // Use a simple direct approach with minimal ESAPI interaction
                 OutputLog += "Starting CSV save operation...\n";
 
-                if (_distances == null || _distances.Count == 0 ||
-                    _doseValues == null || _doseValues.Count == 0 ||
-                    _insideTumorFlags == null || _insideTumorFlags.Count == 0)
+                // Determine which type of data to save based on selected mode
+                if (Is1DCAXSelected)
                 {
-                    OutputLog += "No data to save. Please compute dose first.\n";
-                    MessageBox.Show("No data available to save. Please compute dose first.", "No Data", MessageBoxButton.OK, MessageBoxImage.Information);
-                    return;
+                    Save1DDataToCsv();
                 }
-
-                // Safely create filename without any ESAPI object access
-                string planId = "NoPlan";
-                string beamId = "NoBeam";
-                string tumorId = "NoTumor";
-
-                // Use stored IDs which are already strings, not ESAPI objects
-                if (!string.IsNullOrEmpty(SelectedBeamId))
-                    beamId = SelectedBeamId.Replace(' ', '_').Replace('\\', '_').Replace('/', '_');
-
-                if (!string.IsNullOrEmpty(SelectedTumorId))
-                    tumorId = SelectedTumorId.Replace(' ', '_').Replace('\\', '_').Replace('/', '_');
-
-                // Build data in memory
-                var lines = new List<string>();
-                lines.Add("Distance(mm),Dose(Gy),IsInsideTumor");
-
-                int minCount = Math.Min(Math.Min(_distances.Count, _doseValues.Count), _insideTumorFlags.Count);
-
-                for (int i = 0; i < minCount; i++)
+                else if (Is2DPlanarSelected)
                 {
-                    string line = string.Format("{0:F1},{1:F3},{2}",
-                        _distances[i],
-                        _doseValues[i],
-                        _insideTumorFlags[i] ? "1" : "0");
-                    lines.Add(line);
+                    Save2DDataToCsv();
                 }
-
-                // Create the file on desktop
-                try
+                else if (Is3DEvaluationSelected || Is3DInterpolationSelected)
                 {
-                    string fileName = String.Format("TumorDose_{0}_{1}_{2}_{3:yyyyMMdd_HHmmss}.csv",
-                        planId, beamId, tumorId, DateTime.Now);
-
-                    string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-                    string filePath = System.IO.Path.Combine(desktopPath, fileName);
-
-                    // Write content all at once
-                    File.WriteAllLines(filePath, lines);
-
-                    OutputLog += "Data saved to: " + filePath + "\n";
-                    MessageBox.Show("Data saved to:\n" + filePath, "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                    SaveMetricsToCsv();
                 }
-                catch (Exception ex)
+                else
                 {
-                    OutputLog += "Error writing to desktop: " + ex.Message + "\n";
-
-                    // Try Documents folder
-                    try
-                    {
-                        string fileName = String.Format("TumorDose_{0}_{1}_{2}_{3:yyyyMMdd_HHmmss}.csv",
-                            planId, beamId, tumorId, DateTime.Now);
-
-                        string docPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-                        string filePath = System.IO.Path.Combine(docPath, fileName);
-
-                        // Write content all at once
-                        File.WriteAllLines(filePath, lines);
-
-                        OutputLog += "Data saved to: " + filePath + "\n";
-                        MessageBox.Show("Data saved to:\n" + filePath, "Success", MessageBoxButton.OK, MessageBoxImage.Information);
-                    }
-                    catch (Exception ex2)
-                    {
-                        OutputLog += "Error writing to documents folder: " + ex2.Message + "\n";
-                        MessageBox.Show("Could not save data. Please check the log for details.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
+                    OutputLog += "No data available to save in current mode.\n";
+                    MessageBox.Show("No data available to save. Please compute dose first.",
+                        "No Data", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             }
             catch (Exception ex)
             {
-                // Last resort error handling
+                OutputLog += $"Critical error in ExecuteSaveCsv: {ex.Message}\n";
+                MessageBox.Show($"Error saving data: {ex.Message}",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void Save1DDataToCsv()
+        {
+            if (_distances == null || _distances.Count == 0 ||
+                _doseValues == null || _doseValues.Count == 0 ||
+                _insideTumorFlags == null || _insideTumorFlags.Count == 0)
+            {
+                OutputLog += "No 1D CAX data to save. Please compute dose first.\n";
+                MessageBox.Show("No 1D data available to save. Please compute dose first.",
+                    "No Data", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            string beamId = SelectedBeamId?.Replace(' ', '_').Replace('\\', '_').Replace('/', '_') ?? "NoBeam";
+            string tumorId = SelectedTumorId?.Replace(' ', '_').Replace('\\', '_').Replace('/', '_') ?? "NoTumor";
+
+            var lines = new List<string>();
+            lines.Add("Distance(mm),Dose(Gy),IsInsideTumor");
+
+            int minCount = Math.Min(Math.Min(_distances.Count, _doseValues.Count), _insideTumorFlags.Count);
+
+            for (int i = 0; i < minCount; i++)
+            {
+                string line = string.Format("{0:F1},{1:F3},{2}",
+                    _distances[i],
+                    _doseValues[i],
+                    _insideTumorFlags[i] ? "1" : "0");
+                lines.Add(line);
+            }
+
+            SaveLinesToFile(lines, $"1D_CAX_{tumorId}_{beamId}");
+        }
+
+        // Add new method for saving 2D planar data
+        private void Save2DDataToCsv()
+        {
+            if (!_has2DPlotData || _doseSlices == null || _doseSlices.Count == 0)
+            {
+                OutputLog += "No 2D planar data to save.\n";
+                MessageBox.Show("No 2D data available to save. Please compute dose first.",
+                    "No Data", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            string beamId = SelectedBeamId?.Replace(' ', '_').Replace('\\', '_').Replace('/', '_') ?? "NoBeam";
+            string tumorId = SelectedTumorId?.Replace(' ', '_').Replace('\\', '_').Replace('/', '_') ?? "NoTumor";
+
+            var lines = new List<string>();
+            lines.Add("SliceIndex,Depth(mm),X(mm),Y(mm),Dose(Gy),InsideStructure");
+
+            for (int sliceIdx = 0; sliceIdx < _doseSlices.Count; sliceIdx++)
+            {
+                var doseSlice = _doseSlices[sliceIdx];
+                var structSlice = _structSlices[sliceIdx];
+                var uGrid = _uGridSlices[sliceIdx];
+                var vGrid = _vGridSlices[sliceIdx];
+                var (nX, nY) = _sliceDimensions[sliceIdx];
+                double depth = _depthValues[sliceIdx];
+
+                // Sample data (not all points to keep file manageable)
+                int step = Math.Max(1, Math.Max(nX, nY) / 50); // Limit to ~2500 points per slice
+
+                for (int i = 0; i < nX; i += step)
+                {
+                    for (int j = 0; j < nY; j += step)
+                    {
+                        if (structSlice[i, j] && !double.IsNaN(doseSlice[i, j]))
+                        {
+                            lines.Add(string.Format("{0},{1:F1},{2:F1},{3:F1},{4:F3},{5}",
+                                sliceIdx + 1,
+                                depth,
+                                uGrid[i, j],
+                                vGrid[i, j],
+                                doseSlice[i, j],
+                                structSlice[i, j] ? "1" : "0"));
+                        }
+                    }
+                }
+            }
+
+            SaveLinesToFile(lines, $"2D_Planar_{tumorId}_{beamId}");
+        }
+
+        // Add new method for saving metrics data
+        private void SaveMetricsToCsv()
+        {
+            if (AllMetrics == null || AllMetrics.Count == 0)
+            {
+                OutputLog += "No metrics data to save.\n";
+                MessageBox.Show("No metrics available to save. Please compute dose first.",
+                    "No Data", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            string tumorId = SelectedTumorId?.Replace(' ', '_').Replace('\\', '_').Replace('/', '_') ?? "NoTumor";
+            string analysisType = Is3DEvaluationSelected ? "3D_Metrics" : "PV_Analysis";
+
+            var lines = new List<string>();
+
+            // Add header information
+            lines.Add($"# {analysisType} Report");
+            lines.Add($"# Structure: {SelectedTumorId}");
+            lines.Add($"# Generated: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            lines.Add($"# Analysis Mode: {(Is3DEvaluationSelected ? "3D Dose Metrics" : "3D P/V Interpolation")}");
+            lines.Add("");
+
+            // Add column headers
+            lines.Add("Metric,Value");
+
+            // Add all metrics
+            foreach (var metric in AllMetrics)
+            {
+                // Skip section headers (those with empty values)
+                if (string.IsNullOrEmpty(metric.value))
+                {
+                    // Add as comment for readability
+                    lines.Add($"# {metric.metric}");
+                }
+                else
+                {
+                    // Escape commas in metric names if present
+                    string metricName = metric.metric.Contains(",") ?
+                        $"\"{metric.metric}\"" : metric.metric;
+                    string metricValue = metric.value.Contains(",") ?
+                        $"\"{metric.value}\"" : metric.value;
+
+                    lines.Add($"{metricName},{metricValue}");
+                }
+            }
+
+            // Add additional P/V clustering details if available
+            if (Is3DInterpolationSelected && _pvClusterResults != null)
+            {
+                lines.Add("");
+                lines.Add("# === DETAILED P/V CLUSTER DATA ===");
+                lines.Add("");
+
+                // Peak clusters details
+                lines.Add("# Peak Clusters");
+                lines.Add("ClusterID,Type,VoxelCount,Volume(cc),MeanDose(Gy),MaxDose(Gy),MinDose(Gy),CentroidX(mm),CentroidY(mm),CentroidZ(mm)");
+
+                foreach (var peak in _pvClusterResults.Peaks)
+                {
+                    lines.Add(string.Format("{0},Peak,{1},{2:F3},{3:F2},{4:F2},{5:F2},{6:F1},{7:F1},{8:F1}",
+                        peak.Id,
+                        peak.Voxels.Count,
+                        peak.Volume,
+                        peak.MeanDose,
+                        peak.MaxDose,
+                        peak.MinDose,
+                        peak.Centroid.x,
+                        peak.Centroid.y,
+                        peak.Centroid.z));
+                }
+
+                lines.Add("");
+                lines.Add("# Valley Clusters");
+
+                foreach (var valley in _pvClusterResults.Valleys)
+                {
+                    lines.Add(string.Format("{0},Valley,{1},{2:F3},{3:F2},{4:F2},{5:F2},{6:F1},{7:F1},{8:F1}",
+                        valley.Id,
+                        valley.Voxels.Count,
+                        valley.Volume,
+                        valley.MeanDose,
+                        valley.MaxDose,
+                        valley.MinDose,
+                        valley.Centroid.x,
+                        valley.Centroid.y,
+                        valley.Centroid.z));
+                }
+            }
+
+            SaveLinesToFile(lines, $"{analysisType}_{tumorId}");
+        }
+
+        // Add helper method to handle file saving
+        private void SaveLinesToFile(List<string> lines, string baseFileName)
+        {
+            try
+            {
+                string fileName = $"{baseFileName}_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+
+                // Try to save to desktop first
+                string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                string filePath = System.IO.Path.Combine(desktopPath, fileName);
+
                 try
                 {
-                    OutputLog += "Critical error: " + ex.Message + "\n";
-                    MessageBox.Show("Critical error saving data: " + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    File.WriteAllLines(filePath, lines);
+                    OutputLog += $"Data saved to: {filePath}\n";
+                    MessageBox.Show($"Data saved successfully to:\n{filePath}",
+                        "Success", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // If even the MessageBox fails, we can't do much else
-                    MessageBox.Show("A critical error occurred.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    OutputLog += $"Error writing to desktop: {ex.Message}\n";
+
+                    // Try Documents folder as fallback
+                    string docPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                    filePath = System.IO.Path.Combine(docPath, fileName);
+
+                    File.WriteAllLines(filePath, lines);
+                    OutputLog += $"Data saved to: {filePath}\n";
+                    MessageBox.Show($"Data saved successfully to:\n{filePath}",
+                        "Success", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
+            }
+            catch (Exception ex)
+            {
+                OutputLog += $"Error saving file: {ex.Message}\n";
+                MessageBox.Show($"Could not save data: {ex.Message}",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        // Optional: Add a method to export all data at once (multiple CSV files)
+        private void ExportAllDataToCsv()
+        {
+            try
+            {
+                OutputLog += "Exporting all available data...\n";
+                int filesExported = 0;
+
+                // Export 1D data if available
+                if (Is1DCAXSelected && _distances != null && _distances.Count > 0)
+                {
+                    Save1DDataToCsv();
+                    filesExported++;
+                }
+
+                // Export 2D data if available
+                if (Is2DPlanarSelected && _has2DPlotData)
+                {
+                    Save2DDataToCsv();
+                    filesExported++;
+                }
+
+                // Export metrics if available
+                if ((Is3DEvaluationSelected || Is3DInterpolationSelected) && AllMetrics.Count > 0)
+                {
+                    SaveMetricsToCsv();
+                    filesExported++;
+                }
+
+                if (filesExported == 0)
+                {
+                    OutputLog += "No data available to export.\n";
+                    MessageBox.Show("No data available to export. Please compute dose first.",
+                        "No Data", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                else
+                {
+                    OutputLog += $"Successfully exported {filesExported} file(s).\n";
+                }
+            }
+            catch (Exception ex)
+            {
+                OutputLog += $"Error during export: {ex.Message}\n";
+                MessageBox.Show($"Error exporting data: {ex.Message}",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -3516,7 +3653,7 @@ namespace MAAS_SFRThelper.ViewModels
 
         private void Run3DPVAnalysis(string tumorId, PlanSetup plan)
         {
-            OutputLog += "\n===== Starting 3D Slice Stack Visualization =====\n";
+            OutputLog += "\n===== Starting 3D P/V Clustering Analysis =====\n";
 
             try
             {
@@ -3528,7 +3665,7 @@ namespace MAAS_SFRThelper.ViewModels
                     return;
                 }
 
-                // Extract mesh for structure outline
+                // Extract mesh for structure outline (keeping your existing code)
                 _currentStructureMesh = new MeshData();
                 try
                 {
@@ -3560,12 +3697,8 @@ namespace MAAS_SFRThelper.ViewModels
                 OutputLog += $"Analyzing structure: {tumorId}\n";
                 OutputLog += $"Structure volume: {structure.Volume:F2} cc\n";
 
-                // DELETE ALL THE OLD CODE - no Create3DDoseGrid, no DetectPeaksAndValleys, etc.
-
-                // JUST compute 2D slices using existing method
+                // Compute 2D slices using existing method
                 OutputLog += "Computing standardized axial slices for 3D visualization...\n";
-
-                // Use your existing 2D computation
                 var beamData = Compute2DAllBeamsStandardized(structure, plan);
 
                 if (beamData == null || !beamData.HasData)
@@ -3584,48 +3717,510 @@ namespace MAAS_SFRThelper.ViewModels
 
                 OutputLog += $"Computed {_doseSlices.Count} axial slices\n";
 
-                // Find dose range
-                double maxDose = 0;
-                double minDose = double.MaxValue;
+                // NOW ADD P/V CLUSTERING ANALYSIS
+                OutputLog += "\n=== Starting Peak-Valley Clustering Analysis ===\n";
+                _pvClusterResults = PerformPVClusteringAnalysis();
 
-                foreach (var slice in _doseSlices)
+                if (_pvClusterResults != null)
                 {
-                    for (int i = 0; i < slice.GetLength(0); i++)
-                    {
-                        for (int j = 0; j < slice.GetLength(1); j++)
-                        {
-                            if (!double.IsNaN(slice[i, j]) && slice[i, j] > 0)
-                            {
-                                maxDose = Math.Max(maxDose, slice[i, j]);
-                                minDose = Math.Min(minDose, slice[i, j]);
-                            }
-                        }
-                    }
+                    DisplayPVClusterResults();
                 }
-
-                OutputLog += $"Dose range across all slices: {minDose:F2} - {maxDose:F2} Gy\n";
 
                 // Set flags for visualization
                 _has3DData = true;
                 _has2DPlotData = true;
 
-                // NO CALLS TO OLD METHODS - DELETE THESE LINES:
-                // _dose3DGrid = Create3DDoseGrid(structure, totalDose);  // DELETE
-                // _pvResults = DetectPeaksAndValleys(_dose3DGrid, structure);  // DELETE
-                // CalculatePVMetrics(_pvResults, _dose3DGrid);  // DELETE
-                // DisplayPVResults();  // DELETE
-
-                OutputLog += "===== 3D Slice Stack Data Ready =====\n";
+                OutputLog += "===== 3D P/V Analysis Complete =====\n";
             }
             catch (Exception ex)
             {
-                OutputLog += $"Error in 3D slice stack preparation: {ex.Message}\n";
+                OutputLog += $"Error in 3D P/V Analysis: {ex.Message}\n";
             }
+        }
+
+        // Add this new method for P/V clustering analysis
+        private PVAnalysisResultsClustered PerformPVClusteringAnalysis()
+        {
+            try
+            {
+                var results = new PVAnalysisResultsClustered();
+
+                // Step 1: Collect all dose values within structure
+                var allDoses = new List<double>();
+                var voxelData = new List<(int slice, int x, int y, double dose, double u, double v)>();
+
+                for (int sliceIdx = 0; sliceIdx < _doseSlices.Count; sliceIdx++)
+                {
+                    var doseSlice = _doseSlices[sliceIdx];
+                    var structSlice = _structSlices[sliceIdx];
+                    var uGrid = _uGridSlices[sliceIdx];
+                    var vGrid = _vGridSlices[sliceIdx];
+                    var (nX, nY) = _sliceDimensions[sliceIdx];
+
+                    for (int i = 0; i < nX; i++)
+                    {
+                        for (int j = 0; j < nY; j++)
+                        {
+                            if (structSlice[i, j] && !double.IsNaN(doseSlice[i, j]) && doseSlice[i, j] > 0)
+                            {
+                                double dose = doseSlice[i, j];
+                                allDoses.Add(dose);
+                                voxelData.Add((sliceIdx, i, j, dose, uGrid[i, j], vGrid[i, j]));
+                            }
+                        }
+                    }
+                }
+
+                results.TotalVoxels = allDoses.Count;
+                OutputLog += $"Total voxels in structure: {results.TotalVoxels}\n";
+
+                if (allDoses.Count == 0)
+                {
+                    OutputLog += "No valid dose voxels found!\n";
+                    return results;
+                }
+
+                // Step 2: Calculate percentile thresholds
+                allDoses.Sort();
+                int idx80 = (int)(allDoses.Count * 0.80);
+                int idx20 = (int)(allDoses.Count * 0.20);
+
+                results.DosePercentile80 = allDoses[Math.Min(idx80, allDoses.Count - 1)];
+                results.DosePercentile20 = allDoses[Math.Max(0, idx20)];
+
+                OutputLog += $"Dose thresholds - Peaks: > {results.DosePercentile80:F2} Gy (80th percentile)\n";
+                OutputLog += $"                 Valleys: < {results.DosePercentile20:F2} Gy (20th percentile)\n";
+
+                // Step 3: Create binary masks for peaks and valleys
+                var peakMask = new Dictionary<(int, int, int), bool>();
+                var valleyMask = new Dictionary<(int, int, int), bool>();
+
+                foreach (var voxel in voxelData)
+                {
+                    var key = (voxel.slice, voxel.x, voxel.y);
+                    peakMask[key] = voxel.dose > results.DosePercentile80;
+                    valleyMask[key] = voxel.dose < results.DosePercentile20;
+                }
+
+                // Step 4: Perform 3D clustering for peaks
+                OutputLog += "\nClustering peaks...\n";
+                var peakClusters = Perform3DClustering(peakMask, voxelData, true, results.DosePercentile80);
+                results.Peaks = peakClusters;
+
+                // Step 5: Perform 3D clustering for valleys
+                OutputLog += "Clustering valleys...\n";
+                var valleyClusters = Perform3DClustering(valleyMask, voxelData, false, results.DosePercentile20);
+                results.Valleys = valleyClusters;
+
+                OutputLog += $"Found {results.Peaks.Count} peak clusters and {results.Valleys.Count} valley clusters\n";
+
+                // Step 6: Calculate biological metrics
+                CalculateBiologicalMetrics(results, voxelData);
+
+                return results;
+            }
+            catch (Exception ex)
+            {
+                OutputLog += $"Error in P/V clustering analysis: {ex.Message}\n";
+                return null;
+            }
+        }
+
+        // Add 3D clustering method
+        private List<PVCluster> Perform3DClustering(
+            Dictionary<(int, int, int), bool> mask,
+            List<(int slice, int x, int y, double dose, double u, double v)> voxelData,
+            bool isPeak,
+            double threshold)
+        {
+            var clusters = new List<PVCluster>();
+            var visited = new HashSet<(int, int, int)>();
+            int clusterId = 0;
+
+            // Convert voxelData to dictionary for quick lookup
+            var voxelDict = voxelData.ToDictionary(
+                v => (v.slice, v.x, v.y),
+                v => (v.dose, v.u, v.v)
+            );
+
+            foreach (var kvp in mask)
+            {
+                if (!kvp.Value || visited.Contains(kvp.Key))
+                    continue;
+
+                // Start new cluster
+                var cluster = new PVCluster
+                {
+                    Id = clusterId++,
+                    IsPeak = isPeak
+                };
+
+                // BFS to find connected voxels
+                var queue = new Queue<(int, int, int)>();
+                queue.Enqueue(kvp.Key);
+                visited.Add(kvp.Key);
+
+                double sumDose = 0;
+                double sumX = 0, sumY = 0, sumZ = 0;
+                double maxDose = double.MinValue;
+                double minDose = double.MaxValue;
+
+                while (queue.Count > 0)
+                {
+                    var current = queue.Dequeue();
+                    cluster.Voxels.Add(current);
+
+                    if (voxelDict.TryGetValue(current, out var voxelInfo))
+                    {
+                        sumDose += voxelInfo.dose;
+                        sumX += voxelInfo.u;
+                        sumY += _depthValues[current.Item1]; // Use depth value for Y
+                        sumZ += voxelInfo.v;
+                        maxDose = Math.Max(maxDose, voxelInfo.dose);
+                        minDose = Math.Min(minDose, voxelInfo.dose);
+                    }
+
+                    // Check 26-connectivity neighbors
+                    for (int ds = -1; ds <= 1; ds++)
+                    {
+                        for (int dx = -1; dx <= 1; dx++)
+                        {
+                            for (int dy = -1; dy <= 1; dy++)
+                            {
+                                if (ds == 0 && dx == 0 && dy == 0) continue;
+
+                                int newSlice = current.Item1 + ds;
+                                int newX = current.Item2 + dx;
+                                int newY = current.Item3 + dy;
+
+                                // Check bounds
+                                if (newSlice < 0 || newSlice >= _doseSlices.Count) continue;
+                                var (nX, nY) = _sliceDimensions[newSlice];
+                                if (newX < 0 || newX >= nX || newY < 0 || newY >= nY) continue;
+
+                                var neighbor = (newSlice, newX, newY);
+
+                                if (mask.ContainsKey(neighbor) && mask[neighbor] && !visited.Contains(neighbor))
+                                {
+                                    queue.Enqueue(neighbor);
+                                    visited.Add(neighbor);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Calculate cluster properties
+                if (cluster.Voxels.Count > 0)
+                {
+                    int count = cluster.Voxels.Count;
+                    cluster.MeanDose = sumDose / count;
+                    cluster.MaxDose = maxDose;
+                    cluster.MinDose = minDose;
+                    cluster.Centroid = new VVector(sumX / count, sumY / count, sumZ / count);
+
+                    // Estimate volume (assuming 1.5mm x 1.5mm x 2-3mm voxels)
+                    double voxelVolume = 1.5 * 1.5 * 2.5 / 1000.0; // in cc
+                    cluster.Volume = count * voxelVolume;
+
+                    // Only keep clusters with minimum size (avoid noise)
+                    int minClusterSize = isPeak ? 3 : 5; // Peaks can be smaller
+                    if (cluster.Voxels.Count >= minClusterSize)
+                    {
+                        clusters.Add(cluster);
+                    }
+                }
+            }
+
+            OutputLog += $"  Found {clusters.Count} {(isPeak ? "peak" : "valley")} clusters\n";
+
+            // Sort clusters by volume (largest first)
+            clusters.Sort((a, b) => b.Volume.CompareTo(a.Volume));
+
+            // Log largest clusters
+            int reportCount = Math.Min(5, clusters.Count);
+            for (int i = 0; i < reportCount; i++)
+            {
+                var c = clusters[i];
+                OutputLog += $"    Cluster {i + 1}: {c.Voxels.Count} voxels, ";
+                OutputLog += $"Mean dose: {c.MeanDose:F2} Gy, Volume: {c.Volume:F3} cc\n";
+            }
+
+            return clusters;
+        }
+
+        // Calculate biological metrics
+        private void CalculateBiologicalMetrics(PVAnalysisResultsClustered results,
+            List<(int slice, int x, int y, double dose, double u, double v)> voxelData)
+        {
+            try
+            {
+                OutputLog += "\n=== Calculating Biological Metrics ===\n";
+
+                // 1. Volume percentages
+                int peakVoxelCount = results.Peaks.Sum(p => p.Voxels.Count);
+                int valleyVoxelCount = results.Valleys.Sum(v => v.Voxels.Count);
+
+                results.PeakVolumePercent = 100.0 * peakVoxelCount / results.TotalVoxels;
+                results.ValleyVolumePercent = 100.0 * valleyVoxelCount / results.TotalVoxels;
+
+                OutputLog += $"Peak volume: {results.PeakVolumePercent:F1}% of structure\n";
+                OutputLog += $"Valley volume: {results.ValleyVolumePercent:F1}% of structure\n";
+
+                // 2. Mean doses
+                if (results.Peaks.Count > 0)
+                {
+                    results.MeanPeakDose = results.Peaks.Average(p => p.MeanDose);
+                }
+
+                if (results.Valleys.Count > 0)
+                {
+                    results.MeanValleyDose = results.Valleys.Average(v => v.MeanDose);
+                }
+
+                // 3. Effective PVDR (volume-weighted)
+                if (results.Valleys.Count > 0 && results.MeanValleyDose > 0)
+                {
+                    // Weight by cluster volumes
+                    double weightedPeakDose = 0;
+                    double totalPeakVolume = 0;
+
+                    foreach (var peak in results.Peaks)
+                    {
+                        weightedPeakDose += peak.MeanDose * peak.Volume;
+                        totalPeakVolume += peak.Volume;
+                    }
+
+                    double weightedValleyDose = 0;
+                    double totalValleyVolume = 0;
+
+                    foreach (var valley in results.Valleys)
+                    {
+                        weightedValleyDose += valley.MeanDose * valley.Volume;
+                        totalValleyVolume += valley.Volume;
+                    }
+
+                    if (totalPeakVolume > 0 && totalValleyVolume > 0)
+                    {
+                        double effectivePeakDose = weightedPeakDose / totalPeakVolume;
+                        double effectiveValleyDose = weightedValleyDose / totalValleyVolume;
+                        results.EffectivePVDR = effectivePeakDose / effectiveValleyDose;
+                    }
+                    else
+                    {
+                        // Fallback to simple mean
+                        results.EffectivePVDR = results.MeanPeakDose / results.MeanValleyDose;
+                    }
+                }
+
+                OutputLog += $"Effective PVDR: {results.EffectivePVDR:F2}\n";
+
+                // 4. Heterogeneity Index (HI)
+                var allDosesInVoxels = voxelData.Select(v => v.dose).ToList();
+                double maxDose = allDosesInVoxels.Max();
+                double minDose = allDosesInVoxels.Min();
+                results.HeterogeneityIndex = (maxDose - minDose) / maxDose;
+
+                OutputLog += $"Heterogeneity Index: {results.HeterogeneityIndex:F3}\n";
+
+                // 5. Coefficient of Variation (CV)
+                double meanDose = allDosesInVoxels.Average();
+                double stdDev = Math.Sqrt(allDosesInVoxels.Average(d => Math.Pow(d - meanDose, 2)));
+                results.CoefficientOfVariation = stdDev / meanDose;
+
+                OutputLog += $"Coefficient of Variation: {results.CoefficientOfVariation:F3}\n";
+
+                // 6. Mean Peak Separation
+                if (results.Peaks.Count > 1)
+                {
+                    var separations = new List<double>();
+
+                    for (int i = 0; i < results.Peaks.Count; i++)
+                    {
+                        for (int j = i + 1; j < results.Peaks.Count; j++)
+                        {
+                            var c1 = results.Peaks[i].Centroid;
+                            var c2 = results.Peaks[j].Centroid;
+
+                            double dx = c1.x - c2.x;
+                            double dy = c1.y - c2.y;
+                            double dz = c1.z - c2.z;
+                            double distance = Math.Sqrt(dx * dx + dy * dy + dz * dz);
+
+                            separations.Add(distance);
+                        }
+                    }
+
+                    if (separations.Count > 0)
+                    {
+                        results.MeanPeakSeparation = separations.Average();
+                        OutputLog += $"Mean peak separation: {results.MeanPeakSeparation:F1} mm\n";
+
+                        // Determine if this is SFRT or minibeam scale
+                        if (results.MeanPeakSeparation > 5.0)
+                        {
+                            OutputLog += "Pattern scale: SFRT (cm-scale spacing)\n";
+                        }
+                        else
+                        {
+                            OutputLog += "Pattern scale: Minibeam (mm-scale spacing)\n";
+                        }
+                    }
+                }
+
+                OutputLog += "=== Biological Metrics Complete ===\n";
+            }
+            catch (Exception ex)
+            {
+                OutputLog += $"Error calculating biological metrics: {ex.Message}\n";
+            }
+        }
+
+        // Display P/V clustering results in metrics grid
+        private void DisplayPVClusterResults()
+        {
+            if (_pvClusterResults == null) return;
+
+            OutputLog += "\nUpdating metrics display with P/V results...\n";
+
+            // Clear previous metrics
+            AllMetrics.Clear();
+
+            // Add P/V clustering metrics
+            AllMetrics.Add(new MetricData
+            {
+                metric = "=== PEAK-VALLEY ANALYSIS ===",
+                value = ""
+            });
+
+            AllMetrics.Add(new MetricData
+            {
+                metric = "Number of Peak Clusters",
+                value = _pvClusterResults.Peaks.Count.ToString()
+            });
+
+            AllMetrics.Add(new MetricData
+            {
+                metric = "Number of Valley Clusters",
+                value = _pvClusterResults.Valleys.Count.ToString()
+            });
+
+            AllMetrics.Add(new MetricData
+            {
+                metric = "Effective PVDR",
+                value = double.IsNaN(_pvClusterResults.EffectivePVDR) ? "N/A" :
+                        Math.Round(_pvClusterResults.EffectivePVDR, 2).ToString()
+            });
+
+            AllMetrics.Add(new MetricData
+            {
+                metric = "Mean Peak Dose (Gy)",
+                value = Math.Round(_pvClusterResults.MeanPeakDose, 2).ToString()
+            });
+
+            AllMetrics.Add(new MetricData
+            {
+                metric = "Mean Valley Dose (Gy)",
+                value = Math.Round(_pvClusterResults.MeanValleyDose, 2).ToString()
+            });
+
+            AllMetrics.Add(new MetricData
+            {
+                metric = "Peak Volume (%)",
+                value = Math.Round(_pvClusterResults.PeakVolumePercent, 1).ToString()
+            });
+
+            AllMetrics.Add(new MetricData
+            {
+                metric = "Valley Volume (%)",
+                value = Math.Round(_pvClusterResults.ValleyVolumePercent, 1).ToString()
+            });
+
+            AllMetrics.Add(new MetricData
+            {
+                metric = "Heterogeneity Index",
+                value = Math.Round(_pvClusterResults.HeterogeneityIndex, 3).ToString()
+            });
+
+            AllMetrics.Add(new MetricData
+            {
+                metric = "Coefficient of Variation",
+                value = Math.Round(_pvClusterResults.CoefficientOfVariation, 3).ToString()
+            });
+
+            AllMetrics.Add(new MetricData
+            {
+                metric = "Mean Peak Separation (mm)",
+                value = _pvClusterResults.MeanPeakSeparation > 0 ?
+                        Math.Round(_pvClusterResults.MeanPeakSeparation, 1).ToString() : "N/A"
+            });
+
+            AllMetrics.Add(new MetricData
+            {
+                metric = "Pattern Type",
+                value = _pvClusterResults.MeanPeakSeparation > 5.0 ? "SFRT (cm-scale)" : "Minibeam (mm-scale)"
+            });
+
+            // Add threshold information
+            AllMetrics.Add(new MetricData
+            {
+                metric = "=== THRESHOLDS USED ===",
+                value = ""
+            });
+
+            AllMetrics.Add(new MetricData
+            {
+                metric = "Peak Threshold (80th %ile)",
+                value = $"{Math.Round(_pvClusterResults.DosePercentile80, 2)} Gy"
+            });
+
+            AllMetrics.Add(new MetricData
+            {
+                metric = "Valley Threshold (20th %ile)",
+                value = $"{Math.Round(_pvClusterResults.DosePercentile20, 2)} Gy"
+            });
+
+            AllMetrics.Add(new MetricData
+            {
+                metric = "Total Structure Voxels",
+                value = _pvClusterResults.TotalVoxels.ToString()
+            });
+
+            // Add top 3 peaks info
+            if (_pvClusterResults.Peaks.Count > 0)
+            {
+                AllMetrics.Add(new MetricData
+                {
+                    metric = "=== LARGEST PEAKS ===",
+                    value = ""
+                });
+
+                for (int i = 0; i < Math.Min(3, _pvClusterResults.Peaks.Count); i++)
+                {
+                    var peak = _pvClusterResults.Peaks[i];
+                    AllMetrics.Add(new MetricData
+                    {
+                        metric = $"Peak {i + 1} Volume (cc)",
+                        value = Math.Round(peak.Volume, 3).ToString()
+                    });
+
+                    AllMetrics.Add(new MetricData
+                    {
+                        metric = $"Peak {i + 1} Mean Dose (Gy)",
+                        value = Math.Round(peak.MeanDose, 2).ToString()
+                    });
+                }
+            }
+
+            // Force UI update
+            RaisePropertyChanged(nameof(AllMetrics));
+
+            OutputLog += $"Added {AllMetrics.Count} P/V metrics to display\n";
         }
 
         //private void Run3DPVAnalysis(string tumorId, PlanSetup plan)
         //{
-        //    OutputLog += "\n===== Starting Unified 3D P/V Analysis =====\n";
+        //    OutputLog += "\n===== Starting 3D Slice Stack Visualization =====\n";
 
         //    try
         //    {
@@ -3637,20 +4232,17 @@ namespace MAAS_SFRThelper.ViewModels
         //            return;
         //        }
 
-        //        // Extract mesh data while in ESAPI thread - store as simple data
+        //        // Extract mesh for structure outline
         //        _currentStructureMesh = new MeshData();
-
         //        try
         //        {
         //            if (structure.MeshGeometry != null && structure.MeshGeometry.Positions != null)
         //            {
-        //                // Extract all data as simple types while in ESAPI thread
         //                var positions = structure.MeshGeometry.Positions;
         //                var triangles = structure.MeshGeometry.TriangleIndices;
 
         //                OutputLog += $"Extracting mesh with {positions.Count} vertices...\n";
 
-        //                // Copy data, don't reference ESAPI objects
         //                foreach (var point in positions)
         //                {
         //                    _currentStructureMesh.Positions.Add(new Point3D(point.X, point.Y, point.Z));
@@ -3669,493 +4261,72 @@ namespace MAAS_SFRThelper.ViewModels
         //            OutputLog += $"Warning: Could not extract mesh: {meshEx.Message}\n";
         //        }
 
-        //        var totalDose = plan.Dose;
-        //        if (totalDose == null)
-        //        {
-        //            OutputLog += "No dose calculated for this plan.\n";
-        //            return;
-        //        }
-
         //        OutputLog += $"Analyzing structure: {tumorId}\n";
         //        OutputLog += $"Structure volume: {structure.Volume:F2} cc\n";
 
-        //        // Create 3D dose grid
-        //        //OutputLog += "Creating 3D dose grid...\n";
-        //        //_dose3DGrid = Create3DDoseGrid(structure, totalDose);
+        //        // DELETE ALL THE OLD CODE - no Create3DDoseGrid, no DetectPeaksAndValleys, etc.
 
-        //        if (_dose3DGrid == null)
+        //        // JUST compute 2D slices using existing method
+        //        OutputLog += "Computing standardized axial slices for 3D visualization...\n";
+
+        //        // Use your existing 2D computation
+        //        var beamData = Compute2DAllBeamsStandardized(structure, plan);
+
+        //        if (beamData == null || !beamData.HasData)
         //        {
-        //            OutputLog += "Failed to create 3D dose grid.\n";
+        //            OutputLog += "Failed to compute 2D slices.\n";
         //            return;
         //        }
 
-        //        OutputLog += $"Grid dimensions: {_dose3DGrid.NX} x {_dose3DGrid.NY} x {_dose3DGrid.NZ}\n";
-        //        OutputLog += $"Dose range: {_dose3DGrid.MinDose:F2} - {_dose3DGrid.MaxDose:F2} Gy\n";
+        //        // Store the slice data
+        //        _doseSlices = beamData.DoseSlices;
+        //        _structSlices = beamData.StructSlices;
+        //        _uGridSlices = beamData.UGridSlices;
+        //        _vGridSlices = beamData.VGridSlices;
+        //        _depthValues = beamData.DepthValues;
+        //        _sliceDimensions = beamData.SliceDimensions;
 
-        //        // Detect peaks and valleys
-        //        //OutputLog += "Detecting peaks and valleys...\n";
-        //        //_pvResults = DetectPeaksAndValleys(_dose3DGrid, structure);
+        //        OutputLog += $"Computed {_doseSlices.Count} axial slices\n";
 
-        //        if (_pvResults == null)
+        //        // Find dose range
+        //        double maxDose = 0;
+        //        double minDose = double.MaxValue;
+
+        //        foreach (var slice in _doseSlices)
         //        {
-        //            OutputLog += "Failed to detect peaks and valleys.\n";
-        //            return;
+        //            for (int i = 0; i < slice.GetLength(0); i++)
+        //            {
+        //                for (int j = 0; j < slice.GetLength(1); j++)
+        //                {
+        //                    if (!double.IsNaN(slice[i, j]) && slice[i, j] > 0)
+        //                    {
+        //                        maxDose = Math.Max(maxDose, slice[i, j]);
+        //                        minDose = Math.Min(minDose, slice[i, j]);
+        //                    }
+        //                }
+        //            }
         //        }
 
-        //        OutputLog += $"Found {_pvResults.Peaks.Count} peaks and {_pvResults.Valleys.Count} valleys\n";
+        //        OutputLog += $"Dose range across all slices: {minDose:F2} - {maxDose:F2} Gy\n";
 
-        //        // Calculate P/V metrics
-        //        //OutputLog += "Calculating P/V metrics...\n";
-        //        //CalculatePVMetrics(_pvResults, _dose3DGrid);
-
-        //        // Display results
-        //        //DisplayPVResults();
-
+        //        // Set flags for visualization
         //        _has3DData = true;
-        //        OutputLog += "===== 3D P/V Analysis Complete =====\n";
+        //        _has2DPlotData = true;
 
-        //        // DON'T use Dispatcher here - just set the flag
+        //        // NO CALLS TO OLD METHODS - DELETE THESE LINES:
+        //        // _dose3DGrid = Create3DDoseGrid(structure, totalDose);  // DELETE
+        //        // _pvResults = DetectPeaksAndValleys(_dose3DGrid, structure);  // DELETE
+        //        // CalculatePVMetrics(_pvResults, _dose3DGrid);  // DELETE
+        //        // DisplayPVResults();  // DELETE
+
+        //        OutputLog += "===== 3D Slice Stack Data Ready =====\n";
         //    }
         //    catch (Exception ex)
         //    {
-        //        OutputLog += $"Error in 3D P/V Analysis: {ex.Message}\n";
+        //        OutputLog += $"Error in 3D slice stack preparation: {ex.Message}\n";
         //    }
         //}
-
-        // Create 3D dose grid by sampling at regular intervals
-        //private DoseGrid3D Create3DDoseGrid(Structure structure, Dose dose)
-        //{
-        //    try
-        //    {
-        //        // Get structure bounds
-        //        var bounds = structure.MeshGeometry.Bounds;
-
-        //        OutputLog += $"Structure bounds: X[{bounds.X:F1}-{bounds.X + bounds.SizeX:F1}], ";
-        //        OutputLog += $"Y[{bounds.Y:F1}-{bounds.Y + bounds.SizeY:F1}], ";
-        //        OutputLog += $"Z[{bounds.Z:F1}-{bounds.Z + bounds.SizeZ:F1}]\n";
-        //        OutputLog += $"Structure size: {bounds.SizeX:F1} x {bounds.SizeY:F1} x {bounds.SizeZ:F1} mm\n";
-
-        //        // DEBUG: Let's check the structure center
-        //        var centerPoint = structure.CenterPoint;
-        //        OutputLog += $"Structure center: ({centerPoint.x:F1}, {centerPoint.y:F1}, {centerPoint.z:F1})\n";
-
-        //        // DEBUG: Test some specific points
-        //        OutputLog += "Testing specific points:\n";
-        //        var testPoint1 = new VVector(centerPoint.x, centerPoint.y, centerPoint.z);
-        //        bool centerInside = structure.IsPointInsideSegment(testPoint1);
-        //        OutputLog += $"  Center point inside? {centerInside}\n";
-
-        //        // Test points at different Z levels
-        //        for (double z = bounds.Z; z <= bounds.Z + bounds.SizeZ; z += 20)
-        //        {
-        //            var testPt = new VVector(centerPoint.x, centerPoint.y, z);
-        //            bool inside = structure.IsPointInsideSegment(testPt);
-        //            OutputLog += $"  Point at ({centerPoint.x:F1}, {centerPoint.y:F1}, {z:F1}) inside? {inside}\n";
-        //        }
-
-        //        // Use structure bounds directly without padding first to see what we get
-        //        double minX = bounds.X;
-        //        double maxX = bounds.X + bounds.SizeX;
-        //        double minY = bounds.Y;
-        //        double maxY = bounds.Y + bounds.SizeY;
-        //        double minZ = bounds.Z;
-        //        double maxZ = bounds.Z + bounds.SizeZ;
-
-        //        // Calculate grid dimensions
-        //        int nx = (int)Math.Ceiling((maxX - minX) / _gridResolution3D);
-        //        int ny = (int)Math.Ceiling((maxY - minY) / _gridResolution3D);
-        //        int nz = (int)Math.Ceiling((maxZ - minZ) / _gridResolution3D);
-
-        //        OutputLog += $"Grid will be {nx} x {ny} x {nz} with {_gridResolution3D}mm spacing\n";
-
-        //        var grid = new DoseGrid3D(nx, ny, nz)
-        //        {
-        //            Origin = new VVector(minX, minY, minZ),
-        //            Spacing = new VVector(_gridResolution3D, _gridResolution3D, _gridResolution3D)
-        //        };
-
-        //        // Sample dose at each grid point
-        //        int insideCount = 0;
-        //        int totalPoints = 0;
-
-        //        // Track distribution in all dimensions
-        //        Dictionary<int, int> xDistribution = new Dictionary<int, int>();
-        //        Dictionary<int, int> yDistribution = new Dictionary<int, int>();
-        //        Dictionary<int, int> zDistribution = new Dictionary<int, int>();
-
-        //        for (int i = 0; i < nx; i++)
-        //        {
-        //            double x = minX + i * _gridResolution3D;
-
-        //            for (int j = 0; j < ny; j++)
-        //            {
-        //                double y = minY + j * _gridResolution3D;
-
-        //                for (int k = 0; k < nz; k++)
-        //                {
-        //                    double z = minZ + k * _gridResolution3D;
-        //                    var point = new VVector(x, y, z);
-        //                    totalPoints++;
-
-        //                    // Check if point is inside structure
-        //                    bool isInside = structure.IsPointInsideSegment(point);
-
-        //                    if (isInside)
-        //                    {
-        //                        insideCount++;
-
-        //                        // Track distribution
-        //                        if (!xDistribution.ContainsKey(i)) xDistribution[i] = 0;
-        //                        if (!yDistribution.ContainsKey(j)) yDistribution[j] = 0;
-        //                        if (!zDistribution.ContainsKey(k)) zDistribution[k] = 0;
-
-        //                        xDistribution[i]++;
-        //                        yDistribution[j]++;
-        //                        zDistribution[k]++;
-
-        //                        var doseValue = dose.GetDoseToPoint(point);
-        //                        if (doseValue != null)
-        //                        {
-        //                            double doseGy = doseValue.Dose;
-        //                            grid.Values[i, j, k] = doseGy;
-
-        //                            if (doseGy > grid.MaxDose) grid.MaxDose = doseGy;
-        //                            if (doseGy < grid.MinDose) grid.MinDose = doseGy;
-        //                        }
-        //                        else
-        //                        {
-        //                            grid.Values[i, j, k] = 0; // Use 0 instead of NaN for inside but no dose
-        //                        }
-        //                    }
-        //                    else
-        //                    {
-        //                        grid.Values[i, j, k] = double.NaN;
-        //                    }
-        //                }
-        //            }
-        //        }
-
-        //        OutputLog += $"Sampled {insideCount} voxels inside structure out of {totalPoints} total\n";
-
-        //        // Show distribution in all dimensions
-        //        OutputLog += $"X distribution: {xDistribution.Count} slices with points (should be ~100 for sphere)\n";
-        //        OutputLog += $"Y distribution: {yDistribution.Count} slices with points (should be ~100 for sphere)\n";
-        //        OutputLog += $"Z distribution: {zDistribution.Count} slices with points (should be ~99 for sphere)\n";
-
-        //        // Show first and last slices with points
-        //        if (zDistribution.Count > 0)
-        //        {
-        //            int minZ_k = zDistribution.Keys.Min();
-        //            int maxZ_k = zDistribution.Keys.Max();
-        //            OutputLog += $"Z range with points: slice {minZ_k} to {maxZ_k} (out of {nz} total)\n";
-        //            double actualMinZ = minZ + minZ_k * _gridResolution3D;
-        //            double actualMaxZ = minZ + maxZ_k * _gridResolution3D;
-        //            OutputLog += $"Actual Z range with points: {actualMinZ:F1} to {actualMaxZ:F1} mm\n";
-        //        }
-
-        //        return grid;
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        OutputLog += $"Error creating 3D grid: {ex.Message}\n";
-        //        return null;
-        //    }
-        //}
-
-        //// Detect peaks and valleys using local maxima/minima approach
-        //private PVAnalysisResults DetectPeaksAndValleys(DoseGrid3D grid, Structure structure)
-        //{
-        //    var results = new PVAnalysisResults
-        //    {
-        //        MaxDose = grid.MaxDose,
-        //        MinDose = grid.MinDose
-        //    };
-
-        //    try
-        //    {
-        //        // Calculate thresholds
-        //        double peakThreshold = _peakThresholdPercent * grid.MaxDose;
-        //        double valleyThreshold = _valleyThresholdPercent * grid.MaxDose;
-
-        //        OutputLog += $"Peak threshold: > {peakThreshold:F2} Gy ({_peakThresholdPercent * 100}% of max)\n";
-        //        OutputLog += $"Valley threshold: < {valleyThreshold:F2} Gy ({_valleyThresholdPercent * 100}% of max)\n";
-
-        //        int structureVoxelCount = 0;
-        //        int peakVoxelCount = 0;
-        //        int valleyVoxelCount = 0;
-
-        //        // Method 1: Simple threshold-based detection
-        //        for (int i = 1; i < grid.NX - 1; i++)
-        //        {
-        //            for (int j = 1; j < grid.NY - 1; j++)
-        //            {
-        //                for (int k = 1; k < grid.NZ - 1; k++)
-        //                {
-        //                    double centerDose = grid.Values[i, j, k];
-
-        //                    // Skip if outside structure
-        //                    if (double.IsNaN(centerDose))
-        //                        continue;
-
-        //                    structureVoxelCount++;
-
-        //                    // Check if local maximum (peak)
-        //                    bool isLocalMax = true;
-        //                    bool isLocalMin = true;
-
-        //                    // Check 26 neighbors
-        //                    for (int di = -1; di <= 1; di++)
-        //                    {
-        //                        for (int dj = -1; dj <= 1; dj++)
-        //                        {
-        //                            for (int dk = -1; dk <= 1; dk++)
-        //                            {
-        //                                if (di == 0 && dj == 0 && dk == 0)
-        //                                    continue;
-
-        //                                double neighborDose = grid.Values[i + di, j + dj, k + dk];
-        //                                if (!double.IsNaN(neighborDose))
-        //                                {
-        //                                    if (neighborDose >= centerDose)
-        //                                        isLocalMax = false;
-        //                                    if (neighborDose <= centerDose)
-        //                                        isLocalMin = false;
-        //                                }
-        //                            }
-        //                        }
-        //                    }
-
-        //                    // Classify voxel
-        //                    VVector position = new VVector(
-        //                        grid.Origin.x + i * grid.Spacing.x,
-        //                        grid.Origin.y + j * grid.Spacing.y,
-        //                        grid.Origin.z + k * grid.Spacing.z
-        //                    );
-
-        //                    // Peak: local maximum AND above threshold
-        //                    if (isLocalMax && centerDose > peakThreshold)
-        //                    {
-        //                        results.Peaks.Add(new PVPoint3D
-        //                        {
-        //                            I = i,
-        //                            J = j,
-        //                            K = k,
-        //                            Position = position,
-        //                            DoseValue = centerDose,
-        //                            IsPeak = true
-        //                        });
-        //                        peakVoxelCount++;
-        //                    }
-        //                    // Valley: local minimum AND below threshold
-        //                    else if (isLocalMin && centerDose < valleyThreshold)
-        //                    {
-        //                        results.Valleys.Add(new PVPoint3D
-        //                        {
-        //                            I = i,
-        //                            J = j,
-        //                            K = k,
-        //                            Position = position,
-        //                            DoseValue = centerDose,
-        //                            IsPeak = false
-        //                        });
-        //                        valleyVoxelCount++;
-        //                    }
-
-        //                    // Count for volume statistics
-        //                    if (centerDose > peakThreshold)
-        //                        peakVoxelCount++;
-        //                    if (centerDose < valleyThreshold)
-        //                        valleyVoxelCount++;
-        //                }
-        //            }
-        //        }
-
-        //        results.TotalVoxels = grid.NX * grid.NY * grid.NZ;
-        //        results.StructureVoxels = structureVoxelCount;
-        //        results.PeakVolumePercent = 100.0 * peakVoxelCount / structureVoxelCount;
-        //        results.ValleyVolumePercent = 100.0 * valleyVoxelCount / structureVoxelCount;
-
-        //        return results;
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        OutputLog += $"Error detecting peaks/valleys: {ex.Message}\n";
-        //        return results;
-        //    }
-        //}
-
-        //// Calculate P/V metrics
-        //private void CalculatePVMetrics(PVAnalysisResults results, DoseGrid3D grid)
-        //{
-        //    try
-        //    {
-        //        if (results.Peaks.Count == 0 || results.Valleys.Count == 0)
-        //        {
-        //            OutputLog += "Warning: No peaks or valleys found for P/V calculation.\n";
-        //            results.MeanPVRatio = 0;
-        //            return;
-        //        }
-
-        //        // Calculate P/V ratios using nearest neighbor approach
-        //        List<double> pvRatios = new List<double>();
-
-        //        foreach (var peak in results.Peaks)
-        //        {
-        //            // Find nearest valley
-        //            double minDistance = double.MaxValue;
-        //            PVPoint3D nearestValley = null;
-
-        //            foreach (var valley in results.Valleys)
-        //            {
-        //                double dx = peak.Position.x - valley.Position.x;
-        //                double dy = peak.Position.y - valley.Position.y;
-        //                double dz = peak.Position.z - valley.Position.z;
-        //                double distance = Math.Sqrt(dx * dx + dy * dy + dz * dz);
-
-        //                if (distance < minDistance)
-        //                {
-        //                    minDistance = distance;
-        //                    nearestValley = valley;
-        //                }
-        //            }
-
-        //            if (nearestValley != null && nearestValley.DoseValue > 0)
-        //            {
-        //                double ratio = peak.DoseValue / nearestValley.DoseValue;
-        //                pvRatios.Add(ratio);
-        //            }
-        //        }
-
-        //        if (pvRatios.Count > 0)
-        //        {
-        //            results.MeanPVRatio = pvRatios.Average();
-
-        //            // Calculate standard deviation
-        //            double sumSquares = pvRatios.Sum(r => Math.Pow(r - results.MeanPVRatio, 2));
-        //            results.StdDevPVRatio = Math.Sqrt(sumSquares / pvRatios.Count);
-
-        //            OutputLog += $"P/V Ratios - Mean: {results.MeanPVRatio:F2}, StdDev: {results.StdDevPVRatio:F2}\n";
-        //            OutputLog += $"Min P/V: {pvRatios.Min():F2}, Max P/V: {pvRatios.Max():F2}\n";
-        //        }
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        OutputLog += $"Error calculating P/V metrics: {ex.Message}\n";
-        //    }
-        //}
-
-        //// Display results in the metrics grid
-        //private void DisplayPVResults()
-        //{
-
-        //    if (_pvResults == null) return;
-
-        //    OutputLog += "Updating metrics display...\n";
-
-        //    // Clear all previous metrics first (same as update3DMetrics)
-        //    AllMetrics.Clear();
-
-        //    // Add P/V metrics following the same pattern as update3DMetrics
-        //    AllMetrics.Add(new MetricData
-        //    {
-        //        metric = "Number of Peaks",
-        //        value = _pvResults.Peaks.Count.ToString()
-        //    });
-
-        //    AllMetrics.Add(new MetricData
-        //    {
-        //        metric = "Number of Valleys",
-        //        value = _pvResults.Valleys.Count.ToString()
-        //    });
-
-        //    AllMetrics.Add(new MetricData
-        //    {
-        //        metric = "Mean P/V Ratio",
-        //        value = Math.Round(_pvResults.MeanPVRatio, 2).ToString()
-        //    });
-
-        //    AllMetrics.Add(new MetricData
-        //    {
-        //        metric = "P/V Ratio Std Dev",
-        //        value = Math.Round(_pvResults.StdDevPVRatio, 2).ToString()
-        //    });
-
-        //    AllMetrics.Add(new MetricData
-        //    {
-        //        metric = "Peak Volume (%)",
-        //        value = Math.Round(_pvResults.PeakVolumePercent, 1).ToString()
-        //    });
-
-        //    AllMetrics.Add(new MetricData
-        //    {
-        //        metric = "Valley Volume (%)",
-        //        value = Math.Round(_pvResults.ValleyVolumePercent, 1).ToString()
-        //    });
-
-        //    AllMetrics.Add(new MetricData
-        //    {
-        //        metric = "Max Dose (Gy)",
-        //        value = Math.Round(_pvResults.MaxDose, 2).ToString()
-        //    });
-
-        //    AllMetrics.Add(new MetricData
-        //    {
-        //        metric = "Min Dose (Gy)",
-        //        value = Math.Round(_pvResults.MinDose, 2).ToString()
-        //    });
-
-        //    AllMetrics.Add(new MetricData
-        //    {
-        //        metric = "Structure Voxels",
-        //        value = _pvResults.StructureVoxels.ToString()
-        //    });
-
-        //    // Calculate heterogeneity index
-        //    double heterogeneityIndex = (_pvResults.MaxDose - _pvResults.MinDose) / _pvResults.MaxDose;
-        //    AllMetrics.Add(new MetricData
-        //    {
-        //        metric = "Heterogeneity Index",
-        //        value = Math.Round(heterogeneityIndex, 3).ToString()
-        //    });
-
-        //    OutputLog += $"Added {AllMetrics.Count} metrics to collection\n";
-
-        //    // At the end of your metrics in Run3DPVAnalysis, add these test metrics:
-        //    //AllMetrics.Add(new MetricData
-        //    //{
-        //    //    metric = "Peak Density (peaks/cc)",
-        //    //    value = Math.Round(_pvResults.Peaks.Count / structure.Volume, 2).ToString()
-        //    //});
-
-        //    //AllMetrics.Add(new MetricData
-        //    //{
-        //    //    metric = "Valley Density (valleys/cc)",
-        //    //    value = Math.Round(_pvResults.Valleys.Count / structure.Volume, 2).ToString()
-        //    //});
-
-        //    AllMetrics.Add(new MetricData
-        //    {
-        //        metric = "Grid Resolution (mm)",
-        //        value = _gridResolution3D.ToString()
-        //    });
-
-        //    AllMetrics.Add(new MetricData
-        //    {
-        //        metric = "Peak Threshold (Gy)",
-        //        value = Math.Round(_peakThresholdPercent * _pvResults.MaxDose, 2).ToString()
-        //    });
-
-        //    AllMetrics.Add(new MetricData
-        //    {
-        //        metric = "Valley Threshold (Gy)",
-        //        value = Math.Round(_valleyThresholdPercent * _pvResults.MaxDose, 2).ToString()
-        //    });
-
-        //    // Force UI update (same as update3DMetrics)
-        //    RaisePropertyChanged(nameof(AllMetrics));
-
-        //    OutputLog += "Metrics display updated.\n";
-        //}
+               
 
         private void AddStructureMesh(Model3DGroup modelGroup)
         {
@@ -4306,448 +4477,7 @@ namespace MAAS_SFRThelper.ViewModels
                 OutputLog += $"Error creating onion layers: {ex.Message}\n";
             }
         }
-        // Improved color mapping with more gradations
-        //private void Create3DVisualization()
-        //{
-        //    try
-        //    {
-        //        OutputLog += "\n=== Starting Enhanced 3D Slice Stack Visualization ===\n";
-
-        //        if (_doseSlices == null || _doseSlices.Count == 0)
-        //        {
-        //            OutputLog += "ERROR: No slice data available for visualization.\n";
-        //            return;
-        //        }
-
-        //        var modelGroup = new Model3DGroup();
-
-        //        // STEP 1: ANALYZE DATA BOUNDS AND DOSE DISTRIBUTION
-        //        OutputLog += "Analyzing data bounds and dose distribution...\n";
-
-        //        double dataMinX = double.MaxValue, dataMaxX = double.MinValue;
-        //        double dataMinY = double.MaxValue, dataMaxY = double.MinValue;
-        //        double dataMinZ = double.MaxValue, dataMaxZ = double.MinValue;
-
-        //        // Collect ALL dose values for statistical analysis
-        //        var allDoseValues = new List<double>();
-        //        int totalDosePoints = 0;
-
-        //        // First pass: collect all data
-        //        for (int sliceIdx = 0; sliceIdx < _doseSlices.Count; sliceIdx++)
-        //        {
-        //            var doseSlice = _doseSlices[sliceIdx];
-        //            var structSlice = _structSlices[sliceIdx];
-        //            var uGrid = _uGridSlices[sliceIdx];
-        //            var vGrid = _vGridSlices[sliceIdx];
-        //            var (nX, nY) = _sliceDimensions[sliceIdx];
-
-        //            int pointsInSlice = 0;
-
-        //            for (int i = 0; i < nX; i++)
-        //            {
-        //                for (int j = 0; j < nY; j++)
-        //                {
-        //                    if (!structSlice[i, j] || double.IsNaN(doseSlice[i, j]) || doseSlice[i, j] <= 0)
-        //                        continue;
-
-        //                    double dose = doseSlice[i, j];
-        //                    double u = uGrid[i, j];
-        //                    double v = vGrid[i, j];
-
-        //                    // Track spatial bounds
-        //                    dataMinX = Math.Min(dataMinX, u);
-        //                    dataMaxX = Math.Max(dataMaxX, u);
-        //                    dataMinZ = Math.Min(dataMinZ, v);
-        //                    dataMaxZ = Math.Max(dataMaxZ, v);
-
-        //                    // Collect dose values
-        //                    allDoseValues.Add(dose);
-        //                    totalDosePoints++;
-        //                    pointsInSlice++;
-        //                }
-        //            }
-
-        //            if (sliceIdx < 10 || sliceIdx % 10 == 0)
-        //                OutputLog += $"  Slice {sliceIdx + 1}: {pointsInSlice} dose points\n";
-        //        }
-
-        //        // Y bounds from slice positions
-        //        dataMinY = _depthValues[0];
-        //        dataMaxY = _depthValues[_depthValues.Count - 1];
-
-        //        // Calculate actual data dimensions
-        //        double dataWidth = dataMaxX - dataMinX;
-        //        double dataThickness = dataMaxY - dataMinY;
-        //        double dataHeight = dataMaxZ - dataMinZ;
-
-        //        OutputLog += $"\nData bounds:\n";
-        //        OutputLog += $"  X: [{dataMinX:F1}, {dataMaxX:F1}] mm (width: {dataWidth:F1} mm)\n";
-        //        OutputLog += $"  Y: [{dataMinY:F1}, {dataMaxY:F1}] mm (thickness: {dataThickness:F1} mm)\n";
-        //        OutputLog += $"  Z: [{dataMinZ:F1}, {dataMaxZ:F1}] mm (height: {dataHeight:F1} mm)\n";
-        //        OutputLog += $"  Total dose points: {totalDosePoints}\n";
-
-        //        // STEP 2: CALCULATE DOSE STATISTICS AND PERCENTILES
-        //        if (allDoseValues.Count == 0)
-        //        {
-        //            OutputLog += "ERROR: No dose values found!\n";
-        //            return;
-        //        }
-
-        //        allDoseValues.Sort();
-
-        //        // Helper function for percentiles
-        //        double GetPercentile(List<double> sortedValues, double percentile)
-        //        {
-        //            int index = (int)Math.Max(0, Math.Min(sortedValues.Count - 1,
-        //                                      sortedValues.Count * percentile / 100.0));
-        //            return sortedValues[index];
-        //        }
-
-        //        double absoluteMin = allDoseValues[0];
-        //        double absoluteMax = allDoseValues[allDoseValues.Count - 1];
-        //        double percentile5 = GetPercentile(allDoseValues, 5);
-        //        double percentile10 = GetPercentile(allDoseValues, 10);
-        //        double percentile25 = GetPercentile(allDoseValues, 25);
-        //        double percentile50 = GetPercentile(allDoseValues, 50);
-        //        double percentile75 = GetPercentile(allDoseValues, 75);
-        //        double percentile90 = GetPercentile(allDoseValues, 90);
-        //        double percentile95 = GetPercentile(allDoseValues, 95);
-
-        //        OutputLog += $"\n=== Dose Distribution Analysis ===\n";
-        //        OutputLog += $"Absolute: Min={absoluteMin:F2} Gy, Max={absoluteMax:F2} Gy\n";
-        //        OutputLog += $"Percentiles:\n";
-        //        OutputLog += $"  5%: {percentile5:F2} Gy\n";
-        //        OutputLog += $"  10%: {percentile10:F2} Gy\n";
-        //        OutputLog += $"  25%: {percentile25:F2} Gy\n";
-        //        OutputLog += $"  50% (median): {percentile50:F2} Gy\n";
-        //        OutputLog += $"  75%: {percentile75:F2} Gy\n";
-        //        OutputLog += $"  90%: {percentile90:F2} Gy\n";
-        //        OutputLog += $"  95%: {percentile95:F2} Gy\n";
-
-        //        // USE PERCENTILE-BASED NORMALIZATION
-        //        double doseMin_forNormalization = percentile5;
-        //        double doseMax_forNormalization = percentile95;
-
-        //        OutputLog += $"\nUsing percentile normalization: {doseMin_forNormalization:F2} - {doseMax_forNormalization:F2} Gy\n";
-
-        //        // STEP 3: CALCULATE ADAPTIVE SCALING
-        //        const double TARGET_SIZE = 100.0;
-
-        //        double maxDimension = Math.Max(Math.Max(dataWidth, dataThickness), dataHeight);
-        //        if (maxDimension <= 0)
-        //        {
-        //            OutputLog += "ERROR: Invalid data dimensions!\n";
-        //            return;
-        //        }
-
-        //        double baseScale = TARGET_SIZE / maxDimension;
-        //        double xScale = baseScale;
-        //        double yScale = baseScale;
-        //        double zScale = baseScale;
-
-        //        // Boost thin dimensions
-        //        double minThreshold = maxDimension * 0.15;
-
-        //        if (dataWidth > 0 && dataWidth < minThreshold)
-        //        {
-        //            xScale = baseScale * (minThreshold / dataWidth);
-        //            OutputLog += $"  Boosting X by {minThreshold / dataWidth:F1}x for visibility\n";
-        //        }
-
-        //        if (dataThickness > 0 && dataThickness < minThreshold)
-        //        {
-        //            yScale = baseScale * (minThreshold / dataThickness);
-        //            OutputLog += $"  Boosting Y by {minThreshold / dataThickness:F1}x for visibility\n";
-        //        }
-
-        //        if (dataHeight > 0 && dataHeight < minThreshold)
-        //        {
-        //            zScale = baseScale * (minThreshold / dataHeight);
-        //            OutputLog += $"  Boosting Z by {minThreshold / dataHeight:F1}x for visibility\n";
-        //        }
-
-        //        OutputLog += $"\nScale factors: X={xScale:F2}, Y={yScale:F2}, Z={zScale:F2}\n";
-
-        //        // STEP 4: IMPROVED ADAPTIVE DOWNSAMPLING
-        //        int downsampleStep = 1;
-
-        //        // Progressive downsampling based on data size
-        //        if (totalDosePoints > 1000000)
-        //        {
-        //            downsampleStep = 4;
-        //            OutputLog += "Very large dataset (>1M points) - using 4x downsampling for smooth visualization\n";
-        //        }
-        //        else if (totalDosePoints > 500000)
-        //        {
-        //            downsampleStep = 3;
-        //            OutputLog += "Large dataset (>500K points) - using 3x downsampling\n";
-        //        }
-        //        else if (totalDosePoints > 100000)
-        //        {
-        //            downsampleStep = 2;
-        //            OutputLog += "Medium dataset (>100K points) - using 2x downsampling\n";
-        //        }
-        //        else
-        //        {
-        //            downsampleStep = 1;
-        //            OutputLog += "Small dataset - no downsampling needed\n";
-        //        }
-
-        //        int maxTotalCells = 100000;  // Increased limit
-
-        //        // STEP 5: CREATE 3D VISUALIZATION
-        //        double centerX = (dataMinX + dataMaxX) / 2.0;
-        //        double centerY = (dataMinY + dataMaxY) / 2.0;
-        //        double centerZ = (dataMinZ + dataMaxZ) / 2.0;
-
-        //        OutputLog += $"\nCreating 3D geometry for {_doseSlices.Count} slices...\n";
-
-        //        int totalCellsCreated = 0;
-        //        int slicesProcessed = 0;
-        //        double sliceThickness = 1.0 * Math.Min(xScale, Math.Min(yScale, zScale));
-
-        //        // Material cache for efficiency
-        //        var materialCache = new Dictionary<Color, Material>();
-        //        bool useAdaptiveSampling = downsampleStep > 1;  // Enable adaptive sampling for downsampled data
-
-        //        for (int sliceIdx = 0; sliceIdx < _doseSlices.Count; sliceIdx++)
-        //        {
-        //            var doseSlice = _doseSlices[sliceIdx];
-        //            var structSlice = _structSlices[sliceIdx];
-        //            var uGrid = _uGridSlices[sliceIdx];
-        //            var vGrid = _vGridSlices[sliceIdx];
-        //            var (nX, nY) = _sliceDimensions[sliceIdx];
-
-        //            double originalY = _depthValues[sliceIdx];
-        //            double scaledY = (originalY - centerY) * yScale;
-
-        //            var colorMeshes = new Dictionary<Color, MeshGeometry3D>();
-        //            int cellsInSlice = 0;
-
-        //            // Process cells with improved downsampling
-        //            for (int i = 0; i < nX; i += downsampleStep)
-        //            {
-        //                for (int j = 0; j < nY; j += downsampleStep)
-        //                {
-        //                    if (!structSlice[i, j])
-        //                        continue;
-
-        //                    double dose = doseSlice[i, j];
-        //                    if (double.IsNaN(dose) || dose <= 0)
-        //                        continue;
-
-        //                    if (totalCellsCreated >= maxTotalCells)
-        //                    {
-        //                        OutputLog += $"  Reached cell limit ({maxTotalCells}) at slice {sliceIdx + 1}\n";
-        //                        goto FinishSlices;
-        //                    }
-
-        //                    // Adaptive sampling: check if near boundary for smoother edges
-        //                    bool nearBoundary = false;
-        //                    if (useAdaptiveSampling)
-        //                    {
-        //                        // Check neighbors
-        //                        for (int di = -1; di <= 1 && !nearBoundary; di++)
-        //                        {
-        //                            for (int dj = -1; dj <= 1 && !nearBoundary; dj++)
-        //                            {
-        //                                int ni = i + di;
-        //                                int nj = j + dj;
-        //                                if (ni >= 0 && ni < nX && nj >= 0 && nj < nY)
-        //                                {
-        //                                    if (!structSlice[ni, nj])
-        //                                    {
-        //                                        nearBoundary = true;
-        //                                    }
-        //                                }
-        //                            }
-        //                        }
-        //                    }
-
-        //                    // Use finer resolution near boundaries
-        //                    double cellSizeFactor = nearBoundary ? 0.5 : 1.0;
-
-        //                    double u = uGrid[i, j];
-        //                    double v = vGrid[i, j];
-        //                    double scaledX = (u - centerX) * xScale;
-        //                    double scaledZ = (v - centerZ) * zScale;
-
-        //                    // Calculate adaptive cell size
-        //                    double cellWidth = 2.0 * xScale;
-        //                    double cellHeight = 2.0 * zScale;
-
-        //                    if (i + 1 < nX && !double.IsNaN(uGrid[i + 1, j]))
-        //                        cellWidth = Math.Abs(uGrid[i + 1, j] - u) * xScale;
-        //                    if (j + 1 < nY && !double.IsNaN(vGrid[i, j + 1]))
-        //                        cellHeight = Math.Abs(vGrid[i, j + 1] - v) * zScale;
-
-        //                    // Apply downsampling and boundary adjustment
-        //                    cellWidth *= downsampleStep * 1.05 * cellSizeFactor;
-        //                    cellHeight *= downsampleStep * 1.05 * cellSizeFactor;
-
-        //                    // Percentile-based color normalization
-        //                    double normalizedDose = (dose - doseMin_forNormalization) /
-        //                                          (doseMax_forNormalization - doseMin_forNormalization);
-        //                    normalizedDose = Math.Max(0, Math.Min(1, normalizedDose));
-
-        //                    Color cellColor = GetImprovedDoseColor(normalizedDose);
-
-        //                    if (!colorMeshes.ContainsKey(cellColor))
-        //                        colorMeshes[cellColor] = new MeshGeometry3D();
-
-        //                    var mesh = colorMeshes[cellColor];
-        //                    int baseIndex = mesh.Positions.Count;
-
-        //                    // Create thin box
-        //                    mesh.Positions.Add(new Point3D(scaledX - cellWidth / 2, scaledY - sliceThickness / 2, scaledZ - cellHeight / 2));
-        //                    mesh.Positions.Add(new Point3D(scaledX + cellWidth / 2, scaledY - sliceThickness / 2, scaledZ - cellHeight / 2));
-        //                    mesh.Positions.Add(new Point3D(scaledX + cellWidth / 2, scaledY - sliceThickness / 2, scaledZ + cellHeight / 2));
-        //                    mesh.Positions.Add(new Point3D(scaledX - cellWidth / 2, scaledY - sliceThickness / 2, scaledZ + cellHeight / 2));
-
-        //                    mesh.Positions.Add(new Point3D(scaledX - cellWidth / 2, scaledY + sliceThickness / 2, scaledZ - cellHeight / 2));
-        //                    mesh.Positions.Add(new Point3D(scaledX + cellWidth / 2, scaledY + sliceThickness / 2, scaledZ - cellHeight / 2));
-        //                    mesh.Positions.Add(new Point3D(scaledX + cellWidth / 2, scaledY + sliceThickness / 2, scaledZ + cellHeight / 2));
-        //                    mesh.Positions.Add(new Point3D(scaledX - cellWidth / 2, scaledY + sliceThickness / 2, scaledZ + cellHeight / 2));
-
-        //                    // Top face
-        //                    mesh.TriangleIndices.Add(baseIndex + 4);
-        //                    mesh.TriangleIndices.Add(baseIndex + 5);
-        //                    mesh.TriangleIndices.Add(baseIndex + 6);
-        //                    mesh.TriangleIndices.Add(baseIndex + 4);
-        //                    mesh.TriangleIndices.Add(baseIndex + 6);
-        //                    mesh.TriangleIndices.Add(baseIndex + 7);
-
-        //                    // Bottom face
-        //                    mesh.TriangleIndices.Add(baseIndex + 0);
-        //                    mesh.TriangleIndices.Add(baseIndex + 2);
-        //                    mesh.TriangleIndices.Add(baseIndex + 1);
-        //                    mesh.TriangleIndices.Add(baseIndex + 0);
-        //                    mesh.TriangleIndices.Add(baseIndex + 3);
-        //                    mesh.TriangleIndices.Add(baseIndex + 2);
-
-        //                    cellsInSlice++;
-        //                    totalCellsCreated++;
-        //                }
-        //            }
-
-        //            // Add all color groups for this slice
-        //            foreach (var kvp in colorMeshes)
-        //            {
-        //                if (kvp.Value.Positions.Count > 0)
-        //                {
-        //                    if (!materialCache.ContainsKey(kvp.Key))
-        //                    {
-        //                        var material = new MaterialGroup();
-        //                        material.Children.Add(new DiffuseMaterial(new SolidColorBrush(kvp.Key)));
-
-        //                        if (kvp.Key == Colors.Red || kvp.Key == Colors.OrangeRed || kvp.Key == Colors.DarkRed)
-        //                        {
-        //                            material.Children.Add(new EmissiveMaterial(
-        //                                new SolidColorBrush(Color.FromArgb(40, kvp.Key.R, kvp.Key.G, kvp.Key.B))));
-        //                        }
-        //                        materialCache[kvp.Key] = material;
-        //                    }
-
-        //                    var geoModel = new GeometryModel3D(kvp.Value, materialCache[kvp.Key]);
-        //                    geoModel.BackMaterial = materialCache[kvp.Key];
-        //                    modelGroup.Children.Add(geoModel);
-        //                }
-        //            }
-
-        //            slicesProcessed++;
-
-        //            if (sliceIdx == 0 || (sliceIdx + 1) % 10 == 0 || sliceIdx == _doseSlices.Count - 1)
-        //            {
-        //                OutputLog += $"  Processed slice {sliceIdx + 1}/{_doseSlices.Count}: {cellsInSlice} cells\n";
-        //            }
-        //        }
-
-        //    FinishSlices:
-
-        //        // STEP 6: ADD 3D LEGEND
-        //        // Add3DLegend(modelGroup, doseMin_forNormalization, doseMax_forNormalization);
-        //        // Update legend text labels
-        //        LegendMaxText = $"{doseMax_forNormalization:F0}";
-        //        Legend75Text = $"{doseMin_forNormalization + 0.75 * (doseMax_forNormalization - doseMin_forNormalization):F0}";
-        //        Legend50Text = $"{doseMin_forNormalization + 0.50 * (doseMax_forNormalization - doseMin_forNormalization):F0}";
-        //        Legend25Text = $"{doseMin_forNormalization + 0.25 * (doseMax_forNormalization - doseMin_forNormalization):F0}";
-        //        LegendMinText = $"{doseMin_forNormalization:F0}";
-
-        //        // STEP 7: ADD REFERENCE GEOMETRY
-        //        OutputLog += "\nAdding reference geometry...\n";
-
-        //        double axisLength = TARGET_SIZE * 0.6;
-
-        //        // X-axis (Red)
-        //        var xAxis = CreateLine(new Point3D(-axisLength, 0, 0), new Point3D(axisLength, 0, 0), 2);
-        //        var xMaterial = new MaterialGroup();
-        //        xMaterial.Children.Add(new DiffuseMaterial(new SolidColorBrush(Colors.Red)));
-        //        xMaterial.Children.Add(new EmissiveMaterial(new SolidColorBrush(Color.FromRgb(50, 0, 0))));
-        //        modelGroup.Children.Add(new GeometryModel3D(xAxis, xMaterial));
-
-        //        // Y-axis (Green)
-        //        var yAxis = CreateLine(new Point3D(0, -axisLength, 0), new Point3D(0, axisLength, 0), 2);
-        //        var yMaterial = new MaterialGroup();
-        //        yMaterial.Children.Add(new DiffuseMaterial(new SolidColorBrush(Colors.Green)));
-        //        yMaterial.Children.Add(new EmissiveMaterial(new SolidColorBrush(Color.FromRgb(0, 50, 0))));
-        //        modelGroup.Children.Add(new GeometryModel3D(yAxis, yMaterial));
-
-        //        // Z-axis (Blue)
-        //        var zAxis = CreateLine(new Point3D(0, 0, -axisLength), new Point3D(0, 0, axisLength), 2);
-        //        var zMaterial = new MaterialGroup();
-        //        zMaterial.Children.Add(new DiffuseMaterial(new SolidColorBrush(Colors.Blue)));
-        //        zMaterial.Children.Add(new EmissiveMaterial(new SolidColorBrush(Color.FromRgb(0, 0, 50))));
-        //        modelGroup.Children.Add(new GeometryModel3D(zAxis, zMaterial));
-
-        //        // STEP 8: OPTIONALLY ADD ONION LAYERS (if you have a ShowOnionLayers property)
-        //        // Uncomment this if you want onion layers:
-        //        if (ShowOnionLayers)
-        //        {
-        //            CreateOnionLayers(modelGroup, doseMin_forNormalization, doseMax_forNormalization,
-        //                             centerX, centerY, centerZ, xScale, yScale, zScale);
-        //        }
-
-        //        // STEP 9: FINAL STATISTICS
-        //        OutputLog += $"\n=== Visualization Statistics ===\n";
-        //        OutputLog += $"Slices processed: {slicesProcessed}/{_doseSlices.Count}\n";
-        //        OutputLog += $"Total cells created: {totalCellsCreated}\n";
-        //        OutputLog += $"Total 3D objects: {modelGroup.Children.Count}\n";
-
-        //        int meshCount = 0, totalTriangles = 0, totalVertices = 0;
-        //        foreach (GeometryModel3D geoModel in modelGroup.Children.OfType<GeometryModel3D>())
-        //        {
-        //            var mesh = geoModel.Geometry as MeshGeometry3D;
-        //            if (mesh != null)
-        //            {
-        //                meshCount++;
-        //                totalTriangles += mesh.TriangleIndices.Count / 3;
-        //                totalVertices += mesh.Positions.Count;
-        //            }
-        //        }
-
-        //        OutputLog += $"Meshes: {meshCount}, Vertices: {totalVertices}, Triangles: {totalTriangles}\n";
-
-        //        // Set the model
-        //        Model3DGroup = modelGroup;
-        //        _is3DVisualizationReady = true;
-
-        //        RaisePropertyChanged(nameof(Show3DVisualization));
-        //        RaisePropertyChanged(nameof(Model3DGroup));
-
-        //        OutputLog += "\n=== Visualization Complete ===\n";
-        //        OutputLog += $"Visual size: {dataWidth * xScale:F1} x {dataThickness * yScale:F1} x {dataHeight * zScale:F1} units\n";
-        //        OutputLog += $"Actual size: {dataWidth:F1} x {dataThickness:F1} x {dataHeight:F1} mm\n";
-        //        OutputLog += $"Dose range: {doseMin_forNormalization:F2} - {doseMax_forNormalization:F2} Gy\n";
-        //        OutputLog += "Legend added on right side\n";
-        //        OutputLog += "Use mouse to rotate/zoom/pan the view\n";
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        OutputLog += $"\nERROR in Create3DVisualization: {ex.Message}\n";
-        //        OutputLog += $"Stack trace: {ex.StackTrace}\n";
-        //    }
-        //}
-
+        
         private void Create3DVisualization()
         {
             try
