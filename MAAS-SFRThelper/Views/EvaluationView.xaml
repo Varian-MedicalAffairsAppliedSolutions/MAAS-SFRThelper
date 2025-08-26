@@ -46,11 +46,11 @@
                          IsChecked="{Binding Is1DCAXSelected}"
                          GroupName="EvaluationMethod"
                          Margin="5"/>
-            <RadioButton Content="2D Multi-Depth Minibeam Analysis"
+            <RadioButton Content="2D Multi-Planar"
                          IsChecked="{Binding Is2DPlanarSelected}"
                          GroupName="EvaluationMethod"
                          Margin="5"/>
-            <RadioButton Content="3D P/V Interpolation"
+            <RadioButton Content="3D P/V Analysis"
                          IsChecked="{Binding Is3DInterpolationSelected}"
                          GroupName="EvaluationMethod"
                          Margin="5"/>
