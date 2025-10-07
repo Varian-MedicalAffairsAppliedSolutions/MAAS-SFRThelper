@@ -20,6 +20,7 @@ using MAAS_SFRThelper.Services;
 using System.Windows.Interop;
 using System.Windows.Media.Media3D;
 using System.Security.Policy;
+using System.IO;
 
 namespace MAAS_SFRThelper.ViewModels
 {
@@ -287,6 +288,40 @@ namespace MAAS_SFRThelper.ViewModels
         }
 
         #endregion
+
+        #region Export Properties and Container
+        // Container class for export data
+        public class ExportDataContainer
+        {
+            public List<seedPointModel> GridData { get; set; }
+            public Dictionary<string, object> Statistics { get; set; }
+            public List<(string Id, double Volume)> IndividualSpheres { get; set; }
+            public string PatientId { get; set; }
+            public string PlanId { get; set; }
+            public VVector CentroidOffset { get; set; }
+            public string TargetSelected { get; set; }
+
+            public ExportDataContainer()
+            {
+                GridData = new List<seedPointModel>();
+                Statistics = new Dictionary<string, object>();
+                IndividualSpheres = new List<(string Id, double Volume)>();
+                CentroidOffset = new VVector(0, 0, 0);
+            }
+        }
+
+        private ExportDataContainer _exportData;
+        private bool _dataReadyForExport;
+
+        public bool DataReadyForExport
+        {
+            get { return _dataReadyForExport; }
+            set { SetProperty(ref _dataReadyForExport, value); }
+        }
+
+        public DelegateCommand ExportDataCommand { get; set; }
+        #endregion
+
         #region internals
         private readonly EsapiWorker _esapiWorker;
         //private ScriptContext scriptContext;
@@ -323,6 +358,7 @@ namespace MAAS_SFRThelper.ViewModels
             SingleSphereEnabled = true;
             LateralScalingFactor = 1.0;
             CreateLatticeCommand = new DelegateCommand(CreateLattice, CanCreateLattice);
+            ExportDataCommand = new DelegateCommand(ExportData, () => DataReadyForExport);
             LSFVisibility = true;
 
             // Set valid spacings based on CT img z resolution
@@ -440,103 +476,9 @@ namespace MAAS_SFRThelper.ViewModels
             return retval;
         }
 
-        //private List<seedPointModel> BuildGrid(double progressMax, List<double> xcoords, List<double> ycoords, List<double> zcoords, Structure ptvRetract, Structure ptvRetractVoid) // this sets up points around which spheres are built
-        //{
-        //    var retval = new List<seedPointModel>();
-        //    //double progressMax = 50.0;
-        //    foreach (var x in xcoords)
-        //    {
-        //        foreach (var y in ycoords)
-        //        {
-        //            foreach (var z in zcoords)
-        //            {
-        //                var pt = new VVector(x * LateralScalingFactor, y * LateralScalingFactor, z);
-        //                var ptVoid = new VVector((x + spacingSelected.Value / 2.0) * LateralScalingFactor, (y + spacingSelected.Value / 2) * LateralScalingFactor, z + spacingSelected.Value / 2);
 
-        //                // We want to elminate partial spheres - so if we put a check in here - if the point is in ptvRetract, we add it to retval
-        //                // if it is not inside sphere, we don't add this point to retval
-
-        //                bool isInsideptvRetract = ptvRetract.IsPointInsideSegment(pt);
-
-        //                if (isInsideptvRetract)
-        //                {
-        //                    retval.Add(new seedPointModel(pt, SeedTypeEnum.Sphere));
-        //                }
-
-        //                bool voidInsideptvRetractVoid = ptvRetractVoid.IsPointInsideSegment(ptVoid);
-
-        //                if (voidInsideptvRetractVoid)
-        //                {
-        //                    retval.Add(new seedPointModel(ptVoid, SeedTypeEnum.Void));
-        //                }
-        //                ProgressValue += progressMax / ((double)xcoords.Count() * (double)ycoords.Count() * (double)zcoords.Count());
-        //            }
-        //        }
-        //    }
-
-        //    return retval;
-        //}
-
-        //    private List<seedPointModel> BuildAlternatingCubicGrid(double progressMax, double Xstart, double Xsize,
-        //double Ystart, double Ysize, double Zstart, double Zsize,
-        //Structure ptvRetract, Structure ptvRetractVoid)
-        //    {
-        //        var retval = new List<seedPointModel>();
-        //        double spacing = SpacingSelected.Value;
-
-        //        // Calculate grid dimensions
-        //        int nx = (int)Math.Ceiling(Xsize / spacing) + 1;
-        //        int ny = (int)Math.Ceiling(Ysize / spacing) + 1;
-        //        int nz = (int)Math.Ceiling(Zsize / spacing) + 1;
-
-        //        // Generate alternating cubic pattern
-        //        for (int i = 0; i < nx; i++)
-        //        {
-        //            for (int j = 0; j < ny; j++)
-        //            {
-        //                for (int k = 0; k < nz; k++)
-        //                {
-        //                    double x = Xstart + i * spacing;
-        //                    double y = Ystart + j * spacing;
-        //                    double z = Zstart + k * spacing;
-
-        //                    // Apply lateral scaling
-        //                    double scaledX = x * LateralScalingFactor;
-        //                    double scaledY = y * LateralScalingFactor;
-
-        //                    // Determine if this is a sphere or void position
-        //                    // Using modulo arithmetic to create alternating pattern
-        //                    bool isSpherePosition = (i + j + k) % 2 == 0;
-
-        //                    VVector position = new VVector(scaledX + XShift, scaledY + YShift, z);
-
-        //                    if (isSpherePosition)
-        //                    {
-        //                        // Check if sphere center is inside the retracted PTV
-        //                        if (ptvRetract.IsPointInsideSegment(position))
-        //                        {
-        //                            retval.Add(new seedPointModel(position, SeedTypeEnum.Sphere));
-        //                        }
-        //                    }
-        //                    else
-        //                    {
-        //                        // Check if void center is inside the void boundary structure
-        //                        if (ptvRetractVoid.IsPointInsideSegment(position))
-        //                        {
-        //                            retval.Add(new seedPointModel(position, SeedTypeEnum.Void));
-        //                        }
-        //                    }
-
-        //                    ProgressValue += progressMax / (double)(nx * ny * nz);
-        //                }
-        //            }
-        //        }
-
-        //        return retval;
-        //    }
-
-
-        private List<seedPointModel> BuildGrid(double progressMax, List<double> xcoords, List<double> ycoords, List<double> zcoords, Structure ptvRetract, Structure ptvRetractVoid)
+        private List<seedPointModel> BuildGrid(double progressMax, List<double> xcoords, List<double> ycoords, List<double> zcoords,
+            Structure ptvRetract, Structure ptvRetractVoid, ExportDataContainer exportData)
         {
             var retval = new List<seedPointModel>();
 
@@ -626,6 +568,9 @@ namespace MAAS_SFRThelper.ViewModels
             // Optional: Log the offset for debugging
             Output += $"\nCentroid alignment offset (Rect): X={Math.Round(offset.x, 2)}, Y={Math.Round(offset.y, 2)}, Z={Math.Round(offset.z, 2)}";
 
+            // Store offset for export
+            exportData.CentroidOffset = offset;
+
             return retval;
         }
         private VVector CalculateVolumeCentroid(Structure structure, VMS.TPS.Common.Model.API.Image image)
@@ -674,7 +619,7 @@ namespace MAAS_SFRThelper.ViewModels
         // Revised BuildAlternatingCubicGrid method with centroid alignment
         private List<seedPointModel> BuildAlternatingCubicGrid(double progressMax, double Xstart, double Xsize,
             double Ystart, double Ysize, double Zstart, double Zsize,
-            Structure ptvRetract, Structure ptvRetractVoid)
+            Structure ptvRetract, Structure ptvRetractVoid, ExportDataContainer exportData)
         {
             var retval = new List<seedPointModel>();
             double spacing = SpacingSelected.Value;
@@ -782,6 +727,9 @@ namespace MAAS_SFRThelper.ViewModels
             // Optional: Log the offset for debugging
             Output += $"\nCentroid alignment offset: X={Math.Round(offset.x, 2)}, Y={Math.Round(offset.y, 2)}, Z={Math.Round(offset.z, 2)}";
 
+            // Store offset for export
+            exportData.CentroidOffset = offset;
+
             return retval;
         }
         struct Vec3
@@ -808,238 +756,8 @@ namespace MAAS_SFRThelper.ViewModels
         }
 
 
-        //private List<seedPointModel> BuildHexGrid(double progressMax, double Xstart, double Xsize, double Ystart, double Ysize, double Zstart, double Zsize, Structure ptvRetract, Structure ptvRetractVoid) // this will setup coords for points on hex grid
-        //{
-        //    double A = SpacingSelected.Value * (Math.Sqrt(3) / 2.0); // what is A? why is it this value?
-        //    // https://www.omnicalculator.com/math/hexagon
-        //    // the height of a triangle will be h = √3/2 × a
-
-        //    var retval = new List<seedPointModel>();
-        //    //void CreateLayer(double zCoord, double x0, double y0)
-        //    //{
-
-        //    //    // create planar hexagonal sphere packing grid
-        //    //    var yeven = Arange(y0, y0 + Ysize, 2.0 * A * LateralScalingFactor); // Tenzin - make a drop down menu and rather than having a 2.0, put some variable in it
-        //    //    // 2 is the scaling factor --- changed to 4 and tested -- Matt - 2 and 4 reduces number of spheres overall (makes sense - verified by measurements?)
-
-        //    //    var xeven = Arange(x0, x0 + Xsize, LateralScalingFactor * SpacingSelected.Value);
-        //    //    // int yRow = 0;
-
-        //    //    foreach (var y in yeven)
-        //    //    {
-        //    //        // int xSpot = yRow%2 == 0 ? 1 : 0; // start x spot counter at 1 if y is even and start x spot counter at 0 is y is odd
-        //    //        foreach (var x in xeven)
-        //    //        {
-
-        //    //            var pt1 = new VVector(x, y, zCoord);
-        //    //            var pt2 = new VVector(x + (SpacingSelected.Value / 2.0) * LateralScalingFactor, y + A * LateralScalingFactor, zCoord);
-
-        //    //            bool isInsideptvRetract1 = ptvRetract.IsPointInsideSegment(pt1);
-        //    //            bool isInsideptvRetract2 = ptvRetract.IsPointInsideSegment(pt2);
-
-        //    //            if (isInsideptvRetract1)
-        //    //            {
-        //    //                retval.Add(new seedPointModel(pt1, SeedTypeEnum.Sphere));
-        //    //            }
-
-        //    //            if (isInsideptvRetract2)
-        //    //            {
-        //    //                retval.Add(new seedPointModel(pt2, SeedTypeEnum.Sphere));
-        //    //            }
-
-        //    //            // Void setup
-        //    //            // Both layers A and B find equidistant point from A and B above and below and use these points
-
-        //    //            // Pt 1
-
-        //    //            //var mxA = (x + (x - LateralScalingFactor * SpacingSelected.Value)) / 2.0;  // midpoint of x
-        //    //            //var myA = (y + (y + 2.0 * A * LateralScalingFactor)) / 2.0;  // midpoint of y
-        //    //            //var slopeA = (2.0 * A) / (SpacingSelected.Value); // slope
-        //    //            //var pt1VoidA = new VVector(mxA + (Math.Sqrt(3) / 2.0) * 2.0 * A * LateralScalingFactor, myA - (3 / 2.0) * LateralScalingFactor * SpacingSelected.Value, zCoord + A / 3);
-        //    //            //var pt2VoidA = new VVector(mxA - (Math.Sqrt(3) / 2.0) * 2.0 * A * LateralScalingFactor, myA + (3 / 2.0) * LateralScalingFactor * SpacingSelected.Value, zCoord - A / 3);
-
-        //    //            // Pt 2
-        //    //            //var mxB = (x + (SpacingSelected.Value / 2.0) * LateralScalingFactor + x + (SpacingSelected.Value / 2.0) * LateralScalingFactor - LateralScalingFactor * SpacingSelected.Value) / 2.0;
-        //    //            //var myB = (y + A * LateralScalingFactor + y + A * LateralScalingFactor + 2.0 * A * LateralScalingFactor) / 2.0;
-        //    //            //var slopeB = (2.0 * A * LateralScalingFactor) / (LateralScalingFactor * SpacingSelected.Value); // slope
-        //    //            //var pt1VoidB = new VVector(mxB + (Math.Sqrt(3) / 2.0) * 2.0 * A * LateralScalingFactor, myB - (3 / 2.0) * LateralScalingFactor * SpacingSelected.Value, zCoord + A * Math.Sqrt(2) / 6);
-        //    //            //var pt2VoidB = new VVector(mxB - (Math.Sqrt(3) / 2.0) * 2.0 * A * LateralScalingFactor, myB + (3 / 2.0) * LateralScalingFactor * SpacingSelected.Value, zCoord - A * Math.Sqrt(2) / 6);
-
-        //    //            // var ptVoid = new VVector((x + x + (SpacingSelected.Value / 2.0))/2, ( y + y + A * LateralScalingFactor)/2, zCoord);
-        //    //            // We want to elminate partial spheres - so if we put a check in here - if the point is in ptvRetract, we add it to retval
-        //    //            // if it is not inside sphere, we don't add this point to retval
-
-
-        //    //            // Check for void pts
-        //    //            //bool isInsideptvRetractVoid1A = ptvRetractVoid.IsPointInsideSegment(pt1VoidA); // change to ptvVoid later ptvRetract for testing
-        //    //            //bool isInsideptvRetractVoid2A = ptvRetractVoid.IsPointInsideSegment(pt2VoidA);
-
-        //    //            //bool isInsideptvRetractVoid1A = ptvRetractVoid.IsPointInsideSegment(pt1VoidA); // change to ptvVoid later ptvRetract for testing
-        //    //            //bool isInsideptvRetractVoid2A = ptvRetractVoid.IsPointInsideSegment(pt2VoidA);
-
-
-        //    //            //if (isInsideptvRetractVoid1A)
-        //    //            //{
-        //    //            //    retval.Add(new seedPointModel(pt1VoidA, SeedTypeEnum.Void));
-        //    //            //}
-
-        //    //            //if (isInsideptvRetractVoid2A)
-        //    //            //{
-        //    //            //    retval.Add(new seedPointModel(pt2VoidA, SeedTypeEnum.Void));
-        //    //            //}
-
-        //    //            //bool isInsideptvRetractVoid1B = ptvRetractVoid.IsPointInsideSegment(pt1VoidB); // change to ptvVoid later ptvRetract for testing
-        //    //            //bool isInsideptvRetractVoid2B = ptvRetractVoid.IsPointInsideSegment(pt2VoidB);
-
-
-        //    //            //if (isInsideptvRetractVoid1B)
-        //    //            //{
-        //    //            //    retval.Add(new seedPointModel(pt1VoidB, SeedTypeEnum.Void));
-        //    //            //}
-
-        //    //            //if (isInsideptvRetractVoid2B)
-        //    //            //{
-        //    //            //    retval.Add(new seedPointModel(pt2VoidB, SeedTypeEnum.Void));
-        //    //            //}
-
-
-        //    //            // Old code
-        //    //            // retval.Add(new VVector(x, y, zCoord));
-        //    //            // retval.Add(new VVector(x + (SpacingSelected.Value / 2.0), y + A, zCoord ));
-        //    //            // messy sphere change
-        //    //            // retval.Add(new VVector(x + (SpacingSelected.Value / 2.0), y + A, zCoord + A/4)); 
-
-        //    //            // xSpot++;
-        //    //            //ProgressValue += progressMax / ((double)yeven.Count() * (double)xeven.Count());
-        //    //        }
-        //    //        //  yRow++;
-        //    //    }
-        //    //}
-        //    //var zRange = Arange(Zstart, Zstart + Zsize, 2.0 * A);
-        //    //foreach (var z in zRange)
-        //    //{
-        //    //    CreateLayer(z, Xstart, Ystart);
-        //    //    CreateLayer(z + A, Xstart + (SpacingSelected.Value / 2.0), Ystart + (A / 2.0));
-        //    //    ProgressValue += progressMax / (double)zRange.Count();
-        //    //}
-
-        //    // Initial parameters
-        //    var r = SpacingSelected.Value / 2.0;  // sphere radius
-        //    var ipA = 2.0 * r;                    // in-plane spacing
-        //    var c_over_a = Math.Sqrt(8.0 / 3.0);    // ideal c/a ratio
-        //    var c = c_over_a * ipA;               // out of plane spacing
-
-        //    // Lattice vectors
-        //    //var a1 = new Vec3(ipA, 0.0, 0.0);
-        //    //var a2 = new Vec3(-0.5 * ipA, (Math.Sqrt(3) / 2) * ipA, 0.0);
-        //    //// Modified a2void to maintain hexagonal symmetry while being offset
-        //    //var a2void = new Vec3(-0.5 * ipA, (Math.Sqrt(3) / 2) * ipA, 0.0);
-        //    //var a3 = new Vec3(0.0, 0.0, c);
-
-        //    // revised above to do lateral scaling
-        //    // Lattice vectors with lateral scaling
-        //    var a1 = new Vec3(ipA * LateralScalingFactor, 0.0, 0.0);
-        //    var a2 = new Vec3(-0.5 * ipA * LateralScalingFactor, (Math.Sqrt(3) / 2) * ipA * LateralScalingFactor, 0.0);
-        //    var a2void = new Vec3(-0.5 * ipA * LateralScalingFactor, (Math.Sqrt(3) / 2) * ipA * LateralScalingFactor, 0.0);
-        //    // No scaling for a3 since it's the vertical component
-        //    var a3 = new Vec3(0.0, 0.0, c);
-
-        //    // Base motif - 2 atoms per unit cell
-        //    var atomFrac = new List<Vec3>()
-        //    {
-        //        new Vec3(0.0, 0.0, 0.0),         // Atom at origin
-        //        new Vec3(1.0/3.0, 2.0/3.0, 0.5)  // Atom in upper layer
-        //    };
-
-        //    // Modified octahedral void positions
-        //    var octaFrac = new List<Vec3>()
-        //    {
-        //        new Vec3(0.5, 0.5, 0.25),    // Adjusted position
-        //        new Vec3(0.0, 0.0, 0.75)     // Adjusted position
-        //    };
-
-        //    Func<Vec3, Vec3> frac2cart = (f) =>
-        //    {
-        //        return (f.X * a1) + (f.Y * a2) + (f.Z * a3);
-        //    };
-
-        //    //Func<Vec3, Vec3> frac2cartVoid = (f) =>
-        //    //{
-        //    //    var basePos = (f.X * a1) + (f.Y * a2void) + (f.Z * a3);
-        //    //    // Add slight offset to position voids correctly
-        //    //    return basePos + new Vec3(ipA * 0.25, ipA * 0.0, 0.0);
-        //    //};
-
-        //    // revised above to incorporate lateral scaling for voids
-        //    Func<Vec3, Vec3> frac2cartVoid = (f) =>
-        //    {
-        //        var basePos = (f.X * a1) + (f.Y * a2void) + (f.Z * a3);
-        //        // Add slight offset to position voids correctly
-        //        // The offset in X and Y should also be scaled
-        //        return basePos + new Vec3(ipA * 0.25 * LateralScalingFactor, ipA * 0.0, 0.0);
-        //    };
-
-        //    var atoms = new List<Vec3>();
-        //    var voidVec = new List<Vec3>();
-
-        //    //var nx = (int)(Math.Ceiling(Xsize / ipA) + 2);
-        //    //var ny = (int)(Math.Ceiling(Ysize / (Math.Sqrt(3) / 2) * ipA) + 2);
-        //    // revised above for lateral scaling
-        //    var nx = (int)(Math.Ceiling(Xsize / (ipA * LateralScalingFactor)) + 2);
-        //    var ny = (int)(Math.Ceiling(Ysize / ((Math.Sqrt(3) / 2) * ipA * LateralScalingFactor)) + 2);
-        //    var nz = (int)(Math.Ceiling(Zsize / c) + 2);
-        //    Vec3 globalOffset = new Vec3(Xstart, Ystart, Zstart);
-
-        //    for (int i = 0; i < nx; i++)
-        //    {
-        //        for (int j = 0; j < ny; j++)
-        //        {
-        //            for (int k = 0; k < nz; k++)
-        //            {
-        //                Vec3 cellShift = globalOffset + (i * a1) + (j * a2) + (k * a3);
-        //                Vec3 cellShiftVoid = globalOffset + (i * a1) + (j * a2void) + (k * a3);
-
-        //                foreach (var fA in atomFrac)
-        //                {
-        //                    atoms.Add(cellShift + frac2cart(fA));
-        //                }
-
-        //                foreach (var fO in octaFrac)
-        //                {
-        //                    Vec3 pos = cellShiftVoid + frac2cartVoid(fO);
-        //                    voidVec.Add(pos);
-        //                }
-        //            }
-        //        }
-        //    }
-
-        //    // Boundary checking remains the same
-        //    foreach (var atom in atoms)
-        //    {
-        //        var Pt = new VVector(atom.X, atom.Y, atom.Z);
-        //        bool isInsideptvRetract = ptvRetract.IsPointInsideSegment(Pt);
-        //        if (isInsideptvRetract)
-        //        {
-        //            retval.Add(new seedPointModel(Pt, SeedTypeEnum.Sphere));
-        //        }
-        //    }
-
-        //    foreach (var vec in voidVec)
-        //    {
-        //        var vPt = new VVector(vec.X, vec.Y, vec.Z);
-        //        bool isInsideptvRetractVoid = ptvRetractVoid.IsPointInsideSegment(vPt);
-        //        if (isInsideptvRetractVoid)
-        //        {
-        //            retval.Add(new seedPointModel(vPt, SeedTypeEnum.Void));
-        //        }
-        //    }
-
-        //    // RETURN SEED AND VOID LOCATIONS
-
-        //    return retval;
-        //}
-
-        private List<seedPointModel> BuildHexGrid(double progressMax, double Xstart, double Xsize, double Ystart, double Ysize, double Zstart, double Zsize, Structure ptvRetract, Structure ptvRetractVoid)
+        private List<seedPointModel> BuildHexGrid(double progressMax, double Xstart, double Xsize, double Ystart, double Ysize,
+            double Zstart, double Zsize, Structure ptvRetract, Structure ptvRetractVoid, ExportDataContainer exportData)
         {
             double A = SpacingSelected.Value * (Math.Sqrt(3) / 2.0);
 
@@ -1178,6 +896,9 @@ namespace MAAS_SFRThelper.ViewModels
             // Optional: Log the offset for debugging
             Output += $"\nCentroid alignment offset (Hex): X={Math.Round(offset.x, 2)}, Y={Math.Round(offset.y, 2)}, Z={Math.Round(offset.z, 2)}";
 
+            // Store offset for export
+            exportData.CentroidOffset = offset;
+
             return retval;
         }
 
@@ -1236,6 +957,11 @@ namespace MAAS_SFRThelper.ViewModels
             {
                 return;
             }
+
+            // Create local export container
+            var exportData = new ExportDataContainer();
+            exportData.TargetSelected = targetSelected;
+
             //begin modifications call is already in the DelegateCommand action method.
             //scriptContext.Patient.BeginModifications();
             // Make a new structure
@@ -1244,6 +970,10 @@ namespace MAAS_SFRThelper.ViewModels
 
             _esapiWorker.Run(sc =>
             {
+                // Capture patient info for export
+                exportData.PatientId = sc.Patient.Id;
+                exportData.PlanId = sc.PlanSetup.Id;
+
                 // Retrieve the structure set from the plan
                 var plan = sc.PlanSetup;
                 var structureSet = plan.StructureSet;
@@ -1340,8 +1070,9 @@ namespace MAAS_SFRThelper.ViewModels
                 if (IsHex)
                 {
                     //grid = BuildHexGrid(25.0, bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptv, ptvRetractVoid);
-                    grid = BuildHexGrid(25.0, bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract, ptvRetractVoid);
+                    grid = BuildHexGrid(25.0, bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract, ptvRetractVoid, exportData);
                     structMain = CreateStructure(sc.StructureSet, "LatticeHex", false, true);
+                    exportData.GridData = new List<seedPointModel>(grid);
                 }
                 else if (IsRect)
                 {
@@ -1349,8 +1080,9 @@ namespace MAAS_SFRThelper.ViewModels
                     var ycoords = Arange(bounds.Y + XShift, bounds.Y + bounds.SizeY + YShift, SpacingSelected.Value);
                     var zcoords = Arange(z0, zf, SpacingSelected.Value);
 
-                    grid = BuildGrid(25.0, xcoords, ycoords, zcoords, ptvRetract, ptvRetractVoid);
+                    grid = BuildGrid(25.0, xcoords, ycoords, zcoords, ptvRetract, ptvRetractVoid, exportData);
                     structMain = CreateStructure(sc.StructureSet, "LatticeRect", false, true);
+                    exportData.GridData = new List<seedPointModel>(grid);
                 }
                 else if (IsRectAlt)
                 {
@@ -1363,8 +1095,9 @@ namespace MAAS_SFRThelper.ViewModels
                     grid = BuildAlternatingCubicGrid(25.0, bounds.X + XShift, bounds.SizeX,
                                 bounds.Y + YShift, bounds.SizeY,
                                 z0, bounds.SizeZ,
-                                ptvRetract, ptvRetractVoid);
+                                ptvRetract, ptvRetractVoid, exportData);
                     structMain = CreateStructure(sc.StructureSet, "LatticeAltCubic", false, true);
+                    exportData.GridData = new List<seedPointModel>(grid);
                 }
                 else if (IsCVT3D)
                 {
@@ -1372,7 +1105,9 @@ namespace MAAS_SFRThelper.ViewModels
                     // MessageBox.Show("Calculating number of spheres needed.");
                     // Output += "\nEvaluating number of spheres, this could take several minutes ...";
                     // spacingSelected.Value = spacingSelected.Value * 2;
-                    var gridhex = BuildHexGrid(10.0, bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract, ptvRetractVoid);
+                    // Create a temporary export data for the BuildHexGrid call
+                    var tempExportData = new ExportDataContainer();
+                    var gridhex = BuildHexGrid(10.0, bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract, ptvRetractVoid, tempExportData);
 
                     // make list of the points in gridhex_sph, gridhex_void
                     List<Point3D> gridhexSph = new List<Point3D>();
@@ -1467,7 +1202,22 @@ namespace MAAS_SFRThelper.ViewModels
                     }
                     Output += $"Total seeds in gridCVT: {grid.Count.ToString()}";
                     structMain = CreateStructure(sc.StructureSet, "CVT3D", false, true);
+                    exportData.GridData = new List<seedPointModel>(grid);
+                    // CVT3D doesn't calculate centroids same way
+                    exportData.CentroidOffset = new VVector(0, 0, 0);
                 }
+
+                // Store configuration and statistics for export
+                exportData.Statistics["TargetStructure"] = targetSelected;
+                exportData.Statistics["Pattern"] = IsHex ? "Hexagonal" : IsRect ? "SimpleCubic" : IsRectAlt ? "AlternatingCubic" : IsCVT3D ? "CVT3D" : "Unknown";
+                exportData.Statistics["Radius"] = sphereRadius;
+                exportData.Statistics["Spacing"] = SpacingSelected.Value;
+                exportData.Statistics["XShift"] = XShift;
+                exportData.Statistics["YShift"] = YShift;
+                exportData.Statistics["LateralScalingFactor"] = LateralScalingFactor;
+                exportData.Statistics["VolumeThreshold"] = VThresh;
+                exportData.Statistics["CreateSingleStructure"] = createSingle;
+                exportData.Statistics["CreateVoids"] = createNullsVoids;
 
                 Output += $"\nPTV volume: {target.Volume.ToString()}";
                 Output += $"\nTotal spheres: {grid.Count(g => g.SeedType == SeedTypeEnum.Sphere).ToString()}";
@@ -1475,6 +1225,17 @@ namespace MAAS_SFRThelper.ViewModels
                 Output += $"\nSphere volume: {((0.987053856 * 4 / 3) * Math.PI * 0.1 * 0.1 * 0.1 * sphereRadius * sphereRadius * sphereRadius).ToString()}";
                 Output += $"\nApproximate sphere volume: {((0.987053856 * 4 / 3) * Math.PI * 0.1 * 0.1 * 0.1 * sphereRadius * sphereRadius * sphereRadius * grid.Count(g => g.SeedType == SeedTypeEnum.Sphere)).ToString()}";
                 Output += $"\nRatio (total sphere Volume/PTV volume): {(((100 * 0.987053856 * 4 / 3) * Math.PI * 0.1 * 0.1 * 0.1 * sphereRadius * sphereRadius * sphereRadius * grid.Count(g => g.SeedType == SeedTypeEnum.Sphere)) / (target.Volume)).ToString()} %";
+
+                // Store statistics
+                exportData.Statistics["PTVVolume"] = target.Volume;
+                exportData.Statistics["TotalSpheres"] = grid.Count(g => g.SeedType == SeedTypeEnum.Sphere);
+                exportData.Statistics["TotalVoids"] = grid.Count(g => g.SeedType == SeedTypeEnum.Void);
+                exportData.Statistics["IndividualSphereVolume"] = (0.987053856 * 4.0 / 3.0) * Math.PI * 0.001 * sphereRadius * sphereRadius * sphereRadius;
+                exportData.Statistics["TotalSphereVolume"] = ((double)exportData.Statistics["IndividualSphereVolume"]) * ((int)exportData.Statistics["TotalSpheres"]);
+                exportData.Statistics["VolumeRatio"] = (((double)exportData.Statistics["TotalSphereVolume"]) / target.Volume) * 100;
+                exportData.Statistics["CentroidOffsetX"] = Math.Round(exportData.CentroidOffset.x, 3);
+                exportData.Statistics["CentroidOffsetY"] = Math.Round(exportData.CentroidOffset.y, 3);
+                exportData.Statistics["CentroidOffsetZ"] = Math.Round(exportData.CentroidOffset.z, 3);
 
 
                 // Set a message box to add display the total sphere volume and give users choice of 
@@ -1541,6 +1302,9 @@ namespace MAAS_SFRThelper.ViewModels
                     {
 
                         structMain.SegmentVolume = structMain.Or(currentSphere.SegmentVolume);
+
+                        // Store individual sphere data for export
+                        exportData.IndividualSpheres.Add((currentSphere.Id, currentSphere.Volume));
 
                     }
                     sphere_count++;
@@ -1871,6 +1635,12 @@ namespace MAAS_SFRThelper.ViewModels
                     sc.StructureSet.RemoveStructure(ptvRetractVoid);
                 }
             });
+
+            // After the worker completes, assign the export data
+            _exportData = exportData;
+            DataReadyForExport = true;
+            ExportDataCommand.RaiseCanExecuteChanged();
+
             // And the main structure with target
             // Output += "\nCreated spheres. Please close the tool to view";
             //MessageBox.Show("Created spheres close tool to view. \nFor different sphere locations rerun with different x and y shift values.");
@@ -1887,64 +1657,6 @@ namespace MAAS_SFRThelper.ViewModels
             //        (point.z >= bbox.Z && point.z <= bbox.Z + bbox.SizeZ);
         }
 
-        //static List<(double x, double y, double z)> KMeans(List<(double x, double y, double z)> points, int k)
-        //{
-        //    Random random = new Random();
-
-        //    // Initialize centroids randomly from the points
-        //    List<(double x, double y, double z)> centroids = points.OrderBy(_ => random.Next()).Take(k).ToList();
-        //    Console.WriteLine("Initial centroids:");
-        //    centroids.ForEach(c => Console.WriteLine($"({c.x}, {c.y}, {c.z})"));
-
-        //    List<(double x, double y, double z)> previousCentroids;
-
-        //    while (true)
-        //    {
-        //        // Assign points to the nearest centroid
-        //        var clusters = points.GroupBy(p =>
-        //            centroids.OrderBy(c => Distance(p, c)).First()).ToList();
-
-        //        Console.WriteLine("Clusters:");
-        //        foreach (var cluster in clusters)
-        //        {
-        //            Console.WriteLine($"Cluster around centroid ({cluster.Key.x}, {cluster.Key.y}, {cluster.Key.z}):");
-        //            foreach (var point in cluster)
-        //            {
-        //                Console.WriteLine($"  Point: ({point.x}, {point.y}, {point.z})");
-        //            }
-        //        }
-
-        //        // Update centroids
-        //        previousCentroids = new List<(double x, double y, double z)>(centroids);
-
-        //        centroids = clusters.Select(cluster =>
-        //        {
-        //            if (cluster.Any())
-        //            {
-        //                return (
-        //                    x: cluster.Average(p => p.x),
-        //                    y: cluster.Average(p => p.y),
-        //                    z: cluster.Average(p => p.z)
-        //                );
-        //            }
-        //            else
-        //            {
-        //                // If a cluster is empty, keep the previous centroid
-        //                int index = clusters.IndexOf(cluster);
-        //                return previousCentroids[index];
-        //            }
-        //        }).ToList();
-
-        //        Console.WriteLine("Updated centroids:");
-        //        centroids.ForEach(c => Console.WriteLine($"({c.x}, {c.y}, {c.z})"));
-
-        //        // Check for convergence (if centroids do not change)
-        //        if (!centroids.Where((c, i) => c != previousCentroids[i]).Any())
-        //            break;
-        //    }
-
-        //    return centroids;
-        //}
 
         static (double minX, double maxX, double minY, double maxY, double minZ, double maxZ) GetNormalizationParams(List<(double x, double y, double z)> points)
         {
@@ -2086,6 +1798,10 @@ namespace MAAS_SFRThelper.ViewModels
 
         public void CreateLattice()
         {
+            // Reset export readiness
+            DataReadyForExport = false;
+            ExportDataCommand.RaiseCanExecuteChanged();
+
             _esapiWorker.RunWithWait(sc => { sc.Patient.BeginModifications(); });
             // Make a new structure
             // Matt email 7/15/24
@@ -2095,5 +1811,135 @@ namespace MAAS_SFRThelper.ViewModels
             // Build spheres
             BuildSpheres(true);
         }
+
+        #region Export Methods
+        private void ExportData()
+        {
+            try
+            {
+                // Create base folder path
+                string documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                string dataPath = Path.Combine(documentsPath, "Data");
+
+                // Sanitize names for folder/file use
+                string safePatientId = SanitizeFileName(_exportData.PatientId);
+                string safeTargetName = SanitizeFileName(_exportData.TargetSelected);
+                string safePattern = SanitizeFileName(_exportData.Statistics["Pattern"].ToString());
+                string dateStr = DateTime.Now.ToString("yyyyMMdd");
+
+                // Create patient-specific folder WITHOUT pattern name
+                string patientFolder = Path.Combine(dataPath, $"{safePatientId}_{safeTargetName}_{dateStr}");
+                Directory.CreateDirectory(patientFolder);
+
+                // Generate base filename WITH pattern
+                string baseFileName = $"{safePatientId}_{safeTargetName}_{safePattern}";
+
+                // Export Configuration CSV
+                ExportConfiguration(Path.Combine(patientFolder, $"{baseFileName}_Configuration_{dateStr}.csv"));
+
+                // Export Positions CSV
+                ExportPositions(Path.Combine(patientFolder, $"{baseFileName}_Positions_{dateStr}.csv"));
+
+                // Export Statistics CSV
+                ExportStatistics(Path.Combine(patientFolder, $"{baseFileName}_Statistics_{dateStr}.csv"));
+
+                // Export Individual Spheres CSV (if applicable)
+                if (_exportData.IndividualSpheres != null && _exportData.IndividualSpheres.Count > 0)
+                {
+                    ExportIndividualSpheres(Path.Combine(patientFolder, $"{baseFileName}_IndividualSpheres_{dateStr}.csv"));
+                }
+
+                // Show success message
+                MessageBox.Show($"Data exported successfully to:\n{patientFolder}", "Export Complete",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+
+                Output += $"\n\nData exported to: {patientFolder}";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error exporting data: {ex.Message}", "Export Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private string SanitizeFileName(string fileName)
+        {
+            if (string.IsNullOrEmpty(fileName))
+                return "Unknown";
+
+            string invalid = new string(Path.GetInvalidFileNameChars()) + new string(Path.GetInvalidPathChars());
+            foreach (char c in invalid)
+            {
+                fileName = fileName.Replace(c.ToString(), "_");
+            }
+            return fileName;
+        }
+
+        private void ExportConfiguration(string filePath)
+        {
+            using (var writer = new StreamWriter(filePath))
+            {
+                writer.WriteLine("Parameter,Value");
+                writer.WriteLine($"TargetStructure,{_exportData.Statistics["TargetStructure"]}");
+                writer.WriteLine($"Pattern,{_exportData.Statistics["Pattern"]}");
+                writer.WriteLine($"Radius,{((double)_exportData.Statistics["Radius"]):F3}");
+                writer.WriteLine($"Spacing,{((double)_exportData.Statistics["Spacing"]):F3}");
+                writer.WriteLine($"XShift,{((double)_exportData.Statistics["XShift"]):F3}");
+                writer.WriteLine($"YShift,{((double)_exportData.Statistics["YShift"]):F3}");
+                writer.WriteLine($"LateralScalingFactor,{((double)_exportData.Statistics["LateralScalingFactor"]):F3}");
+                writer.WriteLine($"VolumeThreshold,{_exportData.Statistics["VolumeThreshold"]}");
+                writer.WriteLine($"CreateSingleStructure,{_exportData.Statistics["CreateSingleStructure"]}");
+                writer.WriteLine($"CreateVoids,{_exportData.Statistics["CreateVoids"]}");
+            }
+        }
+
+        private void ExportPositions(string filePath)
+        {
+            using (var writer = new StreamWriter(filePath))
+            {
+                writer.WriteLine("Index,Type,X,Y,Z");
+                int index = 1;
+                foreach (var point in _exportData.GridData)
+                {
+                    writer.WriteLine($"{index},{point.SeedType},{point.Position.x:F3},{point.Position.y:F3},{point.Position.z:F3}");
+                    index++;
+                }
+            }
+        }
+
+        private void ExportStatistics(string filePath)
+        {
+            using (var writer = new StreamWriter(filePath))
+            {
+                writer.WriteLine("Metric,Value,Unit");
+                writer.WriteLine($"PTVVolume,{((double)_exportData.Statistics["PTVVolume"]):F3},cc");
+                writer.WriteLine($"TotalSpheres,{_exportData.Statistics["TotalSpheres"]},count");
+                writer.WriteLine($"TotalVoids,{_exportData.Statistics["TotalVoids"]},count");
+                writer.WriteLine($"SphereRadius,{((double)_exportData.Statistics["Radius"]):F3},mm");
+                writer.WriteLine($"IndividualSphereVolume,{((double)_exportData.Statistics["IndividualSphereVolume"]):F3},cc");
+                writer.WriteLine($"TotalSphereVolume,{((double)_exportData.Statistics["TotalSphereVolume"]):F3},cc");
+                writer.WriteLine($"VolumeRatio,{((double)_exportData.Statistics["VolumeRatio"]):F3},%");
+
+                if (_exportData.Statistics.ContainsKey("CentroidOffsetX"))
+                {
+                    writer.WriteLine($"CentroidOffsetX,{((double)_exportData.Statistics["CentroidOffsetX"]):F3},mm");
+                    writer.WriteLine($"CentroidOffsetY,{((double)_exportData.Statistics["CentroidOffsetY"]):F3},mm");
+                    writer.WriteLine($"CentroidOffsetZ,{((double)_exportData.Statistics["CentroidOffsetZ"]):F3},mm");
+                }
+            }
+        }
+
+        private void ExportIndividualSpheres(string filePath)
+        {
+            using (var writer = new StreamWriter(filePath))
+            {
+                writer.WriteLine("SphereID,Volume");
+                foreach (var sphere in _exportData.IndividualSpheres)
+                {
+                    writer.WriteLine($"{sphere.Id},{sphere.Volume:F3}");
+                }
+            }
+        }
+        #endregion
     }
 }

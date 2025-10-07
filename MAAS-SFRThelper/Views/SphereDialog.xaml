@@ -96,8 +96,24 @@
         <TextBox Grid.Row ="4" Grid.Column="1" x:Name="LateralScalingFactor" Text="{Binding LateralScalingFactor}" HorizontalAlignment="Left" Height="26" Margin="11,10,0,0" VerticalAlignment="Top" Width="123" Style="{x:Null}" Visibility="{Binding LSFVisibility, Converter={StaticResource localVisibilityConverter}}" />
 
         <StackPanel Grid.Row ="4" Grid.Column="2" Grid.ColumnSpan="2" >
-            <Button  Height="26"  Margin="10" HorizontalAlignment="Stretch" VerticalAlignment="Top" Content="Create" Command="{Binding CreateLatticeCommand}" Style="{x:Null}" />
-            <TextBlock Foreground="red" Text="{Binding LatticeValidationText}" Visibility="{Binding LVVis, Converter={StaticResource localVisibilityConverter}}" />
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Button Grid.Column="0" Height="26" Margin="10" Width="123"
+                HorizontalAlignment="Left" VerticalAlignment="Top" 
+                Content="Create" Command="{Binding CreateLatticeCommand}" Style="{x:Null}" />
+
+                <Button Grid.Column="1" Height="26" Margin="10" Width="123" 
+                HorizontalAlignment="Left" VerticalAlignment="Top" 
+                Content="Export Data" Command="{Binding ExportDataCommand}" 
+                IsEnabled="{Binding DataReadyForExport}" Style="{x:Null}" />
+            </Grid>
+
+            <TextBlock Foreground="red" Text="{Binding LatticeValidationText}" 
+               Visibility="{Binding LVVis, Converter={StaticResource localVisibilityConverter}}" />
         </StackPanel>
         <ProgressBar Grid.Row="5" Margin="10" Maximum="100" Minimum="0" Value="{Binding ProgressValue}" 
                      Grid.ColumnSpan="4" Height="20"/>
