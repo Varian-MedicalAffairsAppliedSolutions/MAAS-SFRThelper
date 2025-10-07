@@ -58,14 +58,63 @@
 
         <!-- Selection Controls -->
         <Grid Grid.Row="1" Margin="0,0,0,20">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="10"/>
+                <!-- Spacer -->
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Evaluation Mode Selection -->
-            <StackPanel Grid.Column="0" Margin="0,0,10,0">
+            <!-- First Row -->
+            <!-- Target Structure -->
+            <StackPanel Grid.Row="0" Grid.Column="0" Margin="5,0">
+                <TextBlock Text="Select Target Structure:"
+                   FontWeight="SemiBold"
+                   Margin="0,0,0,5"
+                   HorizontalAlignment="Center"/>
+                <ComboBox ItemsSource="{Binding PotentialTargets}"
+                  SelectedItem="{Binding SelectedTumorId}"
+                  MinWidth="200"
+                  Margin="0,0,0,5"/>
+            </StackPanel>
+
+            <!-- Lattice Structure -->
+            <!-- Lattice Structure -->
+            <StackPanel Grid.Row="0" Grid.Column="1" Margin="5,0">
+                <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                        <Style.Triggers>
+                            <!-- Disable for 1D CAX -->
+                            <DataTrigger Binding="{Binding Is1DCAXSelected}" Value="True">
+                                <Setter Property="Opacity" Value="0.3"/>
+                                <Setter Property="IsEnabled" Value="False"/>
+                            </DataTrigger>
+                            <!-- Disable for 2D Multi-Planar -->
+                            <DataTrigger Binding="{Binding Is2DPlanarSelected}" Value="True">
+                                <Setter Property="Opacity" Value="0.3"/>
+                                <Setter Property="IsEnabled" Value="False"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
+
+                <TextBlock Text="Select Lattice Structure:"
+               FontWeight="SemiBold"
+               Margin="0,0,0,5"
+               HorizontalAlignment="Center"/>
+                <ComboBox ItemsSource="{Binding PotentialTargets}"
+              SelectedItem="{Binding PtvAllId}"
+              MinWidth="200"
+              Margin="0,0,0,5"/>
+            </StackPanel>
+
+            <!-- Second Row -->
+            <!-- Evaluation Mode -->
+            <StackPanel Grid.Row="2" Grid.Column="0" Margin="5,0">
                 <StackPanel.Style>
                     <Style TargetType="StackPanel">
                         <Style.Triggers>
@@ -81,27 +130,18 @@
                     </Style>
                 </StackPanel.Style>
 
-                <TextBlock Text="Select Evaluation Mode:" FontWeight="SemiBold" Margin="0,0,0,5" HorizontalAlignment="Center"/>
+                <TextBlock Text="Select Evaluation Mode:" 
+                   FontWeight="SemiBold" 
+                   Margin="0,0,0,5" 
+                   HorizontalAlignment="Center"/>
                 <ComboBox ItemsSource="{Binding PvdrModeOptions}"
-                          SelectedItem="{Binding SelectedPvdrMode}"
-                          Width="150"
-                          Margin="0,0,0,10"/>
+                  SelectedItem="{Binding SelectedPvdrMode}"
+                  MinWidth="150"
+                  Margin="0,0,0,5"/>
             </StackPanel>
 
-            <!-- Target Structure Dropdown -->
-            <StackPanel Grid.Column="1" Margin="10,0,10,0">
-                <TextBlock Text="Select Target Structure:"
-                           FontWeight="SemiBold"
-                           Margin="0,0,0,5"
-                           HorizontalAlignment="Center"/>
-                <ComboBox ItemsSource="{Binding PotentialTargets}"
-                          SelectedItem="{Binding SelectedTumorId}"
-                          Width="180"
-                          Margin="0,0,0,10"/>
-            </StackPanel>
-
-            <!-- Beam Dropdown -->
-            <StackPanel Grid.Column="2" Margin="10,0,0,0">
+            <!-- Beam Selection -->
+            <StackPanel Grid.Row="2" Grid.Column="1" Margin="5,0">
                 <StackPanel.Style>
                     <Style TargetType="StackPanel">
                         <Style.Triggers>
@@ -118,19 +158,19 @@
                 </StackPanel.Style>
 
                 <CheckBox x:Name="CacheAllBeamsCheckBox" 
-                          Content="Cache All Beams" 
-                          IsChecked="{Binding CacheAllBeams}"
-                          HorizontalAlignment="Center"
-                          VerticalAlignment="Top"
-                          Margin="0,0,5,5"/>
+                  Content="Cache All Beams" 
+                  IsChecked="{Binding CacheAllBeams}"
+                  HorizontalAlignment="Center"
+                  VerticalAlignment="Top"
+                  Margin="0,0,5,5"/>
                 <TextBlock Text="Select Treatment Beam:"
-                           FontWeight="SemiBold"
-                           Margin="0,0,0,5"
-                           HorizontalAlignment="Center"/>
+                   FontWeight="SemiBold"
+                   Margin="0,0,0,5"
+                   HorizontalAlignment="Center"/>
                 <ComboBox ItemsSource="{Binding TreatmentBeams}"
-                          SelectedItem="{Binding SelectedBeamId}"
-                          Width="180"
-                          Margin="0,0,0,10"/>
+                  SelectedItem="{Binding SelectedBeamId}"
+                  MinWidth="200"
+                  Margin="0,0,0,5"/>
             </StackPanel>
         </Grid>
 

@@ -1228,7 +1228,7 @@ namespace MAAS_SFRThelper.ViewModels
 
                 string selectedBeamId = SelectedBeamId;
                 string selectedTumorId = SelectedTumorId;
-                string ptvAllName = SelectedTumorId;
+                string ptvAllName = PtvAllId;
 
                 if (string.IsNullOrEmpty(selectedTumorId))
                 {
@@ -3503,6 +3503,7 @@ namespace MAAS_SFRThelper.ViewModels
         {
             OutputLog += "Starting 3D Dosimetric Calculations \n";
             OutputLog += $"Selected tumor: {tumorName}, PTV All: {ptvAllName}\n";
+            OutputLog += $"Lattice Structure: {ptvAllName}\n";
 
             Structure structureForEval = _structureSet.Structures.FirstOrDefault(s => s.Id == tumorName);
             Structure ptvAll = _structureSet.Structures.FirstOrDefault(s => s.Id == ptvAllName);
@@ -4218,115 +4219,7 @@ namespace MAAS_SFRThelper.ViewModels
             OutputLog += $"Added {AllMetrics.Count} P/V metrics to display\n";
         }
 
-        //private void Run3DPVAnalysis(string tumorId, PlanSetup plan)
-        //{
-        //    OutputLog += "\n===== Starting 3D Slice Stack Visualization =====\n";
-
-        //    try
-        //    {
-        //        // Get the structure
-        //        var structure = plan.StructureSet.Structures.FirstOrDefault(s => s.Id == tumorId);
-        //        if (structure == null)
-        //        {
-        //            OutputLog += $"Structure '{tumorId}' not found.\n";
-        //            return;
-        //        }
-
-        //        // Extract mesh for structure outline
-        //        _currentStructureMesh = new MeshData();
-        //        try
-        //        {
-        //            if (structure.MeshGeometry != null && structure.MeshGeometry.Positions != null)
-        //            {
-        //                var positions = structure.MeshGeometry.Positions;
-        //                var triangles = structure.MeshGeometry.TriangleIndices;
-
-        //                OutputLog += $"Extracting mesh with {positions.Count} vertices...\n";
-
-        //                foreach (var point in positions)
-        //                {
-        //                    _currentStructureMesh.Positions.Add(new Point3D(point.X, point.Y, point.Z));
-        //                }
-
-        //                foreach (var index in triangles)
-        //                {
-        //                    _currentStructureMesh.TriangleIndices.Add(index);
-        //                }
-
-        //                OutputLog += $"Mesh extraction complete: {_currentStructureMesh.Positions.Count} vertices\n";
-        //            }
-        //        }
-        //        catch (Exception meshEx)
-        //        {
-        //            OutputLog += $"Warning: Could not extract mesh: {meshEx.Message}\n";
-        //        }
-
-        //        OutputLog += $"Analyzing structure: {tumorId}\n";
-        //        OutputLog += $"Structure volume: {structure.Volume:F2} cc\n";
-
-        //        // DELETE ALL THE OLD CODE - no Create3DDoseGrid, no DetectPeaksAndValleys, etc.
-
-        //        // JUST compute 2D slices using existing method
-        //        OutputLog += "Computing standardized axial slices for 3D visualization...\n";
-
-        //        // Use your existing 2D computation
-        //        var beamData = Compute2DAllBeamsStandardized(structure, plan);
-
-        //        if (beamData == null || !beamData.HasData)
-        //        {
-        //            OutputLog += "Failed to compute 2D slices.\n";
-        //            return;
-        //        }
-
-        //        // Store the slice data
-        //        _doseSlices = beamData.DoseSlices;
-        //        _structSlices = beamData.StructSlices;
-        //        _uGridSlices = beamData.UGridSlices;
-        //        _vGridSlices = beamData.VGridSlices;
-        //        _depthValues = beamData.DepthValues;
-        //        _sliceDimensions = beamData.SliceDimensions;
-
-        //        OutputLog += $"Computed {_doseSlices.Count} axial slices\n";
-
-        //        // Find dose range
-        //        double maxDose = 0;
-        //        double minDose = double.MaxValue;
-
-        //        foreach (var slice in _doseSlices)
-        //        {
-        //            for (int i = 0; i < slice.GetLength(0); i++)
-        //            {
-        //                for (int j = 0; j < slice.GetLength(1); j++)
-        //                {
-        //                    if (!double.IsNaN(slice[i, j]) && slice[i, j] > 0)
-        //                    {
-        //                        maxDose = Math.Max(maxDose, slice[i, j]);
-        //                        minDose = Math.Min(minDose, slice[i, j]);
-        //                    }
-        //                }
-        //            }
-        //        }
-
-        //        OutputLog += $"Dose range across all slices: {minDose:F2} - {maxDose:F2} Gy\n";
-
-        //        // Set flags for visualization
-        //        _has3DData = true;
-        //        _has2DPlotData = true;
-
-        //        // NO CALLS TO OLD METHODS - DELETE THESE LINES:
-        //        // _dose3DGrid = Create3DDoseGrid(structure, totalDose);  // DELETE
-        //        // _pvResults = DetectPeaksAndValleys(_dose3DGrid, structure);  // DELETE
-        //        // CalculatePVMetrics(_pvResults, _dose3DGrid);  // DELETE
-        //        // DisplayPVResults();  // DELETE
-
-        //        OutputLog += "===== 3D Slice Stack Data Ready =====\n";
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        OutputLog += $"Error in 3D slice stack preparation: {ex.Message}\n";
-        //    }
-        //}
-               
+                      
 
         private void AddStructureMesh(Model3DGroup modelGroup)
         {
