@@ -1,11 +1,6 @@
-
 # MAAS-SFRThelper
 
-Tools to aid in the creation of structure patterns (spheres) or irregular stuctures (straight and angled rods) which can be evaluated or aid in the creation of treatment plans with the intention of not covering traditional PTVs homogeneously.  Spacially Fractionated Radiation Therapy aims to create hetrogenious dose distrubutions with intentionally large peak to valley ratios while underdosing a significant portion of target volume compared with evaluating a traditional radiotherapy PTV.
-
----
-![image](https://github.com/user-attachments/assets/5bc58395-8f92-40f1-ba06-cee08dc40013)
----
+A shared-source toolkit providing extensive support for clinical SFRT (Spatially Fractionated Radiation Therapy) workflows and research. MAAS-SFRThelper enables the creation of structure patterns (spheres) or irregular structures (straight and angled rods) with comprehensive quantitative dose evaluation capabilities. The toolkit is designed for treatment plans that intentionally create heterogeneous dose distributions with large peak-to-valley ratios, fundamentally different from traditional homogeneous PTV coverage approaches.
 
 ## Features 
 
@@ -19,6 +14,7 @@ Options available:
 - Pattern:
   - Hexagonal Closest Packed (HCP)
   - Simple Cubic (SCP)
+  - Alternating Cubic (AC)
   - Centroidal Voronoi Tessellation in 3D (CVT3D)
 - Radius (mm): Defines the radius of each sphere.
 - Spacing (mm): Defines center-to-center spacing between spheres.
@@ -26,7 +22,11 @@ Options available:
 - Lateral Spacing Factor: A multiplier for spacing in the X/Y direction.
 - Full Spheres Only (slider): By default, only full spheres are included. Moving the slider left allows cropped spheres to be included near the edges.
 - Create spheres as single structure only: Reduces structure count by merging all spheres into one ROI.
-- Create void structures: Generates complementary voids (valleys) to guide dose distribution.
+- Create void structures: Generates complementary voids (valleys) to guide dose distribution and improve plan optimization.
+- Option to export sphere/void locations and specifications in csv file.
+
+  <img width="717" height="465" alt="image" src="https://github.com/user-attachments/assets/0ea82290-cf05-4d70-8a26-d4b2673d3b28" />
+
 
 ### SCART
 
@@ -41,6 +41,9 @@ Options available:
 
 Note: The SCART tab reflects implementation aligned with emerging clinical research but is not validated for clinical use. For more background, refer to peer-reviewed studies describing SCART dosimetry and outcomes.
 
+<img width="721" height="528" alt="image" src="https://github.com/user-attachments/assets/d6b5cf05-e46b-4bec-84c2-2fd00116ea33" />
+
+
 ### RapidRods
 
 The RapidRods tab supports creation of cylindrical rod-shaped dose structures. These are intended for experimental or directional SFRT planning techniques.
@@ -49,23 +52,48 @@ The RapidRods tab supports creation of cylindrical rod-shaped dose structures. T
 - Rod axis definition and advanced geometry options are under development.
 - Additional parameters like rod length, diameter, and spacing will be supported in future updates.
 
-Note: This module is still experimental and in validation.
+<img width="720" height="663" alt="image" src="https://github.com/user-attachments/assets/f16420be-a5bc-4182-a7d4-d70b95b821bc" />
 
 ### Evaluation
 
-The Evaluation tab is currently under development. It will provide analysis tools and additional functionality for evaluating or optimizing created structures.
+The Evaluation tab provides comprehensive dose analysis with automated peak-valley evaluation specifically designed for SFRT workflows. The module implements 3D clustering using percentile-based thresholding (80th percentile for peaks, 20th percentile for valleys) to robustly identify dose heterogeneity patterns across varying prescription doses and delivery techniques.
 
-## Planned functionality includes:
+#### Analysis Modes
 
-- Peak-to-Valley Ratio (PVR) analysis:
-  - Quantify dose inhomogeneity across high-dose peaks and low-dose valleys.
-  - Evaluate inhomogeneity index (e.g., max-D95%, min-D5%).
-- Automatic Dose Optimization:
-  - Load optimization objectives for generated peak/valley structures.
-  - Support manual normal tissue objective integration.
+The evaluation module provides four comprehensive analysis modes:
+
+1. **Dose Metrics Evaluation**: Quantifies dose heterogeneity and calculates comprehensive metrics.
+
+2. **1D Central Axis Profiling**: Provides central-axis dose profiling with automated tumor boundary detection for rapid dose assessment along the beam axis.
+
+3. **2D Multi-Planar Visualization**: Displays beam's-eye-view dose distributions with interactive depth navigation through all relevant slices, enabling detailed examination of dose patterns at any depth.
+
+4. **3D Volumetric P/V Analysis**: Performs volumetric peak-valley clustering that identifies distinct peak and valley clusters in clinical SFRT plans, with full 3D visualization of dose heterogeneity.
+
+#### Novel Onion-Layer Analysis
+
+The toolkit features innovative onion-layer analysis that divides target structures into five concentric shells from core to surface, enabling characterization of radial dose heterogeneity patterns. This analysis reveals how dose varies from the tumor center to periphery, providing critical insights for SFRT plan evaluation.
+
+#### Data Export
+
+All metrics are automatically exported to CSV format including:
+- Comprehensive biological metrics
+- Individual cluster properties with spatial coordinates
+- Dose statistics suitable for statistical analysis and outcome correlation studies
+- Quality assurance data for multi-institutional outcome studies
+
+<img width="734" height="364" alt="image" src="https://github.com/user-attachments/assets/60f719f2-fdce-43b7-8d8d-d2448cec39c3" />
+
+Note: This module is still experimental and in validation.
 
 ---
 
+## Upcoming Features
+
+1. Improved PVDR analysis.
+2. Optimization tab with auto planning feature.
+   
+---
 ## Installation
 
 1. Clone or download this repository.
@@ -89,9 +117,9 @@ This project is licensed under the Varian Limited Use Software License Agreement
 
 ---
 
-## Special Recognition for contribution
+## Special Recognition for Contribution
 
-- Pierre Lansonneur – Original research and prototyping of CVT3D algorithms.
+- Pierre Lansonneur – Original research and prototyping of CVT3D algorithms
 - Ilias Sachpazidis – C# CVT3D implementation adapted from 2D open-source generator (https://github.com/isachpaz/CVTGenerator)
 
 ## Publications
