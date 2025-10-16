@@ -74,9 +74,6 @@ The evaluation module provides four comprehensive analysis modes:
 
 The toolkit features innovative onion-layer analysis that divides target structures into five concentric shells from core to surface, enabling characterization of radial dose heterogeneity patterns. This analysis reveals how dose varies from the tumor center to periphery, providing critical insights for SFRT plan evaluation.
 
-<img width="734" height="364" alt="image" src="https://github.com/user-attachments/assets/60f719f2-fdce-43b7-8d8d-d2448cec39c3" />
-
-
 #### Data Export
 
 All metrics are automatically exported to CSV format including:
@@ -85,7 +82,7 @@ All metrics are automatically exported to CSV format including:
 - Dose statistics suitable for statistical analysis and outcome correlation studies
 - Quality assurance data for multi-institutional outcome studies
 
-<img width="718" height="745" alt="image" src="https://github.com/user-attachments/assets/3b1d55af-c019-4c33-bdc5-4cd003a1f1ce" />
+<img width="734" height="364" alt="image" src="https://github.com/user-attachments/assets/60f719f2-fdce-43b7-8d8d-d2448cec39c3" />
 
 Note: This module is still experimental and in validation.
 
