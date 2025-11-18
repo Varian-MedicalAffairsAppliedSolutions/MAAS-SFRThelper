@@ -8,8 +8,8 @@
     <OutputType>library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>MAAS_SFRThelper</RootNamespace>
-    <AssemblyName>MAAS-SFRThelper1.esapi</AssemblyName>
-    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <AssemblyName>MAAS-SFRThelper3.esapi</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <ProjectTypeGuids>{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
     <TargetFrameworkProfile />
@@ -116,12 +116,15 @@
     <Compile Include="Models\Circle.cs" />
     <Compile Include="Models\MetricData.cs" />
     <Compile Include="Models\OARConstraint.cs" />
+    <Compile Include="Models\OptimizationTemplate.cs" />
     <Compile Include="Models\Polygon.cs" />
     <Compile Include="Models\seedPointModel.cs" />
     <Compile Include="Models\Spacing.cs" />
     <Compile Include="Services\AppConfigHelper.cs" />
     <Compile Include="Services\EsapiWorker.cs" />
+    <Compile Include="Services\OptimizationObjectiveCreator.cs" />
     <Compile Include="Services\StructureExtension.cs" />
+    <Compile Include="Utilities\StructureMatchingHelper.cs" />
     <Compile Include="ViewModels\CoordinateConverter.cs" />
     <Compile Include="ViewModels\EvaluationViewModel.cs" />
     <Compile Include="ViewModels\MainViewModel.cs" />
