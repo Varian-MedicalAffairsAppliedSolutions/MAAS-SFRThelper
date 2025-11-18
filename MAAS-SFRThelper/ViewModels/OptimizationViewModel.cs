@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MAAS_SFRThelper.Models;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -13,6 +14,7 @@ namespace MAAS_SFRThelper.ViewModels
         public OptimizationViewModel(EsapiWorker esapi)
         {
             _esapiworker = esapi;
+         
         }
     }
 }
