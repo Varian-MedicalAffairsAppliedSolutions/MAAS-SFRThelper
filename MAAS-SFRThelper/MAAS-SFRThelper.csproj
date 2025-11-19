@@ -8,7 +8,7 @@
     <OutputType>library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>MAAS_SFRThelper</RootNamespace>
-    <AssemblyName>MAAS-SFRThelper3.esapi</AssemblyName>
+    <AssemblyName>MAAS-SFRThelper7.esapi</AssemblyName>
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <ProjectTypeGuids>{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
@@ -116,6 +116,7 @@
     <Compile Include="Models\Circle.cs" />
     <Compile Include="Models\MetricData.cs" />
     <Compile Include="Models\OARConstraint.cs" />
+    <Compile Include="Models\ObjectiveDefinition.cs" />
     <Compile Include="Models\OptimizationTemplate.cs" />
     <Compile Include="Models\Polygon.cs" />
     <Compile Include="Models\seedPointModel.cs" />

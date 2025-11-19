@@ -39,7 +39,8 @@ namespace MAAS_SFRThelper.Services
             string latticeStructureId,
             string valleyStructureId,
             string ptvStructureId,
-            OptimizationTemplate template)
+            OptimizationTemplate template,
+            List<OARConstraint> oarConstraints = null)
         {
             string result = "=== Creating SFRT Optimization Objectives ===\n";
 
@@ -90,8 +91,8 @@ namespace MAAS_SFRThelper.Services
                 result += "\nSkipping valley objectives (no valley structure specified)";
             }
 
-            // Step 6: Add OAR objectives (prostate-specific for now)
-            result += AddOARObjectives();
+            // Step 6: Add OAR objectives using the provided list
+            result += AddOARObjectives(oarConstraints);
 
             // Step 7: Add normal tissue objective
             result += AddNormalTissueObjective();
@@ -129,7 +130,7 @@ namespace MAAS_SFRThelper.Services
         /// Create valley structure by subtracting lattice from PTV
         /// Follows the pattern from your sphere code for structure creation
         /// </summary>
-        private (string message, Structure structure) CreateValleyStructure(string latticeId, string ptvId)
+        public (string message, Structure structure) CreateValleyStructure(string latticeId, string ptvId)
         {
             string msg = "\n--- Creating Valley Structure ---";
 
@@ -283,23 +284,25 @@ namespace MAAS_SFRThelper.Services
 
         /// <summary>
         /// Add optimization objectives for organs at risk (OARs)
-        /// Uses prostate-specific constraints for now
+        /// Uses the provided constraint list (from ViewModel)
         /// </summary>
-        private string AddOARObjectives()
+        private string AddOARObjectives(List<OARConstraint> oarConstraints)
         {
             string result = "\n--- Adding OAR Objectives ---";
 
-            // Load standard prostate OAR constraints
-            var constraints = ProstateOARConstraints.GetConstraints();
+            // If no constraints provided, use default
+            if (oarConstraints == null || oarConstraints.Count == 0)
+            {
+                result += "\nNo OAR constraints specified, using defaults";
+                oarConstraints = ProstateOARConstraints.GetConstraints();
+            }
+
             int addedCount = 0;
 
-            foreach (var constraint in constraints)
+            foreach (var constraint in oarConstraints)
             {
-                // Try to find this OAR using name variations
-                var oarStructure = StructureMatchingHelper.FindStructureByNameVariations(
-                    _structureSet,
-                    constraint.NameVariations,
-                    requireNonEmpty: true);
+                // Find the structure by its name (already matched in ViewModel)
+                var oarStructure = FindStructureById(constraint.StructureName);
 
                 if (oarStructure == null)
                 {
@@ -309,7 +312,7 @@ namespace MAAS_SFRThelper.Services
 
                 try
                 {
-                    // Add upper dose constraint for this OAR
+                    // Add dose constraint for this OAR
                     _plan.OptimizationSetup.AddPointObjective(
                         oarStructure,
                         constraint.Operator,
@@ -317,16 +320,16 @@ namespace MAAS_SFRThelper.Services
                         constraint.VolumePercent,
                         constraint.Priority);
 
-                    result += $"\n  {oarStructure.Id}: Max {constraint.MaxDoseGy} Gy (Priority {constraint.Priority})";
+                    result += $"\n  ✓ {oarStructure.Id}: {constraint.Operator} {constraint.MaxDoseGy} Gy @ {constraint.VolumePercent}% (Priority {constraint.Priority})";
                     addedCount++;
                 }
                 catch (Exception ex)
                 {
-                    result += $"\n  ERROR adding {oarStructure.Id}: {ex.Message}";
+                    result += $"\n  ✗ ERROR adding {oarStructure.Id}: {ex.Message}";
                 }
             }
 
-            result += $"\nAdded {addedCount} of {constraints.Count} OAR objectives";
+            result += $"\n  Added {addedCount} of {oarConstraints.Count} OAR objectives";
             return result;
         }
 
