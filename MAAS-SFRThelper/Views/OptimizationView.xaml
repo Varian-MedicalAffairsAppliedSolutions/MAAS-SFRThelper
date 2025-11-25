@@ -5,279 +5,378 @@
             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
             xmlns:local="clr-namespace:MAAS_SFRThelper.Views"
             mc:Ignorable="d"
-            d:DesignHeight="800" d:DesignWidth="900">
+            d:DesignHeight="950" d:DesignWidth="900">
 
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
     </UserControl.Resources>
 
-    <Grid Margin="10">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="200"/>
-        </Grid.RowDefinitions>
+    <!-- Global ScrollViewer wrapping everything -->
+    <ScrollViewer VerticalScrollBarVisibility="Auto" 
+                  HorizontalScrollBarVisibility="Disabled">
+        <Grid Margin="10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="250"/>
+            </Grid.RowDefinitions>
 
-        <!-- Title -->
-        <TextBlock Grid.Row="0" 
-                   Text="SFRT Optimization" 
-                   FontSize="18" 
-                   FontWeight="Bold" 
-                   Margin="0,0,0,15"/>
+            <!-- Title -->
+            <TextBlock Grid.Row="0" 
+                       Text="SFRT Optimization" 
+                       FontSize="18" 
+                       FontWeight="Bold" 
+                       Margin="0,0,0,15"/>
 
-        <!-- Structure Selection Section -->
-        <GroupBox Grid.Row="1" 
-                  Header="Structure Selection" 
-                  Margin="0,0,0,10"
-                  Padding="10">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="150"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <TextBlock Grid.Row="0" Grid.Column="0" 
-                           Text="Lattice (Peak):" 
-                           VerticalAlignment="Center"
-                           Margin="0,0,0,10"/>
-                <ComboBox Grid.Row="0" Grid.Column="1"
-                          ItemsSource="{Binding AvailableLatticeStructures}"
-                          SelectedItem="{Binding SelectedLatticeStructure}"
-                          Margin="0,0,0,10"
-                          Height="25"/>
-
-                <TextBlock Grid.Row="1" Grid.Column="0" 
-                           Text="Valley (Low Dose):" 
-                           VerticalAlignment="Center"
-                           Margin="0,0,0,10"/>
-                <ComboBox Grid.Row="1" Grid.Column="1"
-                          ItemsSource="{Binding AvailableValleyStructures}"
-                          SelectedItem="{Binding SelectedValleyStructure}"
-                          Margin="0,0,0,10"
-                          Height="25"/>
-
-                <TextBlock Grid.Row="2" Grid.Column="0" 
-                           Text="PTV Structure:" 
-                           VerticalAlignment="Center"
-                           Visibility="{Binding PTVSelectionVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                <Grid Grid.Row="2" Grid.Column="1"
-                      Visibility="{Binding PTVSelectionVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <!-- Structure Selection Section -->
+            <GroupBox Grid.Row="1" 
+                      Header="Structure Selection" 
+                      Margin="0,0,0,10"
+                      Padding="10">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <ComboBox Grid.Column="0"
-                              ItemsSource="{Binding AvailablePTVStructures}"
-                              SelectedItem="{Binding SelectedPTVStructure}"
-                              Height="25"
-                              Margin="0,0,10,0"/>
+                    <TextBlock Grid.Row="0" Grid.Column="0" 
+                               Text="Lattice (Peak):" 
+                               VerticalAlignment="Center"
+                               Margin="0,0,0,10"/>
+                    <ComboBox Grid.Row="0" Grid.Column="1"
+                              ItemsSource="{Binding AvailableLatticeStructures}"
+                              SelectedItem="{Binding SelectedLatticeStructure}"
+                              Margin="0,0,0,10"
+                              Height="25"/>
 
-                    <Button Grid.Column="1"
-                            Content="Create Valley"
-                            Command="{Binding CreateValleyStructureCommand}"
-                            Height="25"
-                            Width="100"
-                            ToolTip="Create Valley structure (PTV - Lattice)"
-                            Visibility="{Binding CreateValleyButtonVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    <TextBlock Grid.Row="1" Grid.Column="0" 
+                               Text="Valley (Low Dose):" 
+                               VerticalAlignment="Center"
+                               Margin="0,0,0,10"/>
+                    <ComboBox Grid.Row="1" Grid.Column="1"
+                              ItemsSource="{Binding AvailableValleyStructures}"
+                              SelectedItem="{Binding SelectedValleyStructure}"
+                              Margin="0,0,0,10"
+                              Height="25"/>
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" 
+                               Text="PTV Structure:" 
+                               VerticalAlignment="Center"
+                               Visibility="{Binding PTVSelectionVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    <Grid Grid.Row="2" Grid.Column="1"
+                          Visibility="{Binding PTVSelectionVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <ComboBox Grid.Column="0"
+                                  ItemsSource="{Binding AvailablePTVStructures}"
+                                  SelectedItem="{Binding SelectedPTVStructure}"
+                                  Height="25"
+                                  Margin="0,0,10,0"/>
+
+                        <Button Grid.Column="1"
+                                Content="Create Valley"
+                                Command="{Binding CreateValleyStructureCommand}"
+                                Height="25"
+                                Width="100"
+                                ToolTip="Create Valley structure (PTV - Lattice)"
+                                Visibility="{Binding CreateValleyButtonVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    </Grid>
                 </Grid>
-            </Grid>
-        </GroupBox>
+            </GroupBox>
 
-        <!-- Unified Objectives Table -->
-        <GroupBox Grid.Row="2" 
-                  Header="Optimization Objectives (Peak, Valley, and OARs)" 
-                  Margin="0,0,0,10"
-                  Padding="10">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="200"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
+            <!-- Unified Objectives Table -->
+            <GroupBox Grid.Row="2" 
+                      Header="Optimization Objectives (Peak, Valley, and OARs)" 
+                      Margin="0,0,0,10"
+                      Padding="10">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="200"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" 
-                           Text="Click 'Populate Objectives' below to fill this table. Edit as needed before creating in Eclipse."
-                           FontStyle="Italic"
-                           Margin="0,0,0,10"
+                    <TextBlock Grid.Row="0" 
+                               Text="Click 'Populate Objectives' below to fill this table. Edit as needed before creating in Eclipse."
+                               FontStyle="Italic"
+                               Margin="0,0,0,10"
+                               TextWrapping="Wrap"/>
+
+                    <!-- Objectives DataGrid with Fixed Height and Scrolling -->
+                    <DataGrid Grid.Row="1"
+                              ItemsSource="{Binding Objectives}"
+                              SelectedItem="{Binding SelectedObjective}"
+                              AutoGenerateColumns="False"
+                              CanUserAddRows="False"
+                              CanUserDeleteRows="False"
+                              SelectionMode="Single"
+                              RowBackground="{Binding BackgroundColor}"
+                              AlternatingRowBackground="{Binding BackgroundColor}"
+                              ScrollViewer.VerticalScrollBarVisibility="Auto"
+                              ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                              Margin="0,0,0,10">
+                        <DataGrid.Columns>
+                            <!-- Include Checkbox -->
+                            <DataGridCheckBoxColumn Header="Include" 
+                                                    Binding="{Binding IsIncluded, UpdateSourceTrigger=PropertyChanged}" 
+                                                    Width="60"/>
+
+                            <!-- Structure Name -->
+                            <DataGridTextColumn Header="Structure" 
+                                                Binding="{Binding StructureName}" 
+                                                Width="130"
+                                                IsReadOnly="True"/>
+
+                            <!-- Objective Type ComboBox (Point/Mean) -->
+                            <DataGridTemplateColumn Header="Obj Type" Width="80">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding ObjectiveType}" VerticalAlignment="Center"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                                <DataGridTemplateColumn.CellEditingTemplate>
+                                    <DataTemplate>
+                                        <ComboBox ItemsSource="{Binding DataContext.AvailableObjectiveTypes, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                  SelectedItem="{Binding ObjectiveType, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellEditingTemplate>
+                            </DataGridTemplateColumn>
+
+                            <!-- Upper/Lower ComboBox -->
+                            <DataGridTemplateColumn Header="Upper/Lower" Width="100">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Operator}" 
+                                                   VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsOperatorEnabled}" Value="False">
+                                                            <Setter Property="Foreground" Value="Gray"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                                <DataGridTemplateColumn.CellEditingTemplate>
+                                    <DataTemplate>
+                                        <ComboBox ItemsSource="{Binding DataContext.AvailableOperators, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                  SelectedItem="{Binding Operator, UpdateSourceTrigger=PropertyChanged}"
+                                                  IsEnabled="{Binding IsOperatorEnabled}"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellEditingTemplate>
+                            </DataGridTemplateColumn>
+
+                            <!-- Dose -->
+                            <DataGridTextColumn Header="Dose (Gy)" 
+                                                Binding="{Binding Dose, UpdateSourceTrigger=PropertyChanged}" 
+                                                Width="80"/>
+
+                            <!-- Volume % -->
+                            <DataGridTextColumn Header="Vol (%)" 
+                                                Binding="{Binding Volume, UpdateSourceTrigger=PropertyChanged}" 
+                                                Width="70"/>
+
+                            <!-- Priority -->
+                            <DataGridTextColumn Header="Priority" 
+                                                Binding="{Binding Priority, UpdateSourceTrigger=PropertyChanged}" 
+                                                Width="70"/>
+
+                            <!-- Role -->
+                            <DataGridTextColumn Header="Role" 
+                                                Binding="{Binding Role}" 
+                                                Width="60"
+                                                IsReadOnly="True"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <!-- Action Buttons -->
+                    <StackPanel Grid.Row="2" Orientation="Horizontal">
+                        <Button Content="Add Objective"
+                                Command="{Binding AddObjectiveCommand}"
+                                Width="120"
+                                Height="25"
+                                Margin="0,0,10,0"
+                                ToolTip="Duplicate selected objective or add new blank objective"/>
+                        <Button Content="Remove Selected"
+                                Command="{Binding RemoveObjectiveCommand}"
+                                Width="120"
+                                Height="25"
+                                Margin="0,0,10,0"/>
+                        <Button Content="Reset to Defaults"
+                                Command="{Binding ResetToDefaultsCommand}"
+                                Width="120"
+                                Height="25"
+                                ToolTip="Clear all objectives"/>
+                    </StackPanel>
+                </Grid>
+            </GroupBox>
+
+            <!-- Action Buttons -->
+            <StackPanel Grid.Row="3"
+                        Orientation="Horizontal"
+                        Margin="0,0,0,10">
+                <Button Content="Populate Objectives" 
+                        Command="{Binding PopulateObjectivesCommand}"
+                        Width="150" 
+                        Height="35"
+                        Margin="0,0,10,0"
+                        ToolTip="Fill the table with Peak, Valley, and OAR objectives"/>
+
+                <Button Content="Create Objectives" 
+                        Command="{Binding CreateObjectivesCommand}"
+                        Width="150" 
+                        Height="35"
+                        FontWeight="Bold"
+                        ToolTip="Apply objectives from table to Eclipse plan"/>
+            </StackPanel>
+
+            <!-- Optimization Settings -->
+            <GroupBox Grid.Row="4" 
+                      Header="Optimization Settings" 
+                      Margin="0,0,0,10"
+                      Padding="10">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Beam Selection -->
+                    <StackPanel Grid.Row="0" Margin="0,0,0,10">
+                        <TextBlock Text="Select Beams for Optimization:" 
+                                   FontWeight="SemiBold" 
+                                   Margin="0,0,0,5"/>
+
+                        <!-- Warning if no VMAT arcs -->
+                        <TextBlock Text="{Binding BeamWarningText}" 
+                                   Foreground="OrangeRed" 
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,5"
+                                   TextWrapping="Wrap"/>
+
+                        <ScrollViewer MaxHeight="80" VerticalScrollBarVisibility="Auto">
+                            <ItemsControl ItemsSource="{Binding AvailableBeams}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Vertical"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <CheckBox IsChecked="{Binding IsSelected}" 
+                                                  Margin="0,2">
+                                            <CheckBox.Content>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding BeamId}" Width="100" FontWeight="SemiBold"/>
+                                                    <TextBlock Text="{Binding Technique}" Width="100"/>
+                                                    <TextBlock Text="{Binding Description}" Width="200"/>
+                                                    <TextBlock Text=" ✓ VMAT" 
+                                                               Foreground="Green" 
+                                                               FontWeight="Bold"
+                                                               Visibility="{Binding IsVMAT, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                                </StackPanel>
+                                            </CheckBox.Content>
+                                        </CheckBox>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </StackPanel>
+
+                    <!-- MLC and Intermediate Dose -->
+                    <Grid Grid.Row="1" Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="150"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0" 
+                                   Text="MLC:" 
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,10,0"/>
+                        <ComboBox Grid.Column="1"
+                                  ItemsSource="{Binding AvailableMLCs}"
+                                  SelectedItem="{Binding SelectedMLC}"
+                                  Height="25"
+                                  Margin="0,0,20,0"/>
+
+                        <CheckBox Grid.Column="2"
+                                  Content="Use Intermediate Dose"
+                                  IsChecked="{Binding UseIntermediateDose}"
+                                  VerticalAlignment="Center"
+                                  ToolTip="Calculate intermediate dose during optimization (recommended)"/>
+                    </Grid>
+
+                    <!-- Run Button -->
+                    <Button Grid.Row="2"
+                            Content="Run Optimization"
+                            Command="{Binding RunOptimizationCommand}"
+                            Width="160"
+                            Height="35"
+                            FontWeight="Bold"
+                            HorizontalAlignment="Left"
+                            ToolTip="Run VMAT optimization on selected beams"/>
+                </Grid>
+            </GroupBox>
+
+            <!-- Validation Message -->
+            <Border Grid.Row="5" 
+                    Background="#FFFFEBCD" 
+                    BorderBrush="#FFD2691E" 
+                    BorderThickness="1" 
+                    Padding="10"
+                    Margin="0,0,0,10"
+                    Visibility="{Binding ValidationVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <TextBlock Text="{Binding ValidationText}" 
+                           Foreground="#FF8B0000"
+                           FontWeight="SemiBold"
                            TextWrapping="Wrap"/>
+            </Border>
 
-                <!-- Objectives DataGrid with Fixed Height and Scrolling -->
-                <DataGrid Grid.Row="1"
-                          ItemsSource="{Binding Objectives}"
-                          SelectedItem="{Binding SelectedObjective}"
-                          AutoGenerateColumns="False"
-                          CanUserAddRows="False"
-                          CanUserDeleteRows="False"
-                          SelectionMode="Single"
-                          RowBackground="{Binding BackgroundColor}"
-                          AlternatingRowBackground="{Binding BackgroundColor}"
-                          ScrollViewer.VerticalScrollBarVisibility="Auto"
-                          ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                          Margin="0,0,0,10">
-                    <DataGrid.Columns>
-                        <!-- Include Checkbox -->
-                        <DataGridCheckBoxColumn Header="Include" 
-                                                Binding="{Binding IsIncluded, UpdateSourceTrigger=PropertyChanged}" 
-                                                Width="60"/>
+            <!-- Progress Bar -->
+            <ProgressBar Grid.Row="6" 
+                         Height="20" 
+                         Minimum="0" 
+                         Maximum="100"
+                         Value="{Binding ProgressValue}"
+                         IsIndeterminate="{Binding IsOptimizing}"
+                         Margin="0,0,0,10"/>
 
-                        <!-- Structure Name -->
-                        <DataGridTextColumn Header="Structure" 
-                                            Binding="{Binding StructureName}" 
-                                            Width="130"
-                                            IsReadOnly="True"/>
-
-                        <!-- Objective Type ComboBox (Point/Mean) -->
-                        <DataGridTemplateColumn Header="Obj Type" Width="80">
-                            <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding ObjectiveType}" VerticalAlignment="Center"/>
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellTemplate>
-                            <DataGridTemplateColumn.CellEditingTemplate>
-                                <DataTemplate>
-                                    <ComboBox ItemsSource="{Binding DataContext.AvailableObjectiveTypes, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                              SelectedItem="{Binding ObjectiveType, UpdateSourceTrigger=PropertyChanged}"/>
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellEditingTemplate>
-                        </DataGridTemplateColumn>
-
-                        <!-- Upper/Lower ComboBox -->
-                        <DataGridTemplateColumn Header="Upper/Lower" Width="100">
-                            <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding Operator}" 
-                                               VerticalAlignment="Center">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock">
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsOperatorEnabled}" Value="False">
-                                                        <Setter Property="Foreground" Value="Gray"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellTemplate>
-                            <DataGridTemplateColumn.CellEditingTemplate>
-                                <DataTemplate>
-                                    <ComboBox ItemsSource="{Binding DataContext.AvailableOperators, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                              SelectedItem="{Binding Operator, UpdateSourceTrigger=PropertyChanged}"
-                                              IsEnabled="{Binding IsOperatorEnabled}"/>
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellEditingTemplate>
-                        </DataGridTemplateColumn>
-
-                        <!-- Dose -->
-                        <DataGridTextColumn Header="Dose (Gy)" 
-                                            Binding="{Binding Dose, UpdateSourceTrigger=PropertyChanged}" 
-                                            Width="80"/>
-
-                        <!-- Volume % -->
-                        <DataGridTextColumn Header="Vol (%)" 
-                                            Binding="{Binding Volume, UpdateSourceTrigger=PropertyChanged}" 
-                                            Width="70"/>
-
-                        <!-- Priority -->
-                        <DataGridTextColumn Header="Priority" 
-                                            Binding="{Binding Priority, UpdateSourceTrigger=PropertyChanged}" 
-                                            Width="70"/>
-
-                        <!-- Role -->
-                        <DataGridTextColumn Header="Role" 
-                                            Binding="{Binding Role}" 
-                                            Width="60"
-                                            IsReadOnly="True"/>
-                    </DataGrid.Columns>
-                </DataGrid>
-
-                <!-- Action Buttons -->
-                <StackPanel Grid.Row="2" Orientation="Horizontal">
-                    <Button Content="Add Objective"
-                            Command="{Binding AddObjectiveCommand}"
-                            Width="120"
-                            Height="25"
-                            Margin="0,0,10,0"
-                            ToolTip="Duplicate selected objective or add new blank objective"/>
-                    <Button Content="Remove Selected"
-                            Command="{Binding RemoveObjectiveCommand}"
-                            Width="120"
-                            Height="25"
-                            Margin="0,0,10,0"/>
-                    <Button Content="Reset to Defaults"
-                            Command="{Binding ResetToDefaultsCommand}"
-                            Width="120"
-                            Height="25"
-                            ToolTip="Clear all objectives"/>
-                </StackPanel>
-            </Grid>
-        </GroupBox>
-
-        <!-- Action Buttons -->
-        <StackPanel Grid.Row="3"
-                    Orientation="Horizontal"
-                    Margin="0,0,0,10">
-            <Button Content="Populate Objectives" 
-                    Command="{Binding PopulateObjectivesCommand}"
-                    Width="150" 
-                    Height="35"
-                    Margin="0,0,10,0"
-                    ToolTip="Fill the table with Peak, Valley, and OAR objectives"/>
-
-            <Button Content="Create Objectives" 
-                    Command="{Binding CreateObjectivesCommand}"
-                    Width="150" 
-                    Height="35"
-                    FontWeight="Bold"
-                    ToolTip="Apply objectives from table to Eclipse plan"/>
-        </StackPanel>
-
-        <!-- Validation Message -->
-        <Border Grid.Row="4" 
-                Background="#FFFFEBCD" 
-                BorderBrush="#FFD2691E" 
-                BorderThickness="1" 
-                Padding="10"
-                Margin="0,0,0,10"
-                Visibility="{Binding ValidationVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <TextBlock Text="{Binding ValidationText}" 
-                       Foreground="#FF8B0000"
-                       FontWeight="SemiBold"
-                       TextWrapping="Wrap"/>
-        </Border>
-
-        <!-- Progress Bar -->
-        <ProgressBar Grid.Row="5" 
-                     Height="20" 
-                     Minimum="0" 
-                     Maximum="100"
-                     Value="{Binding ProgressValue}"
-                     Margin="0,0,0,10"/>
-
-        <!-- Output Log -->
-        <Border Grid.Row="6" 
-                BorderBrush="Gray" 
-                BorderThickness="1" 
-                Padding="5">
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <TextBox Text="{Binding Output, Mode=OneWay}" 
-                         FontFamily="Consolas" 
-                         FontSize="12"
-                         TextWrapping="Wrap"
-                         IsReadOnly="True"
-                         Background="White"
-                         BorderThickness="0"/>
-            </ScrollViewer>
-        </Border>
-    </Grid>
+            <!-- Output Log - Made taller -->
+            <Border Grid.Row="7" 
+                    BorderBrush="Gray" 
+                    BorderThickness="1" 
+                    Padding="5"
+                    MinHeight="200">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <TextBox Text="{Binding Output, Mode=OneWay}" 
+                             FontFamily="Consolas" 
+                             FontSize="12"
+                             TextWrapping="Wrap"
+                             IsReadOnly="True"
+                             Background="White"
+                             BorderThickness="0"/>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+    </ScrollViewer>
 </UserControl>
