@@ -113,14 +113,20 @@
   <ItemGroup>
     <Compile Include="Converters\boolVisibilityConverter.cs" />
     <Compile Include="Models\BaseObject.cs" />
+    <Compile Include="Models\BeamSelectionItem.cs" />
     <Compile Include="Models\Circle.cs" />
     <Compile Include="Models\MetricData.cs" />
+    <Compile Include="Models\OARConstraint.cs" />
+    <Compile Include="Models\ObjectiveDefinition.cs" />
+    <Compile Include="Models\OptimizationTemplate.cs" />
     <Compile Include="Models\Polygon.cs" />
     <Compile Include="Models\seedPointModel.cs" />
     <Compile Include="Models\Spacing.cs" />
     <Compile Include="Services\AppConfigHelper.cs" />
     <Compile Include="Services\EsapiWorker.cs" />
+    <Compile Include="Services\OptimizationObjectiveCreator.cs" />
     <Compile Include="Services\StructureExtension.cs" />
+    <Compile Include="Utilities\StructureMatchingHelper.cs" />
     <Compile Include="ViewModels\CoordinateConverter.cs" />
     <Compile Include="ViewModels\EvaluationViewModel.cs" />
     <Compile Include="ViewModels\MainViewModel.cs" />
