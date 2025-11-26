@@ -60,37 +60,43 @@ The SFRT Optimization module provides an integrated workflow for optimizing Spat
 Workflow
 
 1. Select Structures
-Choose the Lattice (Peak) structure from the dropdown
-Choose the Valley structure, or select "[Auto-create Valley]" to generate one
+   
+- Choose the Lattice (Peak) structure from the dropdown
+- Choose the Valley structure, or select "[Auto-create Valley]" to generate one
 
 2. Create Valley Structure (if needed)
-Select the PTV structure
-Click "Create Valley" to generate Valley = PTV - Lattice
+   
+- Select the PTV structure
+- Click "Create Valley" to generate Valley = PTV - Lattice
 
 3. Populate Objectives
-Click "Populate Objectives" to fill the table with default values
-Peak objectives: Lower dose bounds to ensure hot spots in lattice
-Valley objectives: Upper dose bounds to spare tissue between peaks
-OAR objectives: Auto-matched based on structure names
+   
+- Click "Populate Objectives" to fill the table with default values
+- Peak objectives: Lower dose bounds to ensure hot spots in lattice
+- Valley objectives: Upper dose bounds to spare tissue between peaks
+- OAR objectives: Auto-matched based on structure names
 
 4. Edit Objectives
-Modify dose, volume, and priority values as needed
-Use checkboxes to include/exclude objectives
-Add or remove objectives using the buttons below the table
+   
+- Modify dose, volume, and priority values as needed
+- Use checkboxes to include/exclude objectives
+- Add or remove objectives using the buttons below the table
 
 5. Create Objectives in Eclipse
-Click "Create Objectives" to apply the table to the Eclipse plan
-Existing objectives will be cleared and replaced
+   
+- Click "Create Objectives" to apply the table to the Eclipse plan
+- Existing objectives will be cleared and replaced
 
 6. Run Optimization
-Select VMAT beams to optimize
-Choose MLC and intermediate dose options
-Click "Run Optimization" (typically completes in 5-15 minutes)
+   
+- Select VMAT beams to optimize
+- Choose MLC and intermediate dose options
+- Click "Run Optimization" (typically completes in 5-15 minutes)
 
 7. Calculate Dose
-After optimization completes, click "Calculate Dose"
-Note: Dose calculation for SFRT plans can take 1+ hour due to complex MLC patterns
-DVH summary displays automatically upon completion
+   
+- After optimization completes, click "Calculate Dose"
+- DVH summary displays automatically upon completion
 
 <img width="732" height="845" alt="image" src="https://github.com/user-attachments/assets/7c3755ed-1b3d-4160-a877-9bce4e676ff0" />
 
