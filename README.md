@@ -54,6 +54,48 @@ The RapidRods tab supports creation of cylindrical rod-shaped dose structures. T
 
 <img width="720" height="663" alt="image" src="https://github.com/user-attachments/assets/f16420be-a5bc-4182-a7d4-d70b95b821bc" />
 
+### Optimization
+The SFRT Optimization module provides an integrated workflow for optimizing Spatially Fractionated Radiation Therapy (SFRT) plans directly within Eclipse. This module streamlines the process of setting up and running VMAT optimization with Peak-Valley dose objectives specific to lattice-based SFRT treatments.
+
+Workflow
+
+1. Select Structures
+Choose the Lattice (Peak) structure from the dropdown
+Choose the Valley structure, or select "[Auto-create Valley]" to generate one
+
+2. Create Valley Structure (if needed)
+Select the PTV structure
+Click "Create Valley" to generate Valley = PTV - Lattice
+
+3. Populate Objectives
+Click "Populate Objectives" to fill the table with default values
+Peak objectives: Lower dose bounds to ensure hot spots in lattice
+Valley objectives: Upper dose bounds to spare tissue between peaks
+OAR objectives: Auto-matched based on structure names
+
+4. Edit Objectives
+Modify dose, volume, and priority values as needed
+Use checkboxes to include/exclude objectives
+Add or remove objectives using the buttons below the table
+
+5. Create Objectives in Eclipse
+Click "Create Objectives" to apply the table to the Eclipse plan
+Existing objectives will be cleared and replaced
+
+6. Run Optimization
+Select VMAT beams to optimize
+Choose MLC and intermediate dose options
+Click "Run Optimization" (typically completes in 5-15 minutes)
+
+7. Calculate Dose
+After optimization completes, click "Calculate Dose"
+Note: Dose calculation for SFRT plans can take 1+ hour due to complex MLC patterns
+DVH summary displays automatically upon completion
+
+<img width="732" height="845" alt="image" src="https://github.com/user-attachments/assets/7c3755ed-1b3d-4160-a877-9bce4e676ff0" />
+
+This module is currently under heavy development. This module is experimental. Please reach out with comments and suggestions on how to improve. 
+
 ### Evaluation
 
 The Evaluation tab provides comprehensive dose analysis with automated peak-valley evaluation specifically designed for SFRT workflows. The module implements 3D clustering using percentile-based thresholding (80th percentile for peaks, 20th percentile for valleys) to robustly identify dose heterogeneity patterns across varying prescription doses and delivery techniques.
@@ -91,7 +133,7 @@ Note: This module is still experimental and in validation.
 ## Upcoming Features
 
 1. Improved PVDR analysis.
-2. Optimization tab with auto planning feature.
+2. Improved optimization with auto planning feature.
    
 ---
 ## Installation
