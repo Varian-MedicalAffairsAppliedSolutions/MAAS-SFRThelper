@@ -11,7 +11,6 @@
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
     </UserControl.Resources>
 
-    <!-- Global ScrollViewer wrapping everything -->
     <ScrollViewer VerticalScrollBarVisibility="Auto" 
                   HorizontalScrollBarVisibility="Disabled">
         <Grid Margin="10">
@@ -115,7 +114,6 @@
                                Margin="0,0,0,10"
                                TextWrapping="Wrap"/>
 
-                    <!-- Objectives DataGrid with Fixed Height and Scrolling -->
                     <DataGrid Grid.Row="1"
                               ItemsSource="{Binding Objectives}"
                               SelectedItem="{Binding SelectedObjective}"
@@ -129,18 +127,13 @@
                               ScrollViewer.HorizontalScrollBarVisibility="Auto"
                               Margin="0,0,0,10">
                         <DataGrid.Columns>
-                            <!-- Include Checkbox -->
                             <DataGridCheckBoxColumn Header="Include" 
                                                     Binding="{Binding IsIncluded, UpdateSourceTrigger=PropertyChanged}" 
                                                     Width="60"/>
-
-                            <!-- Structure Name -->
                             <DataGridTextColumn Header="Structure" 
                                                 Binding="{Binding StructureName}" 
                                                 Width="130"
                                                 IsReadOnly="True"/>
-
-                            <!-- Objective Type ComboBox (Point/Mean) -->
                             <DataGridTemplateColumn Header="Obj Type" Width="80">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
@@ -154,13 +147,10 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellEditingTemplate>
                             </DataGridTemplateColumn>
-
-                            <!-- Upper/Lower ComboBox -->
                             <DataGridTemplateColumn Header="Upper/Lower" Width="100">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding Operator}" 
-                                                   VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Operator}" VerticalAlignment="Center">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock">
                                                     <Style.Triggers>
@@ -181,23 +171,15 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellEditingTemplate>
                             </DataGridTemplateColumn>
-
-                            <!-- Dose -->
                             <DataGridTextColumn Header="Dose (Gy)" 
                                                 Binding="{Binding Dose, UpdateSourceTrigger=PropertyChanged}" 
                                                 Width="80"/>
-
-                            <!-- Volume % -->
                             <DataGridTextColumn Header="Vol (%)" 
                                                 Binding="{Binding Volume, UpdateSourceTrigger=PropertyChanged}" 
                                                 Width="70"/>
-
-                            <!-- Priority -->
                             <DataGridTextColumn Header="Priority" 
                                                 Binding="{Binding Priority, UpdateSourceTrigger=PropertyChanged}" 
                                                 Width="70"/>
-
-                            <!-- Role -->
                             <DataGridTextColumn Header="Role" 
                                                 Binding="{Binding Role}" 
                                                 Width="60"
@@ -205,7 +187,6 @@
                         </DataGrid.Columns>
                     </DataGrid>
 
-                    <!-- Action Buttons -->
                     <StackPanel Grid.Row="2" Orientation="Horizontal">
                         <Button Content="Add Objective"
                                 Command="{Binding AddObjectiveCommand}"
@@ -264,7 +245,6 @@
                                    FontWeight="SemiBold" 
                                    Margin="0,0,0,5"/>
 
-                        <!-- Warning if no VMAT arcs -->
                         <TextBlock Text="{Binding BeamWarningText}" 
                                    Foreground="OrangeRed" 
                                    FontWeight="SemiBold"
@@ -280,8 +260,7 @@
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <CheckBox IsChecked="{Binding IsSelected}" 
-                                                  Margin="0,2">
+                                        <CheckBox IsChecked="{Binding IsSelected}" Margin="0,2">
                                             <CheckBox.Content>
                                                 <StackPanel Orientation="Horizontal">
                                                     <TextBlock Text="{Binding BeamId}" Width="100" FontWeight="SemiBold"/>
@@ -300,7 +279,7 @@
                         </ScrollViewer>
                     </StackPanel>
 
-                    <!-- MLC and Intermediate Dose -->
+                    <!-- MLC and Options -->
                     <Grid Grid.Row="1" Margin="0,0,0,10">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -326,15 +305,23 @@
                                   ToolTip="Calculate intermediate dose during optimization (recommended)"/>
                     </Grid>
 
-                    <!-- Run Button -->
-                    <Button Grid.Row="2"
-                            Content="Run Optimization"
-                            Command="{Binding RunOptimizationCommand}"
-                            Width="160"
-                            Height="35"
-                            FontWeight="Bold"
-                            HorizontalAlignment="Left"
-                            ToolTip="Run VMAT optimization on selected beams"/>
+                    <!-- Action Buttons -->
+                    <StackPanel Grid.Row="2" Orientation="Horizontal">
+                        <Button Content="Run Optimization"
+                                Command="{Binding RunOptimizationCommand}"
+                                Width="150"
+                                Height="35"
+                                FontWeight="Bold"
+                                Margin="0,0,15,0"
+                                ToolTip="Run VMAT optimization on selected beams"/>
+
+                        <Button Content="Calculate Dose"
+                                Command="{Binding CalculateDoseCommand}"
+                                Width="150"
+                                Height="35"
+                                FontWeight="Bold"                                
+                                ToolTip="Calculate dose after optimization (can take 1+ hour for SFRT plans)"/>
+                    </StackPanel>
                 </Grid>
             </GroupBox>
 
@@ -361,7 +348,7 @@
                          IsIndeterminate="{Binding IsOptimizing}"
                          Margin="0,0,0,10"/>
 
-            <!-- Output Log - Made taller -->
+            <!-- Output Log -->
             <Border Grid.Row="7" 
                     BorderBrush="Gray" 
                     BorderThickness="1" 
