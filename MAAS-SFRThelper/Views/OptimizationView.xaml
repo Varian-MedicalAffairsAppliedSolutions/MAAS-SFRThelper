@@ -22,15 +22,9 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="250"/>
             </Grid.RowDefinitions>
-
-            <!-- Title -->
-            <TextBlock Grid.Row="0" 
-                       Text="SFRT Optimization" 
-                       FontSize="18" 
-                       FontWeight="Bold" 
-                       Margin="0,0,0,15"/>
 
             <!-- Structure Selection Section -->
             <GroupBox Grid.Row="1" 
@@ -96,8 +90,24 @@
                 </Grid>
             </GroupBox>
 
-            <!-- Unified Objectives Table -->
+            <!-- Geometric Analysis Section (NEW) -->
             <GroupBox Grid.Row="2" 
+          Header="Geometric Analysis" 
+          Margin="0,0,0,10"
+          Padding="10">
+                <StackPanel>
+                    <TextBlock Text="Extract and analyze sphere geometry from lattice structure." 
+                   Margin="0,0,0,10"/>
+                    <Button Content="Test Sphere Extraction" 
+                Command="{Binding TestSphereExtractionCommand}"
+                Width="160" 
+                Height="30"
+                HorizontalAlignment="Left"/>
+                </StackPanel>
+            </GroupBox>
+
+            <!-- Unified Objectives Table -->
+            <GroupBox Grid.Row="3" 
                       Header="Optimization Objectives (Peak, Valley, and OARs)" 
                       Margin="0,0,0,10"
                       Padding="10">
@@ -209,7 +219,7 @@
             </GroupBox>
 
             <!-- Action Buttons -->
-            <StackPanel Grid.Row="3"
+            <StackPanel Grid.Row="4"
                         Orientation="Horizontal"
                         Margin="0,0,0,10">
                 <Button Content="Populate Objectives" 
@@ -225,10 +235,11 @@
                         Height="35"
                         FontWeight="Bold"
                         ToolTip="Apply objectives from table to Eclipse plan"/>
+
             </StackPanel>
 
             <!-- Optimization Settings -->
-            <GroupBox Grid.Row="4" 
+            <GroupBox Grid.Row="5" 
                       Header="Optimization Settings" 
                       Margin="0,0,0,10"
                       Padding="10">
@@ -326,7 +337,7 @@
             </GroupBox>
 
             <!-- Validation Message -->
-            <Border Grid.Row="5" 
+            <Border Grid.Row="6" 
                     Background="#FFFFEBCD" 
                     BorderBrush="#FFD2691E" 
                     BorderThickness="1" 
@@ -340,7 +351,7 @@
             </Border>
 
             <!-- Progress Bar -->
-            <ProgressBar Grid.Row="6" 
+            <ProgressBar Grid.Row="7" 
                          Height="20" 
                          Minimum="0" 
                          Maximum="100"
@@ -349,7 +360,7 @@
                          Margin="0,0,0,10"/>
 
             <!-- Output Log -->
-            <Border Grid.Row="7" 
+            <Border Grid.Row="8" 
                     BorderBrush="Gray" 
                     BorderThickness="1" 
                     Padding="5"

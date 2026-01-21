@@ -14,7 +14,7 @@ using VMS.TPS.Common.Model.API;
 [assembly: AssemblyCopyright("Copyright ©  2021")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
-[assembly: AssemblyExpirationDate("12/31/2025")]
+[assembly: AssemblyExpirationDate("12/12/2026")]
 
 
 

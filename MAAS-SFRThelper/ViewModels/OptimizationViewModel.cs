@@ -10,6 +10,7 @@ using System.Linq;
 using VMS.TPS.Common.Model.API;
 using VMS.TPS.Common.Model.Types;
 using System.Windows;
+using System.Text;
 
 namespace MAAS_SFRThelper.ViewModels
 {
@@ -77,6 +78,7 @@ namespace MAAS_SFRThelper.ViewModels
                 PopulateObjectivesCommand?.RaiseCanExecuteChanged();
                 CreateObjectivesCommand?.RaiseCanExecuteChanged();
                 CreateValleyStructureCommand?.RaiseCanExecuteChanged();
+                TestSphereExtractionCommand?.RaiseCanExecuteChanged();
             }
         }
 
@@ -267,7 +269,7 @@ namespace MAAS_SFRThelper.ViewModels
         public DelegateCommand CreateValleyStructureCommand { get; set; }
         public DelegateCommand RunOptimizationCommand { get; set; }
         public DelegateCommand CalculateDoseCommand { get; set; }
-
+        public DelegateCommand TestSphereExtractionCommand { get; set; }
         #endregion
 
         #region Constructor
@@ -300,6 +302,7 @@ namespace MAAS_SFRThelper.ViewModels
             CreateValleyStructureCommand = new DelegateCommand(OnCreateValleyStructure, CanCreateValleyStructure);
             RunOptimizationCommand = new DelegateCommand(OnRunOptimization, CanRunOptimization);
             CalculateDoseCommand = new DelegateCommand(OnCalculateDose, CanCalculateDose);
+            TestSphereExtractionCommand = new DelegateCommand(OnTestSphereExtraction, CanTestSphereExtraction);
 
             PopulateStructureLists();
         }
@@ -1226,5 +1229,80 @@ namespace MAAS_SFRThelper.ViewModels
         }
 
         #endregion
+
+        #region Sphere Extraction Test
+
+        private bool CanTestSphereExtraction()
+        {
+            return !IsOptimizing && !string.IsNullOrEmpty(SelectedLatticeStructure);
+        }
+
+        private void OnTestSphereExtraction()
+        {
+            Output += "\n\n========================================";
+            Output += "\n=== TESTING SPHERE EXTRACTION ===";
+            Output += "\n========================================\n";
+
+            string latticeId = SelectedLatticeStructure;
+            Output += $"Selected structure: {latticeId}\n";
+
+            _esapiWorker.RunWithWait(sc =>
+            {
+                try
+                {
+                    var latticeStructure = sc.StructureSet.Structures
+                        .FirstOrDefault(s => s.Id.Equals(latticeId, StringComparison.OrdinalIgnoreCase));
+
+                    if (latticeStructure == null)
+                    {
+                        Output += $"ERROR: Structure '{latticeId}' not found!\n";
+                        return;
+                    }
+
+                    if (latticeStructure.IsEmpty)
+                    {
+                        Output += $"ERROR: Structure '{latticeId}' is empty!\n";
+                        return;
+                    }
+
+                    Output += $"Structure found: {latticeStructure.Id}\n";
+                    Output += $"  Volume: {latticeStructure.Volume:F2} cc\n";
+
+                    var log = new StringBuilder();
+
+                    Output += "\nRunning SphereExtractor...\n";
+                    var extractor = new SphereExtractor();
+                    var result = extractor.ExtractSpheres(latticeStructure, sc.Image, log);
+
+                    Output += log.ToString();
+
+                    Output += "\n--- RESULTS ---\n";
+                    Output += $"Success: {result.Success}\n";
+                    Output += $"Message: {result.Message}\n";
+                    Output += $"Sphere Count (from ESAPI): {result.SphereCount}\n";
+                    Output += $"Spheres Extracted: {result.Spheres.Count}\n";
+                    Output += $"Mean Radius: {result.MeanRadius:F1} mm\n";
+                    Output += $"Total Volume: {result.TotalVolume:F2} cc\n";
+
+                    if (result.Success && result.Spheres.Count > 0)
+                    {
+                        Output += "\n✓ Sphere extraction successful!\n";
+                    }
+                    else
+                    {
+                        Output += "\n✗ Sphere extraction failed.\n";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Output += $"\nEXCEPTION: {ex.Message}\n";
+                }
+            });
+
+            Output += "\n========================================\n";
+        }
+
+        #endregion
+
     }
 }
