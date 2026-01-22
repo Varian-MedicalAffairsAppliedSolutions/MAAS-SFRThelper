@@ -90,19 +90,210 @@
                 </Grid>
             </GroupBox>
 
-            <!-- Geometric Analysis Section (NEW) -->
+            <!-- Geometric Analysis Section -->
             <GroupBox Grid.Row="2" 
           Header="Geometric Analysis" 
           Margin="0,0,0,10"
           Padding="10">
                 <StackPanel>
-                    <TextBlock Text="Extract and analyze sphere geometry from lattice structure." 
-                   Margin="0,0,0,10"/>
+
+                    <!-- Description -->
+                    <TextBlock Text="Calculate geometric surrogate metrics (SII, VSI, SSI, OSI) to predict PVDR without dose calculation."
+                   TextWrapping="Wrap"
+                   Margin="0,0,0,10"
+                   FontStyle="Italic"
+                   Foreground="Gray"/>
+
+                    <!-- Test Extraction Button (keep existing) -->
                     <Button Content="Test Sphere Extraction" 
                 Command="{Binding TestSphereExtractionCommand}"
                 Width="160" 
                 Height="30"
-                HorizontalAlignment="Left"/>
+                HorizontalAlignment="Left"
+                Margin="0,0,0,15"/>
+
+                    <!-- OAR Selection - THIS IS WHERE YOU CHOOSE OARs -->
+                    <TextBlock Text="Select OARs for Analysis:" 
+                   FontWeight="SemiBold" 
+                   Margin="0,0,0,5"/>
+
+                    <Border BorderBrush="LightGray" 
+                BorderThickness="1" 
+                MaxHeight="100" 
+                Margin="0,0,0,10">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <ItemsControl ItemsSource="{Binding AvailableOARs}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <CheckBox Content="{Binding Name}" 
+                                      IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                      Margin="5,2"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Border>
+
+                    <!-- Calculate Button -->
+                    <Button Content="Calculate Geometric Metrics" 
+                Command="{Binding CalculateGeometricMetricsCommand}"
+                Width="200" 
+                Height="30"
+                HorizontalAlignment="Left"
+                Margin="0,0,0,10"/>
+
+                    <!-- Results Display -->
+                    <TextBlock Text="Results:" 
+                   FontWeight="SemiBold" 
+                   Margin="0,5,0,5"/>
+
+                    <Border BorderBrush="LightGray" 
+                BorderThickness="1" 
+                Background="#FFFAFAFA"
+                Padding="10"
+                MinHeight="80">
+                        <TextBlock Text="{Binding GeometricResultsSummary, FallbackValue='Click Calculate Geometric Metrics to see results...'}"
+                       FontFamily="Consolas"
+                       FontSize="12"
+                       TextWrapping="Wrap"/>
+                    </Border>
+
+                    <!-- Metric Explanations (collapsible) -->
+                    <Expander Header="What do these metrics mean?" Margin="0,10,0,0" IsExpanded="False">
+                        <StackPanel Margin="10,5,0,0">
+                            <TextBlock TextWrapping="Wrap" Margin="0,0,0,5">
+                    <Run FontWeight="SemiBold">SII (Sphere Independence Index):</Run>
+                    <Run> How independently targetable each sphere is in beam's eye view. Higher = less overlap = better.</Run>
+                            </TextBlock>
+                            <TextBlock TextWrapping="Wrap" Margin="0,0,0,5">
+                    <Run FontWeight="SemiBold">VSI (Valley Shielding Index):</Run>
+                    <Run> Fraction of target that is "valley" (not covered by spheres). Higher = more valley visible = lower valley dose.</Run>
+                            </TextBlock>
+                            <TextBlock TextWrapping="Wrap" Margin="0,0,0,5">
+                    <Run FontWeight="SemiBold">SSI (Sphere Spread Index):</Run>
+                    <Run> 3D distribution quality (volume coverage + centroid alignment). Higher = better spread.</Run>
+                            </TextBlock>
+                            <TextBlock TextWrapping="Wrap" Margin="0,0,0,5">
+                    <Run FontWeight="SemiBold">OSI (OAR Sparing Index):</Run>
+                    <Run> How well OARs avoid sphere projections. Higher = OAR stays in valley = better sparing.</Run>
+                            </TextBlock>
+                            <TextBlock TextWrapping="Wrap">
+                    <Run FontWeight="SemiBold">Combined Score:</Run>
+                    <Run> Weighted average of all metrics (equal weights by default).</Run>
+                            </TextBlock>
+                        </StackPanel>
+                    </Expander>
+
+                    <!-- ========== POSITION OPTIMIZATION SECTION ========== -->
+                    <Separator Margin="0,15,0,15"/>
+
+                    <TextBlock Text="Position Optimization" 
+                               FontWeight="Bold" 
+                               FontSize="14"
+                               Margin="0,0,0,10"/>
+
+                    <TextBlock Text="Search for optimal X/Y offset to maximize combined score. Spheres outside the target or too close to OARs are automatically excluded."
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,10"
+                               FontStyle="Italic"
+                               Foreground="Gray"/>
+
+                    <!-- Search Parameters -->
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="60"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="60"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0" 
+                                   Text="Search Range:" 
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,10,0"/>
+
+                        <TextBox Grid.Column="1"
+                                 Text="{Binding GridSearchRangePercent, UpdateSourceTrigger=PropertyChanged}"
+                                 Height="25"
+                                 VerticalContentAlignment="Center"
+                                 Margin="0,0,5,0"
+                                 ToolTip="Search range as percentage of target radius"/>
+
+                        <TextBlock Grid.Column="2" 
+                                   Text="% of target" 
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,5,0"/>
+
+                        <TextBlock Grid.Column="3" 
+                                   Text="{Binding GridSearchRangeDisplay}" 
+                                   VerticalAlignment="Center"
+                                   Foreground="Gray"
+                                   FontStyle="Italic"/>
+
+                        <TextBlock Grid.Column="5" 
+                                   Text="Steps:" 
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,10,0"/>
+
+                        <ComboBox Grid.Column="6"
+                                  ItemsSource="{Binding AvailableGridSearchSteps}"
+                                  SelectedItem="{Binding GridSearchSteps}"
+                                  Height="25"
+                                  ToolTip="Number of steps per axis (total positions = steps²)"/>
+                    </Grid>
+
+                    <!-- Run Grid Search Button -->
+                    <Button Content="Run Grid Search" 
+                            Command="{Binding RunGridSearchCommand}"
+                            Width="150" 
+                            Height="30"
+                            HorizontalAlignment="Left"
+                            Margin="0,0,0,15"
+                            ToolTip="Search for optimal X/Y offset position"/>
+
+                    <!-- Grid Search Results -->
+                    <TextBlock Text="Optimization Results:" 
+                               FontWeight="SemiBold" 
+                               Margin="0,5,0,5"/>
+
+                    <Border BorderBrush="LightGray" 
+                            BorderThickness="1" 
+                            Background="#FFF5F5F5"
+                            Padding="10"
+                            MinHeight="100"
+                            Margin="0,0,0,10">
+                        <TextBlock Text="{Binding GridSearchResultsSummary}"
+                                   FontFamily="Consolas"
+                                   FontSize="11"
+                                   TextWrapping="Wrap"/>
+                    </Border>
+
+                    <!-- Apply Buttons -->
+                    <StackPanel Orientation="Horizontal" 
+                                Margin="0,0,0,10"
+                                Visibility="{Binding HasGridSearchResults, Converter={StaticResource BooleanToVisibilityConverter}}">
+
+                        <Button Content="Apply Best Overall"
+                                Command="{Binding ApplyBestOverallCommand}"
+                                Width="140"
+                                Height="30"
+                                Margin="0,0,10,0"
+                                FontWeight="SemiBold"
+                                ToolTip="Create new lattice at the best position (may have fewer spheres)"/>
+
+                        </StackPanel>
+
+                    <TextBlock Text="After applying, select the new lattice from the dropdown above, then proceed to Populate Objectives."
+                               TextWrapping="Wrap"
+                               Margin="0,5,0,0"
+                               FontStyle="Italic"
+                               Foreground="Gray"
+                               Visibility="{Binding HasGridSearchResults, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
                 </StackPanel>
             </GroupBox>
 

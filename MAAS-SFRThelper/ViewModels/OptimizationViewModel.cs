@@ -11,6 +11,7 @@ using VMS.TPS.Common.Model.API;
 using VMS.TPS.Common.Model.Types;
 using System.Windows;
 using System.Text;
+using System.ComponentModel;
 
 namespace MAAS_SFRThelper.ViewModels
 {
@@ -58,6 +59,152 @@ namespace MAAS_SFRThelper.ViewModels
 
         #endregion
 
+        #region Geometric Analysis Properties
+
+        /// <summary>
+        /// List of available OARs for geometric analysis (with checkbox selection)
+        /// </summary>
+        private ObservableCollection<OARInfo> _availableOARs;
+        public ObservableCollection<OARInfo> AvailableOARs
+        {
+            get => _availableOARs;
+            set => SetProperty(ref _availableOARs, value);
+        }
+
+        /// <summary>
+        /// Results from geometric surrogate calculation
+        /// </summary>
+        private GeometricResults _geometricResults;
+        public GeometricResults GeometricResults
+        {
+            get => _geometricResults;
+            set => SetProperty(ref _geometricResults, value);
+        }
+
+        /// <summary>
+        /// Flag indicating if geometric calculation is in progress
+        /// </summary>
+        private bool _isCalculatingMetrics;
+        public bool IsCalculatingMetrics
+        {
+            get => _isCalculatingMetrics;
+            set
+            {
+                SetProperty(ref _isCalculatingMetrics, value);
+                CalculateGeometricMetricsCommand?.RaiseCanExecuteChanged();
+            }
+        }
+
+        /// <summary>
+        /// Summary text for geometric results display
+        /// </summary>
+        private string _geometricResultsSummary;
+        public string GeometricResultsSummary
+        {
+            get => _geometricResultsSummary;
+            set => SetProperty(ref _geometricResultsSummary, value);
+        }
+
+        #endregion
+
+        #region Grid Search Properties
+
+        /// <summary>
+        /// Search range as percentage of target radius (default 20%)
+        /// </summary>
+        private double _gridSearchRangePercent = 20.0;
+        public double GridSearchRangePercent
+        {
+            get => _gridSearchRangePercent;
+            set => SetProperty(ref _gridSearchRangePercent, value);
+        }
+
+        /// <summary>
+        /// Display of search range in mm (calculated from percentage)
+        /// </summary>
+        private string _gridSearchRangeDisplay = "";
+        public string GridSearchRangeDisplay
+        {
+            get => _gridSearchRangeDisplay;
+            set => SetProperty(ref _gridSearchRangeDisplay, value);
+        }
+
+        /// <summary>
+        /// Number of steps per axis (3, 5, 7, 9)
+        /// </summary>
+        private int _gridSearchSteps = 5;
+        public int GridSearchSteps
+        {
+            get => _gridSearchSteps;
+            set => SetProperty(ref _gridSearchSteps, value);
+        }
+
+        /// <summary>
+        /// Available step options
+        /// </summary>
+        public List<int> AvailableGridSearchSteps { get; } = new List<int> { 3, 5, 7, 9 };
+
+        /// <summary>
+        /// Grid search results
+        /// </summary>
+        private GridSearchResult _gridSearchResult;
+        public GridSearchResult GridSearchResult
+        {
+            get => _gridSearchResult;
+            set
+            {
+                SetProperty(ref _gridSearchResult, value);
+                RaisePropertyChanged(nameof(HasGridSearchResults));
+                RaisePropertyChanged(nameof(GridSearchResultsSummary));
+                RaisePropertyChanged(nameof(ShowBestFullOption));
+                ApplyBestOverallCommand?.RaiseCanExecuteChanged();
+                ApplyBestFullCountCommand?.RaiseCanExecuteChanged();
+            }
+        }
+
+        /// <summary>
+        /// Flag indicating grid search has results
+        /// </summary>
+        public bool HasGridSearchResults => GridSearchResult != null && GridSearchResult.Success;
+
+        /// <summary>
+        /// Flag indicating whether to show the "Best Full Count" option
+        /// </summary>
+        public bool ShowBestFullOption => HasGridSearchResults && GridSearchResult.HasDifferentBestOptions;
+
+        /// <summary>
+        /// Summary text for grid search results
+        /// </summary>
+        public string GridSearchResultsSummary
+        {
+            get
+            {
+                if (GridSearchResult == null)
+                    return "Click 'Run Grid Search' to find optimal position...";
+                return GridSearchResult.GetSummary();
+            }
+        }
+
+        /// <summary>
+        /// Flag indicating grid search is running
+        /// </summary>
+        private bool _isRunningGridSearch;
+        public bool IsRunningGridSearch
+        {
+            get => _isRunningGridSearch;
+            set
+            {
+                SetProperty(ref _isRunningGridSearch, value);
+                RunGridSearchCommand?.RaiseCanExecuteChanged();
+                CalculateGeometricMetricsCommand?.RaiseCanExecuteChanged();
+            }
+        }
+
+        // Simple double to store target radius for display (no complex object)
+        private double _targetRadius = 0;
+
+        #endregion
+
         #region Structure Selection Properties
 
         private List<string> _availableLatticeStructures;
@@ -79,6 +226,7 @@ namespace MAAS_SFRThelper.ViewModels
                 CreateObjectivesCommand?.RaiseCanExecuteChanged();
                 CreateValleyStructureCommand?.RaiseCanExecuteChanged();
                 TestSphereExtractionCommand?.RaiseCanExecuteChanged();
+                CalculateGeometricMetricsCommand?.RaiseCanExecuteChanged();
             }
         }
 
@@ -122,6 +270,8 @@ namespace MAAS_SFRThelper.ViewModels
                 PopulateObjectivesCommand?.RaiseCanExecuteChanged();
                 CreateObjectivesCommand?.RaiseCanExecuteChanged();
                 CreateValleyStructureCommand?.RaiseCanExecuteChanged();
+                CalculateGeometricMetricsCommand?.RaiseCanExecuteChanged();
+                RunGridSearchCommand?.RaiseCanExecuteChanged();
             }
         }
 
@@ -270,6 +420,11 @@ namespace MAAS_SFRThelper.ViewModels
         public DelegateCommand RunOptimizationCommand { get; set; }
         public DelegateCommand CalculateDoseCommand { get; set; }
         public DelegateCommand TestSphereExtractionCommand { get; set; }
+        public DelegateCommand CalculateGeometricMetricsCommand { get; set; }
+        public DelegateCommand RunGridSearchCommand { get; set; }
+        public DelegateCommand ApplyBestOverallCommand { get; set; }
+        public DelegateCommand ApplyBestFullCountCommand { get; set; }
+
         #endregion
 
         #region Constructor
@@ -293,6 +448,7 @@ namespace MAAS_SFRThelper.ViewModels
 
             Objectives = new ObservableCollection<ObjectiveDefinition>();
             AvailableBeams = new ObservableCollection<BeamSelectionItem>();
+            AvailableOARs = new ObservableCollection<OARInfo>();
 
             PopulateObjectivesCommand = new DelegateCommand(OnPopulateObjectives, CanPopulateObjectives);
             CreateObjectivesCommand = new DelegateCommand(OnCreateObjectives, CanCreateObjectives);
@@ -303,6 +459,10 @@ namespace MAAS_SFRThelper.ViewModels
             RunOptimizationCommand = new DelegateCommand(OnRunOptimization, CanRunOptimization);
             CalculateDoseCommand = new DelegateCommand(OnCalculateDose, CanCalculateDose);
             TestSphereExtractionCommand = new DelegateCommand(OnTestSphereExtraction, CanTestSphereExtraction);
+            CalculateGeometricMetricsCommand = new DelegateCommand(OnCalculateGeometricMetrics, CanCalculateGeometricMetrics);
+            RunGridSearchCommand = new DelegateCommand(OnRunGridSearch, CanRunGridSearch);
+            ApplyBestOverallCommand = new DelegateCommand(OnApplyBestOverall, CanApplyBestOverall);
+            ApplyBestFullCountCommand = new DelegateCommand(OnApplyBestFullCount, CanApplyBestFullCount);
 
             PopulateStructureLists();
         }
@@ -313,35 +473,37 @@ namespace MAAS_SFRThelper.ViewModels
 
         private void PopulateStructureLists()
         {
-            var beamItems = new List<BeamSelectionItem>();
+            // Capture dispatcher BEFORE entering worker thread
+            var dispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
 
-            _esapiWorker.RunWithWait(sc =>
+            // Use async Run() to avoid blocking UI when Eclipse shows dialogs
+            _esapiWorker.Run(sc =>
             {
-                AvailableLatticeStructures = OptimizationObjectiveCreator.GetAvailableLatticeStructures(sc.StructureSet);
-                AvailableValleyStructures = OptimizationObjectiveCreator.GetAvailableValleyStructures(sc.StructureSet);
-                AvailablePTVStructures = OptimizationObjectiveCreator.GetAvailablePTVStructures(sc.StructureSet);
+                // Collect all data first - don't update UI properties directly from worker thread!
+                var latticeList = OptimizationObjectiveCreator.GetAvailableLatticeStructures(sc.StructureSet);
+                var valleyList = OptimizationObjectiveCreator.GetAvailableValleyStructures(sc.StructureSet);
+                var ptvList = OptimizationObjectiveCreator.GetAvailablePTVStructures(sc.StructureSet);
 
-                if (AvailableLatticeStructures != null && AvailableLatticeStructures.Count == 1)
-                {
-                    SelectedLatticeStructure = AvailableLatticeStructures[0];
-                }
+                // Determine auto-selections (but don't set properties yet)
+                string autoSelectLattice = (latticeList != null && latticeList.Count == 1) ? latticeList[0] : null;
 
-                if (AvailableValleyStructures != null && AvailableValleyStructures.Count > 0)
+                string autoSelectValley = null;
+                if (valleyList != null && valleyList.Count > 0)
                 {
-                    if (AvailableValleyStructures.Contains("coreVoid"))
-                        SelectedValleyStructure = "coreVoid";
-                    else if (AvailableValleyStructures.Contains("Voids"))
-                        SelectedValleyStructure = "Voids";
-                    else if (AvailableValleyStructures.Contains("Valley"))
-                        SelectedValleyStructure = "Valley";
+                    var valleyOpt = valleyList.FirstOrDefault(v => v.StartsWith("Valley_", StringComparison.OrdinalIgnoreCase));
+                    if (valleyOpt != null)
+                        autoSelectValley = valleyOpt;
+                    else if (valleyList.Contains("coreVoid"))
+                        autoSelectValley = "coreVoid";
+                    else if (valleyList.Contains("Voids"))
+                        autoSelectValley = "Voids";
+                    else if (valleyList.Contains("Valley"))
+                        autoSelectValley = "Valley";
                     else
-                        SelectedValleyStructure = "[Auto-create Valley]";
+                        autoSelectValley = "[Auto-create Valley]";
                 }
 
-                if (AvailablePTVStructures != null && AvailablePTVStructures.Count == 1)
-                {
-                    SelectedPTVStructure = AvailablePTVStructures[0];
-                }
+                string autoSelectPTV = (ptvList != null && ptvList.Count == 1) ? ptvList[0] : null;
 
                 // Populate MLCs from plan beams
                 var mlcs = sc.PlanSetup.Beams
@@ -350,13 +512,10 @@ namespace MAAS_SFRThelper.ViewModels
                     .Distinct()
                     .ToList();
 
-                AvailableMLCs = mlcs;
-                if (mlcs.Count >= 1)
-                {
-                    SelectedMLC = mlcs[0];
-                }
+                string autoSelectMLC = mlcs.Count >= 1 ? mlcs[0] : null;
 
                 // Populate beam list
+                var beamItems = new List<BeamSelectionItem>();
                 bool hasVMAT = false;
 
                 foreach (var beam in sc.PlanSetup.Beams.Where(b => !b.IsSetupField))
@@ -386,31 +545,100 @@ namespace MAAS_SFRThelper.ViewModels
                     });
                 }
 
-                HasVMATArcs = hasVMAT;
+                string beamWarning = !hasVMAT ? "⚠ No VMAT arcs found. Please create VMAT arcs in Eclipse before optimizing." : "";
 
+                // Populate OAR list
+                var oarStructures = sc.StructureSet.Structures
+                    .Where(s => !s.IsEmpty &&
+                                !s.Id.ToUpper().Contains("PTV") &&
+                                !s.Id.ToUpper().Contains("GTV") &&
+                                !s.Id.ToUpper().Contains("CTV") &&
+                                !s.Id.ToUpper().Contains("LATTICE") &&
+                                !s.Id.ToUpper().Contains("CVT") &&
+                                !s.Id.ToUpper().Contains("SPHERE") &&
+                                !s.Id.ToUpper().Contains("VALLEY") &&
+                                !s.Id.ToUpper().Contains("BODY") &&
+                                !s.Id.ToUpper().Contains("EXTERNAL") &&
+                                !s.Id.ToUpper().Contains("COUCH") &&
+                                !s.Id.ToUpper().Contains("SUPPORT") &&
+                                s.DicomType != "EXTERNAL" &&
+                                s.DicomType != "SUPPORT")
+                    .OrderBy(s => s.Id)
+                    .ToList();
+
+                var oarList = new List<OARInfo>();
+                foreach (var structure in oarStructures)
+                {
+                    var oarInfo = OARInfo.FromStructure(structure);
+                    if (oarInfo != null)
+                    {
+                        string upperName = oarInfo.Name.ToUpper();
+                        oarInfo.IsSelected = upperName.Contains("CORD") ||
+                                             upperName.Contains("BRAIN") ||
+                                             upperName.Contains("STEM") ||
+                                             upperName.Contains("CHIASM") ||
+                                             upperName.Contains("NERVE") ||
+                                             upperName.Contains("EYE") ||
+                                             upperName.Contains("PAROTID") ||
+                                             upperName.Contains("ESOPH") ||
+                                             upperName.Contains("HEART") ||
+                                             upperName.Contains("KIDNEY") ||
+                                             upperName.Contains("LIVER") ||
+                                             upperName.Contains("BOWEL") ||
+                                             upperName.Contains("RECTUM") ||
+                                             upperName.Contains("BLADDER") ||
+                                             upperName.Contains("FEMUR") ||
+                                             upperName.Contains("OAR");
+                        oarList.Add(oarInfo);
+                    }
+                }
+
+                // Log output (Output property handles threading internally)
                 if (!hasVMAT)
-                {
-                    BeamWarningText = "⚠ No VMAT arcs found. Please create VMAT arcs in Eclipse before optimizing.";
                     Output += "\n⚠ WARNING: No VMAT arcs found in plan";
-                }
-                else
-                {
-                    BeamWarningText = "";
-                }
 
-                Output += $"\nFound {AvailableLatticeStructures?.Count ?? 0} lattice structure(s)";
-                Output += $"\nFound {AvailableValleyStructures?.Count ?? 0} valley structure option(s)";
-                Output += $"\nFound {AvailablePTVStructures?.Count ?? 0} PTV structure(s)";
+                Output += $"\nFound {latticeList?.Count ?? 0} lattice structure(s)";
+                Output += $"\nFound {valleyList?.Count ?? 0} valley structure option(s)";
+                Output += $"\nFound {ptvList?.Count ?? 0} PTV structure(s)";
                 Output += $"\nFound {mlcs.Count} MLC(s)";
                 Output += $"\nFound {beamItems.Count} beam(s) ({beamItems.Count(b => b.IsVMAT)} VMAT)";
-            });
+                Output += $"Found {oarList.Count} potential OAR(s) for geometric analysis\n";
 
-            // Update ObservableCollection on UI thread after RunWithWait
-            AvailableBeams.Clear();
-            foreach (var beam in beamItems)
-            {
-                AvailableBeams.Add(beam);
-            }
+                // Update ALL UI properties via dispatcher (CRITICAL - avoid threading errors)
+                dispatcher.BeginInvoke(new Action(() =>
+                {
+                    // Update list properties
+                    AvailableLatticeStructures = latticeList;
+                    AvailableValleyStructures = valleyList;
+                    AvailablePTVStructures = ptvList;
+                    AvailableMLCs = mlcs;
+                    HasVMATArcs = hasVMAT;
+                    BeamWarningText = beamWarning;
+
+                    // Update selected items (triggers PropertyChanged safely on UI thread)
+                    if (autoSelectLattice != null)
+                        SelectedLatticeStructure = autoSelectLattice;
+                    if (autoSelectValley != null)
+                        SelectedValleyStructure = autoSelectValley;
+                    if (autoSelectPTV != null)
+                        SelectedPTVStructure = autoSelectPTV;
+                    if (autoSelectMLC != null)
+                        SelectedMLC = autoSelectMLC;
+
+                    // Update ObservableCollections
+                    AvailableBeams.Clear();
+                    foreach (var beam in beamItems)
+                    {
+                        AvailableBeams.Add(beam);
+                    }
+
+                    AvailableOARs.Clear();
+                    foreach (var oar in oarList)
+                    {
+                        AvailableOARs.Add(oar);
+                    }
+                }));
+            });
         }
 
         #endregion
@@ -423,6 +651,9 @@ namespace MAAS_SFRThelper.ViewModels
                 return;
 
             Output += $"\n✓ Selected lattice structure: {SelectedLatticeStructure}";
+
+            // Clear grid search results when lattice changes
+            GridSearchResult = null;
         }
 
         private void OnValleyStructureChanged()
@@ -520,20 +751,50 @@ namespace MAAS_SFRThelper.ViewModels
         {
             Output += "\n\n=== Populating Objectives Table ===";
 
-            var objectivesList = new List<ObjectiveDefinition>();
+            // Capture selected structures and dispatcher BEFORE entering worker
+            string selectedLattice = SelectedLatticeStructure;
+            string selectedValley = SelectedValleyStructure;
+            var dispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
 
-            _esapiWorker.RunWithWait(sc =>
+            // Use async Run() to avoid blocking UI
+            _esapiWorker.Run(sc =>
             {
                 try
                 {
+                    // Collect all data in worker thread - don't update UI properties directly!
+                    var latticeList = OptimizationObjectiveCreator.GetAvailableLatticeStructures(sc.StructureSet);
+                    var valleyList = OptimizationObjectiveCreator.GetAvailableValleyStructures(sc.StructureSet);
+
+                    Output += $"\nFound {latticeList?.Count ?? 0} lattice structure(s)";
+                    Output += $"\nFound {valleyList?.Count ?? 0} valley structure(s)";
+
+                    // Determine which lattice to use - prefer _Opt version
+                    string latticeToUse = selectedLattice;
+                    string newSelectedLattice = null;  // Will be set via dispatcher
+
+                    if (!string.IsNullOrEmpty(selectedLattice))
+                    {
+                        string optVersion = latticeList?.FirstOrDefault(l =>
+                            l.StartsWith(selectedLattice.Substring(0, Math.Min(10, selectedLattice.Length))) &&
+                            l.Contains("_Opt"));
+                        if (optVersion != null)
+                        {
+                            latticeToUse = optVersion;
+                            newSelectedLattice = optVersion;
+                            Output += $"\n  → Using optimized lattice: {optVersion}";
+                        }
+                    }
+
                     var template = OptimizationTemplate.CreateStandardProstateTemplate();
                     var defaultConstraints = ProstateOARConstraints.GetConstraints();
+                    var objectivesList = new List<ObjectiveDefinition>();
 
-                    if (!string.IsNullOrEmpty(SelectedLatticeStructure))
+                    // Add Peak objectives for selected lattice
+                    if (!string.IsNullOrEmpty(latticeToUse))
                     {
                         objectivesList.Add(new ObjectiveDefinition
                         {
-                            StructureName = SelectedLatticeStructure,
+                            StructureName = latticeToUse,
                             ObjectiveType = "Point",
                             Operator = OptimizationObjectiveOperator.Lower,
                             Dose = template.PeakLowerDose,
@@ -545,7 +806,7 @@ namespace MAAS_SFRThelper.ViewModels
 
                         objectivesList.Add(new ObjectiveDefinition
                         {
-                            StructureName = SelectedLatticeStructure,
+                            StructureName = latticeToUse,
                             ObjectiveType = "Mean",
                             Operator = OptimizationObjectiveOperator.Lower,
                             Dose = template.PeakMeanDose,
@@ -555,16 +816,36 @@ namespace MAAS_SFRThelper.ViewModels
                             IsIncluded = true
                         });
 
-                        Output += $"\n  ✓ Added Peak objectives for {SelectedLatticeStructure}";
+                        Output += $"\n  ✓ Added Peak objectives for {latticeToUse}";
                     }
 
+                    // Find valley structure - prefer Valley_Opt if it exists
+                    string valleyToUse = null;
+                    string newSelectedValley = null;  // Will be set via dispatcher
+
                     var valleyStructure = sc.StructureSet.Structures.FirstOrDefault(s =>
-                        s.Id.Equals("Valley", StringComparison.OrdinalIgnoreCase) ||
-                        s.Id.Equals("Voids", StringComparison.OrdinalIgnoreCase) ||
-                        s.Id.Equals("coreVoid", StringComparison.OrdinalIgnoreCase));
+                        s.Id.StartsWith("Valley_Opt", StringComparison.OrdinalIgnoreCase));
+
+                    if (valleyStructure == null && !string.IsNullOrEmpty(selectedValley) &&
+                        selectedValley != "[Auto-create Valley]")
+                    {
+                        valleyStructure = sc.StructureSet.Structures.FirstOrDefault(s =>
+                            s.Id.Equals(selectedValley, StringComparison.OrdinalIgnoreCase));
+                    }
+
+                    if (valleyStructure == null)
+                    {
+                        valleyStructure = sc.StructureSet.Structures.FirstOrDefault(s =>
+                            s.Id.StartsWith("Valley", StringComparison.OrdinalIgnoreCase) ||
+                            s.Id.Equals("Voids", StringComparison.OrdinalIgnoreCase) ||
+                            s.Id.Equals("coreVoid", StringComparison.OrdinalIgnoreCase));
+                    }
 
                     if (valleyStructure != null)
                     {
+                        valleyToUse = valleyStructure.Id;
+                        newSelectedValley = valleyStructure.Id;
+
                         objectivesList.Add(new ObjectiveDefinition
                         {
                             StructureName = valleyStructure.Id,
@@ -596,6 +877,7 @@ namespace MAAS_SFRThelper.ViewModels
                         Output += "\n  ⚠ WARNING: Valley structure not found, skipping valley objectives";
                     }
 
+                    // Add OAR objectives
                     var structures = sc.StructureSet.Structures
                         .Where(s => !s.IsEmpty)
                         .OrderBy(s => s.Id)
@@ -646,6 +928,32 @@ namespace MAAS_SFRThelper.ViewModels
 
                     Output += $"\n  ✓ Added {oarCount} OAR objectives";
                     Output += $"\n\n✓ Total: {objectivesList.Count} objectives ready";
+
+                    // Update ALL UI properties via dispatcher (CRITICAL - avoid threading errors)
+                    dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        // Update dropdown lists
+                        AvailableLatticeStructures = latticeList;
+                        AvailableValleyStructures = valleyList;
+
+                        // Update selected items (this triggers property changed events safely on UI thread)
+                        if (newSelectedLattice != null)
+                            SelectedLatticeStructure = newSelectedLattice;
+                        if (newSelectedValley != null)
+                            SelectedValleyStructure = newSelectedValley;
+
+                        // Update objectives collection
+                        Objectives.Clear();
+                        foreach (var obj in objectivesList)
+                        {
+                            Objectives.Add(obj);
+                        }
+
+                        Output += "\n✓ Objectives table populated";
+                        Output += "\n\nReview and edit objectives as needed, then click 'Create Objectives' to apply to Eclipse.";
+
+                        CreateObjectivesCommand?.RaiseCanExecuteChanged();
+                    }));
                 }
                 catch (Exception ex)
                 {
@@ -653,17 +961,6 @@ namespace MAAS_SFRThelper.ViewModels
                     Output += $"\nStack trace: {ex.StackTrace}";
                 }
             });
-
-            Objectives.Clear();
-            foreach (var obj in objectivesList)
-            {
-                Objectives.Add(obj);
-            }
-
-            Output += "\n✓ Objectives table populated";
-            Output += "\n\nReview and edit objectives as needed, then click 'Create Objectives' to apply to Eclipse.";
-
-            CreateObjectivesCommand?.RaiseCanExecuteChanged();
         }
 
         #endregion
@@ -1224,6 +1521,7 @@ namespace MAAS_SFRThelper.ViewModels
             Output += "\n\n=== Resetting ===";
             Objectives.Clear();
             OptimizationCompleted = false;
+            GridSearchResult = null;
             Output += "\n✓ Objectives table cleared";
             Output += "\nClick 'Populate Objectives' to reload";
         }
@@ -1246,7 +1544,8 @@ namespace MAAS_SFRThelper.ViewModels
             string latticeId = SelectedLatticeStructure;
             Output += $"Selected structure: {latticeId}\n";
 
-            _esapiWorker.RunWithWait(sc =>
+            // Use async Run() to avoid blocking UI
+            _esapiWorker.Run(sc =>
             {
                 try
                 {
@@ -1292,17 +1591,795 @@ namespace MAAS_SFRThelper.ViewModels
                     {
                         Output += "\n✗ Sphere extraction failed.\n";
                     }
+
+                    Output += "\n========================================\n";
                 }
                 catch (Exception ex)
                 {
                     Output += $"\nEXCEPTION: {ex.Message}\n";
+                    Output += "\n========================================\n";
                 }
             });
-
-            Output += "\n========================================\n";
         }
 
         #endregion
 
+        #region Geometric Analysis
+
+        /// <summary>
+        /// Populate the OAR list from structure set
+        /// Call this after structure set is loaded
+        /// </summary>
+        private void PopulateOARList()
+        {
+            // OAR list is now populated inside PopulateStructureLists to avoid threading issues
+            // This method is kept for backward compatibility but does nothing
+        }
+
+        /// <summary>
+        /// Check if geometric metrics calculation can run
+        /// </summary>
+        private bool CanCalculateGeometricMetrics()
+        {
+            return !IsCalculatingMetrics &&
+                   !IsOptimizing &&
+                   !IsRunningGridSearch &&
+                   !string.IsNullOrEmpty(SelectedLatticeStructure) &&
+                   !string.IsNullOrEmpty(SelectedPTVStructure);
+        }
+
+        /// <summary>
+        /// Calculate geometric surrogate metrics - FIXED THREADING
+        /// </summary>
+        private void OnCalculateGeometricMetrics()
+        {
+            IsCalculatingMetrics = true;
+            GeometricResultsSummary = "Calculating geometric metrics...";
+            Output += "\n========================================\n";
+            Output += "=== GEOMETRIC SURROGATE ANALYSIS ===\n";
+            Output += "========================================\n";
+
+            string latticeId = SelectedLatticeStructure;
+            string targetId = SelectedPTVStructure;
+
+            var selectedOARNames = AvailableOARs
+                .Where(o => o.IsSelected)
+                .Select(o => o.Name)
+                .ToList();
+
+            Output += $"Lattice: {latticeId}\n";
+            Output += $"Target: {targetId}\n";
+            Output += $"OARs selected: {selectedOARNames.Count}\n";
+
+            // CRITICAL: Capture the UI dispatcher BEFORE entering the worker
+            var uiDispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
+
+            _esapiWorker.Run(sc =>
+            {
+                var log = new StringBuilder();
+                GeometricResults results = null;
+                double targetRadius = 0;
+
+                try
+                {
+                    if (sc?.StructureSet == null)
+                    {
+                        log.AppendLine("ERROR: No structure set available");
+                        return;
+                    }
+
+                    var image = sc.StructureSet.Image;
+
+                    var latticeStructure = sc.StructureSet.Structures
+                        .FirstOrDefault(s => s.Id.Equals(latticeId, StringComparison.OrdinalIgnoreCase));
+
+                    if (latticeStructure == null || latticeStructure.IsEmpty)
+                    {
+                        log.AppendLine($"ERROR: Lattice structure '{latticeId}' not found or empty");
+                        return;
+                    }
+
+                    var targetStructure = sc.StructureSet.Structures
+                        .FirstOrDefault(s => s.Id.Equals(targetId, StringComparison.OrdinalIgnoreCase));
+
+                    if (targetStructure == null || targetStructure.IsEmpty)
+                    {
+                        log.AppendLine($"ERROR: Target structure '{targetId}' not found or empty");
+                        return;
+                    }
+
+                    // Step 1: Extract spheres
+                    log.AppendLine("\n--- Step 1: Extracting Spheres ---");
+                    var sphereExtractor = new SphereExtractor();
+                    var extractionLog = new StringBuilder();
+                    var extractionResult = sphereExtractor.ExtractSpheres(latticeStructure, image, extractionLog);
+                    log.Append(extractionLog.ToString());
+
+                    if (!extractionResult.Success)
+                    {
+                        log.AppendLine($"ERROR: Sphere extraction failed - {extractionResult.Message}");
+                        return;
+                    }
+
+                    log.AppendLine($"Extracted {extractionResult.Spheres.Count} spheres, radius = {extractionResult.MeanRadius:F1} mm");
+
+                    // Step 2: Create target info
+                    log.AppendLine("\n--- Step 2: Analyzing Target ---");
+                    var targetInfo = TargetInfo.FromStructure(targetStructure);
+                    log.AppendLine($"Target: {targetInfo}");
+
+                    // Capture target radius for grid search display
+                    targetRadius = targetInfo.Radius;
+
+                    // Step 3: Create OAR info list
+                    log.AppendLine("\n--- Step 3: Analyzing OARs ---");
+                    var oarInfoList = new List<OARInfo>();
+
+                    foreach (var oarName in selectedOARNames)
+                    {
+                        var oarStructure = sc.StructureSet.Structures
+                            .FirstOrDefault(s => s.Id.Equals(oarName, StringComparison.OrdinalIgnoreCase));
+
+                        if (oarStructure != null && !oarStructure.IsEmpty)
+                        {
+                            var oarInfo = OARInfo.FromStructure(oarStructure);
+                            oarInfo.IsSelected = true;
+                            oarInfoList.Add(oarInfo);
+                            log.AppendLine($"  OAR: {oarInfo}");
+                        }
+                    }
+
+                    if (oarInfoList.Count == 0)
+                    {
+                        log.AppendLine("  No OARs selected (OSI will default to 1.0)");
+                    }
+
+                    // Step 4: Calculate geometric metrics
+                    log.AppendLine("\n--- Step 4: Calculating Metrics ---");
+                    log.AppendLine("  Gantry angles: 0 to 355 in 5 deg steps (72 angles)");
+
+                    var calculator = new GeometricSurrogateCalculator(
+                        gantryAngleStep: 5.0,
+                        gantryStart: 0.0,
+                        gantryEnd: 360.0);
+
+                    results = calculator.Calculate(
+                        extractionResult.Spheres,
+                        targetInfo,
+                        oarInfoList);
+
+                    // Step 5: Display results
+                    if (results.Success)
+                    {
+                        log.AppendLine("\n" + results.GetSummary());
+                    }
+                    else
+                    {
+                        log.AppendLine($"ERROR: Calculation failed - {results.Message}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    log.AppendLine($"ERROR: {ex.Message}");
+                }
+                finally
+                {
+                    // Capture final values for UI update
+                    string logOutput = log.ToString();
+                    var finalResults = results;
+                    var finalRadius = targetRadius;
+
+                    // FIX: Use captured dispatcher instead of Application.Current.Dispatcher
+                    try
+                    {
+                        uiDispatcher.BeginInvoke(new Action(() =>
+                        {
+                            try
+                            {
+                                Output += logOutput;
+
+                                if (finalResults != null && finalResults.Success)
+                                {
+                                    GeometricResults = finalResults;
+                                    GeometricResultsSummary = FormatResultsSummary(finalResults);
+                                    _targetRadius = finalRadius;
+
+                                    // Update search range display
+                                    if (_targetRadius > 0)
+                                    {
+                                        double rangeMm = _targetRadius * GridSearchRangePercent / 100.0;
+                                        GridSearchRangeDisplay = $"(±{rangeMm:F1}mm)";
+                                    }
+                                }
+
+                                IsCalculatingMetrics = false;
+
+                                // Force all commands to re-evaluate
+                                RunGridSearchCommand?.RaiseCanExecuteChanged();
+                                ApplyBestOverallCommand?.RaiseCanExecuteChanged();
+                                ApplyBestFullCountCommand?.RaiseCanExecuteChanged();
+                            }
+                            catch { }
+                        }));
+                    }
+                    catch { }
+                }
+            });
+        }
+
+        /// <summary>
+        /// Format results for compact UI display
+        /// </summary>
+        private string FormatResultsSummary(GeometricResults results)
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"SII: {results.SII_Mean:F3}  (range: {results.SII_Min:F3} - {results.SII_Max:F3})");
+            sb.AppendLine($"VSI: {results.VSI_Mean:F3}  (range: {results.VSI_Min:F3} - {results.VSI_Max:F3})");
+            sb.AppendLine($"SSI: {results.SSI:F3}");
+
+            if (results.OAR_Results.Count > 0)
+            {
+                sb.AppendLine($"OSI: {results.OSI_Combined:F3}  (worst: {results.OSI_WorstOARName} @ {results.OSI_Worst:F3})");
+            }
+
+            sb.AppendLine($"─────────────────────");
+            sb.AppendLine($"Combined Score: {results.CombinedScore:F3}");
+
+            return sb.ToString();
+        }
+
+        #endregion
+
+        #region Grid Search
+
+        /// <summary>
+        /// Check if grid search can run
+        /// </summary>
+        private bool CanRunGridSearch()
+        {
+            return !IsRunningGridSearch &&
+                   !IsCalculatingMetrics &&
+                   !IsOptimizing &&
+                   !string.IsNullOrEmpty(SelectedLatticeStructure) &&
+                   !string.IsNullOrEmpty(SelectedPTVStructure) &&
+                   GeometricResults != null;  // Must have baseline first
+        }
+
+        /// <summary>
+        /// Run grid search to find optimal X/Y offset - FIXED THREADING
+        /// </summary>
+        private void OnRunGridSearch()
+        {
+            IsRunningGridSearch = true;
+            Output += "\n========================================\n";
+            Output += "=== GRID SEARCH OPTIMIZATION ===\n";
+            Output += "========================================\n";
+
+            string latticeId = SelectedLatticeStructure;
+            string targetId = SelectedPTVStructure;
+            double rangePercent = GridSearchRangePercent;
+            int steps = GridSearchSteps;
+
+            var selectedOARNames = AvailableOARs
+                .Where(o => o.IsSelected)
+                .Select(o => o.Name)
+                .ToList();
+
+            // CRITICAL: Capture the UI dispatcher BEFORE entering the worker
+            var uiDispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
+
+            _esapiWorker.Run(sc =>
+            {
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                var result = new GridSearchResult();
+                var log = new StringBuilder();
+
+                try
+                {
+                    // Get structures
+                    var latticeStructure = sc.StructureSet.Structures
+                        .FirstOrDefault(s => s.Id.Equals(latticeId, StringComparison.OrdinalIgnoreCase));
+                    var targetStructure = sc.StructureSet.Structures
+                        .FirstOrDefault(s => s.Id.Equals(targetId, StringComparison.OrdinalIgnoreCase));
+
+                    if (latticeStructure == null || targetStructure == null)
+                    {
+                        result.Success = false;
+                        result.Message = "Could not find lattice or target structure";
+                        return;
+                    }
+
+                    // Extract spheres
+                    var extractor = new SphereExtractor();
+                    var extractionLog = new System.Text.StringBuilder();
+                    var extraction = extractor.ExtractSpheres(latticeStructure, sc.Image, extractionLog);
+
+                    if (!extraction.Success || extraction.Spheres.Count == 0)
+                    {
+                        result.Success = false;
+                        result.Message = "Failed to extract spheres from lattice";
+                        return;
+                    }
+
+                    var baseSpheres = extraction.Spheres;
+                    result.OriginalSphereCount = baseSpheres.Count;
+                    result.SphereRadius = extraction.MeanRadius;
+
+                    // Get target info
+                    var targetInfo = TargetInfo.FromStructure(targetStructure);
+                    result.SearchRangePercent = rangePercent;
+                    result.SearchRangeMm = targetInfo.Radius * rangePercent / 100.0;
+                    result.StepsPerAxis = steps;
+
+                    // Get OAR info
+                    var oarInfoList = new List<OARInfo>();
+                    foreach (var oarName in selectedOARNames)
+                    {
+                        var oarStructure = sc.StructureSet.Structures
+                            .FirstOrDefault(s => s.Id.Equals(oarName, StringComparison.OrdinalIgnoreCase));
+                        if (oarStructure != null && !oarStructure.IsEmpty)
+                        {
+                            var oarInfo = OARInfo.FromStructure(oarStructure);
+                            oarInfo.IsSelected = true;
+                            oarInfoList.Add(oarInfo);
+                        }
+                    }
+
+                    // Create calculator
+                    var calculator = new GeometricSurrogateCalculator(gantryAngleStep: 5.0);
+
+                    // Calculate grid offsets
+                    double maxOffset = result.SearchRangeMm;
+                    double stepSize = steps > 1 ? (2.0 * maxOffset) / (steps - 1) : 0;
+
+                    log.AppendLine($"Search range: ±{maxOffset:F1}mm, Step size: {stepSize:F1}mm");
+                    log.AppendLine($"Testing {steps}x{steps} = {steps * steps} positions...");
+
+                    // Run grid search
+                    for (int xi = 0; xi < steps; xi++)
+                    {
+                        for (int yi = 0; yi < steps; yi++)
+                        {
+                            double offsetX = -maxOffset + xi * stepSize;
+                            double offsetY = -maxOffset + yi * stepSize;
+
+                            // Shift sphere centers
+                            var shiftedSpheres = ShiftSpheres(baseSpheres, offsetX, offsetY);
+
+                            // Filter invalid spheres
+                            var validSpheres = FilterValidSpheres(shiftedSpheres, targetInfo, oarInfoList, extraction.MeanRadius);
+
+                            if (validSpheres.Count == 0)
+                                continue;
+
+                            // Calculate metrics
+                            var metrics = calculator.Calculate(validSpheres, targetInfo, oarInfoList);
+
+                            if (!metrics.Success)
+                                continue;
+
+                            var posResult = new GridPositionResult
+                            {
+                                OffsetX = offsetX,
+                                OffsetY = offsetY,
+                                ValidSphereCount = validSpheres.Count,
+                                OriginalSphereCount = baseSpheres.Count,
+                                SII = metrics.SII_Mean,
+                                VSI = metrics.VSI_Mean,
+                                SSI = metrics.SSI,
+                                OSI = metrics.OSI_Combined,
+                                CombinedScore = metrics.CombinedScore,
+                                FullResults = metrics
+                            };
+
+                            result.AllResults.Add(posResult);
+
+                            // Track baseline (0,0)
+                            if (Math.Abs(offsetX) < 0.01 && Math.Abs(offsetY) < 0.01)
+                            {
+                                result.Baseline = posResult;
+                            }
+                        }
+                    }
+
+                    result.TotalPositionsTested = result.AllResults.Count;
+
+                    if (result.AllResults.Count == 0)
+                    {
+                        result.Success = false;
+                        result.Message = "No valid positions found in search";
+                        return;
+                    }
+
+                    // Find best overall
+                    result.BestOverall = result.AllResults
+                        .OrderByDescending(r => r.CombinedScore)
+                        .First();
+
+                    // Find best with full sphere count
+                    var fullCountResults = result.AllResults
+                        .Where(r => r.ValidSphereCount == result.OriginalSphereCount)
+                        .ToList();
+
+                    if (fullCountResults.Count > 0)
+                    {
+                        result.BestFullCount = fullCountResults
+                            .OrderByDescending(r => r.CombinedScore)
+                            .First();
+                    }
+                    else
+                    {
+                        // No position keeps all spheres - use best overall
+                        result.BestFullCount = result.BestOverall;
+                    }
+
+                    // If baseline wasn't found (rare), use (0,0) result or closest
+                    if (result.Baseline == null)
+                    {
+                        result.Baseline = result.AllResults
+                            .OrderBy(r => Math.Abs(r.OffsetX) + Math.Abs(r.OffsetY))
+                            .First();
+                    }
+
+                    stopwatch.Stop();
+                    result.ComputationTimeMs = stopwatch.ElapsedMilliseconds;
+                    result.Success = true;
+                    result.Message = "Grid search completed successfully";
+                }
+                catch (Exception ex)
+                {
+                    result.Success = false;
+                    result.Message = $"Error: {ex.Message}";
+                }
+                finally
+                {
+                    // Capture final values for UI update
+                    string logOutput = log.ToString();
+                    var finalResult = result;
+
+                    // FIX: Use captured dispatcher instead of Application.Current.Dispatcher
+                    try
+                    {
+                        uiDispatcher.BeginInvoke(new Action(() =>
+                        {
+                            try
+                            {
+                                Output += logOutput;
+                                Output += "\n" + finalResult.GetSummary();
+                                GridSearchResult = finalResult;
+                                IsRunningGridSearch = false;
+                            }
+                            catch { }
+                        }));
+                    }
+                    catch { }
+                }
+            });
+        }
+
+        /// <summary>
+        /// Shift sphere centers by given offset
+        /// </summary>
+        private List<ExtractedSphere> ShiftSpheres(List<ExtractedSphere> spheres, double offsetX, double offsetY)
+        {
+            return spheres.Select(s => new ExtractedSphere
+            {
+                CenterX = s.CenterX + offsetX,
+                CenterY = s.CenterY + offsetY,
+                CenterZ = s.CenterZ,
+                Radius = s.Radius
+            }).ToList();
+        }
+
+        /// <summary>
+        /// Filter out spheres that are outside target or too close to OARs
+        /// </summary>
+        private List<ExtractedSphere> FilterValidSpheres(
+            List<ExtractedSphere> spheres,
+            TargetInfo target,
+            List<OARInfo> oars,
+            double sphereRadius)
+        {
+            var validSpheres = new List<ExtractedSphere>();
+
+            foreach (var sphere in spheres)
+            {
+                // Check if sphere center is inside target (with margin for sphere radius)
+                double distToTargetCenter = Math.Sqrt(
+                    Math.Pow(sphere.CenterX - target.CenterX, 2) +
+                    Math.Pow(sphere.CenterY - target.CenterY, 2) +
+                    Math.Pow(sphere.CenterZ - target.CenterZ, 2));
+
+                // Sphere must fit entirely within target (spherical approximation)
+                if (distToTargetCenter + sphereRadius > target.Radius)
+                    continue;
+
+                // Check distance to each OAR
+                bool tooCloseToOAR = false;
+                foreach (var oar in oars)
+                {
+                    double distToOAR = Math.Sqrt(
+                        Math.Pow(sphere.CenterX - oar.CenterX, 2) +
+                        Math.Pow(sphere.CenterY - oar.CenterY, 2) +
+                        Math.Pow(sphere.CenterZ - oar.CenterZ, 2));
+
+                    // Sphere must not overlap OAR (using OAR's XY radius as approximation)
+                    if (distToOAR < sphereRadius + oar.RadiusXY)
+                    {
+                        tooCloseToOAR = true;
+                        break;
+                    }
+                }
+
+                if (!tooCloseToOAR)
+                {
+                    validSpheres.Add(sphere);
+                }
+            }
+
+            return validSpheres;
+        }
+
+        /// <summary>
+        /// Check if apply best overall is available
+        /// </summary>
+        private bool CanApplyBestOverall()
+        {
+            return HasGridSearchResults && GridSearchResult.BestOverall != null;
+        }
+
+        /// <summary>
+        /// Check if apply best full count is available
+        /// </summary>
+        private bool CanApplyBestFullCount()
+        {
+            return HasGridSearchResults && GridSearchResult.BestFullCount != null;
+        }
+
+        /// <summary>
+        /// Apply the best overall position
+        /// </summary>
+        private void OnApplyBestOverall()
+        {
+            if (GridSearchResult?.BestOverall == null) return;
+            ApplyOptimalOffset(GridSearchResult.BestOverall.OffsetX, GridSearchResult.BestOverall.OffsetY, "Opt");
+        }
+
+        /// <summary>
+        /// Apply the best full-count position
+        /// </summary>
+        private void OnApplyBestFullCount()
+        {
+            if (GridSearchResult?.BestFullCount == null) return;
+            ApplyOptimalOffset(GridSearchResult.BestFullCount.OffsetX, GridSearchResult.BestFullCount.OffsetY, "OptFull");
+        }
+
+        /// <summary>
+        /// Create new lattice structure at optimal offset and auto-create valley - FIXED THREADING
+        /// </summary>
+        /// <summary>
+        /// Create new lattice structure at optimal offset - uses async Run() to avoid freezing
+        /// </summary>
+        private void ApplyOptimalOffset(double offsetX, double offsetY, string suffix)
+        {
+            Output += $"\n\n=== Applying Optimal Offset ===\n";
+            Output += $"Offset: X={offsetX:+0.0;-0.0}mm, Y={offsetY:+0.0;-0.0}mm\n";
+
+            string latticeId = SelectedLatticeStructure;
+            string targetId = SelectedPTVStructure;
+            var selectedOARNames = AvailableOARs.Where(o => o.IsSelected).Select(o => o.Name).ToList();
+
+            // Use async Run() to avoid blocking UI (RunWithWait causes freezes with dialogs)
+            _esapiWorker.Run(sc =>
+            {
+                try
+                {
+                    sc.Patient.BeginModifications();
+
+                    var latticeStructure = sc.StructureSet.Structures
+                        .FirstOrDefault(s => s.Id.Equals(latticeId, StringComparison.OrdinalIgnoreCase));
+                    var targetStructure = sc.StructureSet.Structures
+                        .FirstOrDefault(s => s.Id.Equals(targetId, StringComparison.OrdinalIgnoreCase));
+
+                    if (latticeStructure == null || targetStructure == null)
+                    {
+                        Output += "ERROR: Could not find structures\n";
+                        return;
+                    }
+
+                    // Extract spheres
+                    var extractor = new SphereExtractor();
+                    var extractionLog = new System.Text.StringBuilder();
+                    var extraction = extractor.ExtractSpheres(latticeStructure, sc.Image, extractionLog);
+
+                    if (!extraction.Success)
+                    {
+                        Output += "ERROR: Could not extract spheres\n";
+                        return;
+                    }
+
+                    Output += $"Extracted {extraction.Spheres.Count} spheres, radius = {extraction.MeanRadius:F1} mm\n";
+
+                    // Create target info for filtering
+                    var targetInfo = TargetInfo.FromStructure(targetStructure);
+
+                    // Get selected OARs
+                    var oarInfoList = new List<OARInfo>();
+                    foreach (var oarName in selectedOARNames)
+                    {
+                        var oarStructure = sc.StructureSet.Structures
+                            .FirstOrDefault(s => s.Id.Equals(oarName, StringComparison.OrdinalIgnoreCase));
+                        if (oarStructure != null && !oarStructure.IsEmpty)
+                        {
+                            oarInfoList.Add(OARInfo.FromStructure(oarStructure));
+                        }
+                    }
+
+                    // Shift and filter spheres
+                    var shiftedSpheres = ShiftSpheres(extraction.Spheres, offsetX, offsetY);
+                    var validSpheres = FilterValidSpheres(shiftedSpheres, targetInfo, oarInfoList, extraction.MeanRadius);
+
+                    Output += $"After filtering: {validSpheres.Count} valid spheres\n";
+
+                    if (validSpheres.Count == 0)
+                    {
+                        Output += "ERROR: No valid spheres remain after filtering!\n";
+                        return;
+                    }
+
+                    // Generate new structure name
+                    string baseName = latticeId.Length > 10 ? latticeId.Substring(0, 10) : latticeId;
+                    string newLatticeId = $"{baseName}_{suffix}";
+                    if (newLatticeId.Length > 16)
+                        newLatticeId = newLatticeId.Substring(0, 16);
+
+                    // Remove existing if present
+                    var existingLattice = sc.StructureSet.Structures
+                        .FirstOrDefault(s => s.Id.Equals(newLatticeId, StringComparison.OrdinalIgnoreCase));
+                    if (existingLattice != null)
+                    {
+                        sc.StructureSet.RemoveStructure(existingLattice);
+                        Output += $"Removed existing structure: {newLatticeId}\n";
+                    }
+
+                    // Create new structure
+                    Output += $"Creating new lattice structure: {newLatticeId}\n";
+                    var newLattice = sc.StructureSet.AddStructure("PTV", newLatticeId);
+                    newLattice.ConvertToHighResolution();
+
+                    // Build spheres
+                    Output += "Building spheres...\n";
+                    foreach (var sphere in validSpheres)
+                    {
+                        var center = new VMS.TPS.Common.Model.Types.VVector(
+                            sphere.CenterX, sphere.CenterY, sphere.CenterZ);
+                        BuildSphereOnStructure(newLattice, center, (float)sphere.Radius, sc.Image);
+                    }
+
+                    Output += $"Built spheres, volume before crop: {newLattice.Volume:F2} cc\n";
+
+                    // Handle resolution mismatch for boolean operations
+                    Structure targetForBoolean = targetStructure;
+                    Structure tempTarget = null;
+
+                    if (!targetStructure.IsHighResolution)
+                    {
+                        Output += $"Target '{targetStructure.Id}' is low-resolution, creating high-res copy for boolean...\n";
+
+                        tempTarget = sc.StructureSet.AddStructure("CONTROL", "TempTarget_HR");
+
+                        for (int z = 0; z < sc.StructureSet.Image.ZSize; z++)
+                        {
+                            var contours = targetStructure.GetContoursOnImagePlane(z);
+                            foreach (var contour in contours)
+                            {
+                                if (contour.Length > 0)
+                                {
+                                    tempTarget.AddContourOnImagePlane(contour, z);
+                                }
+                            }
+                        }
+
+                        tempTarget.ConvertToHighResolution();
+                        targetForBoolean = tempTarget;
+                        Output += $"Created high-res target copy\n";
+                    }
+
+                    // Crop to target
+                    newLattice.SegmentVolume = newLattice.SegmentVolume.And(targetForBoolean);
+                    Output += $"✓ Created: {newLatticeId} ({newLattice.Volume:F2} cc)\n";
+
+                    // Auto-create valley structure
+                    string valleyId = $"Valley_{suffix}";
+                    if (valleyId.Length > 16)
+                        valleyId = valleyId.Substring(0, 16);
+
+                    var existingValley = sc.StructureSet.Structures
+                        .FirstOrDefault(s => s.Id.Equals(valleyId, StringComparison.OrdinalIgnoreCase));
+                    if (existingValley != null)
+                    {
+                        sc.StructureSet.RemoveStructure(existingValley);
+                    }
+
+                    var valleyStructure = sc.StructureSet.AddStructure("CONTROL", valleyId);
+                    valleyStructure.ConvertToHighResolution();
+                    valleyStructure.SegmentVolume = targetForBoolean.Sub(newLattice);
+
+                    // Clean up temporary structure
+                    if (tempTarget != null)
+                    {
+                        sc.StructureSet.RemoveStructure(tempTarget);
+                        Output += "Cleaned up temporary target structure\n";
+                    }
+
+                    Output += $"✓ Created: {valleyId} ({valleyStructure.Volume:F2} cc)\n";
+                    Output += $"\n=== Apply Complete ===\n";
+                    Output += $"Created: {newLatticeId} and {valleyId}\n";
+                    Output += $"\n*** IMPORTANT: Click 'Populate Objectives' to refresh dropdowns and use the new structures! ***\n";
+                }
+                catch (Exception ex)
+                {
+                    Output += $"ERROR: {ex.Message}\n";
+                    Output += $"Stack: {ex.StackTrace}\n";
+                }
+            });
+
+            // Don't try to refresh dropdowns here - Run() is async so this executes immediately
+            // User must click "Populate Objectives" which will refresh the lists
+        }
+
+        /// <summary>
+        /// Build a sphere on a structure (same logic as SphereDialogViewModel.BuildSphere)
+        /// </summary>
+        private void BuildSphereOnStructure(
+            VMS.TPS.Common.Model.API.Structure parentStruct,
+            VMS.TPS.Common.Model.Types.VVector center,
+            float radius,
+            VMS.TPS.Common.Model.API.Image image)
+        {
+            // Calculate slice sign for Z direction
+            double sliceSign = Math.Sign(
+                image.XDirection.x * image.YDirection.y -
+                image.XDirection.y * image.YDirection.x);
+
+            for (int z = 0; z < image.ZSize; ++z)
+            {
+                double zCoord = sliceSign * z * image.ZRes + image.Origin.z;
+
+                var zDiff = Math.Abs(zCoord - center.z);
+                if (zDiff > radius)
+                    continue;
+
+                var rZ = Math.Sqrt(Math.Pow(radius, 2.0) - Math.Pow(zDiff, 2.0));
+                var contour = CreateCircleContour(center, rZ, 100);
+                parentStruct.AddContourOnImagePlane(contour, z);
+            }
+        }
+
+        /// <summary>
+        /// Create a circular contour
+        /// </summary>
+        private VMS.TPS.Common.Model.Types.VVector[] CreateCircleContour(
+            VMS.TPS.Common.Model.Types.VVector center,
+            double radius,
+            int nPoints)
+        {
+            var contour = new VMS.TPS.Common.Model.Types.VVector[nPoints + 1];
+            double angleIncrement = Math.PI * 2.0 / nPoints;
+
+            for (int i = 0; i < nPoints; i++)
+            {
+                double angle = i * angleIncrement;
+                double xDelta = radius * Math.Cos(angle);
+                double yDelta = radius * Math.Sin(angle);
+                contour[i] = new VMS.TPS.Common.Model.Types.VVector(
+                    center.x + xDelta, center.y + yDelta, center.z);
+            }
+            contour[nPoints] = contour[0];
+
+            return contour;
+        }
+
+        #endregion
     }
 }
