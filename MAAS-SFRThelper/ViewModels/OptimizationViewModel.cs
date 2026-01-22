@@ -1235,34 +1235,70 @@ namespace MAAS_SFRThelper.ViewModels
             });
         }
 
+        //private bool RunVMATOptimization(ExternalPlanSetup plan, string mlcId, bool useIntermediateDose)
+        //{
+        //    try
+        //    {
+        //        Output += $"\n  [{DateTime.Now:HH:mm:ss}] Calling OptimizeVMAT...";
+
+        //        var intermediateOption = useIntermediateDose
+        //            ? OptimizationIntermediateDoseOption.UseIntermediateDose
+        //            : OptimizationIntermediateDoseOption.NoIntermediateDose;
+
+        //        var options = new OptimizationOptionsVMAT(intermediateOption, mlcId);
+
+        //        var result = plan.OptimizeVMAT(options);
+
+
+        //        Output += $"\n  [{DateTime.Now:HH:mm:ss}] Optimization result: {result}";
+
+        //        // Use backing field directly to avoid threading issues with RaiseCanExecuteChanged
+        //        _optimizationCompleted = true;
+
+        //        return true;
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        try
+        //        {
+        //            Output += $"\n  [{DateTime.Now:HH:mm:ss}] Optimization failed: {ex.Message}";
+        //        }
+        //        catch { }
+        //        return false;
+        //    }
+        //}
+
         private bool RunVMATOptimization(ExternalPlanSetup plan, string mlcId, bool useIntermediateDose)
         {
             try
             {
-                Output += $"\n  [{DateTime.Now:HH:mm:ss}] Calling OptimizeVMAT...";
+                // Run multiple optimization cycles
+                int numberOfCycles = 5;
 
-                var intermediateOption = useIntermediateDose
-                    ? OptimizationIntermediateDoseOption.UseIntermediateDose
-                    : OptimizationIntermediateDoseOption.NoIntermediateDose;
+                for (int cycle = 1; cycle <= numberOfCycles; cycle++)
+                {
+                    Output += $"\n  [{DateTime.Now:HH:mm:ss}] Running optimization cycle {cycle}/{numberOfCycles}...";
 
-                var options = new OptimizationOptionsVMAT(intermediateOption, mlcId);
+                    try
+                    {
+                        // Try parameterless first
+                        var result = plan.OptimizeVMAT();
+                        Output += $" Done.";
+                    }
+                    catch
+                    {
+                        // Fallback to MLC-specified version
+                        var result = plan.OptimizeVMAT(mlcId);
+                        Output += $" Done (with MLC).";
+                    }
+                }
 
-                var result = plan.OptimizeVMAT(options);
-
-                Output += $"\n  [{DateTime.Now:HH:mm:ss}] Optimization result: {result}";
-
-                // Use backing field directly to avoid threading issues with RaiseCanExecuteChanged
                 _optimizationCompleted = true;
-
                 return true;
             }
             catch (Exception ex)
             {
-                try
-                {
-                    Output += $"\n  [{DateTime.Now:HH:mm:ss}] Optimization failed: {ex.Message}";
-                }
-                catch { }
+                Output += $"\n  [{DateTime.Now:HH:mm:ss}] Optimization failed: {ex.Message}";
                 return false;
             }
         }
