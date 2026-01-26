@@ -61,9 +61,6 @@ namespace MAAS_SFRThelper.ViewModels
 
         #region Geometric Analysis Properties
 
-        /// <summary>
-        /// List of available OARs for geometric analysis (with checkbox selection)
-        /// </summary>
         private ObservableCollection<OARInfo> _availableOARs;
         public ObservableCollection<OARInfo> AvailableOARs
         {
@@ -71,9 +68,6 @@ namespace MAAS_SFRThelper.ViewModels
             set => SetProperty(ref _availableOARs, value);
         }
 
-        /// <summary>
-        /// Results from geometric surrogate calculation
-        /// </summary>
         private GeometricResults _geometricResults;
         public GeometricResults GeometricResults
         {
@@ -81,9 +75,6 @@ namespace MAAS_SFRThelper.ViewModels
             set => SetProperty(ref _geometricResults, value);
         }
 
-        /// <summary>
-        /// Flag indicating if geometric calculation is in progress
-        /// </summary>
         private bool _isCalculatingMetrics;
         public bool IsCalculatingMetrics
         {
@@ -95,9 +86,6 @@ namespace MAAS_SFRThelper.ViewModels
             }
         }
 
-        /// <summary>
-        /// Summary text for geometric results display
-        /// </summary>
         private string _geometricResultsSummary;
         public string GeometricResultsSummary
         {
@@ -109,9 +97,6 @@ namespace MAAS_SFRThelper.ViewModels
 
         #region Grid Search Properties
 
-        /// <summary>
-        /// Search range as percentage of target radius (default 20%)
-        /// </summary>
         private double _gridSearchRangePercent = 20.0;
         public double GridSearchRangePercent
         {
@@ -119,9 +104,6 @@ namespace MAAS_SFRThelper.ViewModels
             set => SetProperty(ref _gridSearchRangePercent, value);
         }
 
-        /// <summary>
-        /// Display of search range in mm (calculated from percentage)
-        /// </summary>
         private string _gridSearchRangeDisplay = "";
         public string GridSearchRangeDisplay
         {
@@ -129,9 +111,6 @@ namespace MAAS_SFRThelper.ViewModels
             set => SetProperty(ref _gridSearchRangeDisplay, value);
         }
 
-        /// <summary>
-        /// Number of steps per axis (3, 5, 7, 9)
-        /// </summary>
         private int _gridSearchSteps = 5;
         public int GridSearchSteps
         {
@@ -139,14 +118,8 @@ namespace MAAS_SFRThelper.ViewModels
             set => SetProperty(ref _gridSearchSteps, value);
         }
 
-        /// <summary>
-        /// Available step options
-        /// </summary>
         public List<int> AvailableGridSearchSteps { get; } = new List<int> { 3, 5, 7, 9 };
 
-        /// <summary>
-        /// Grid search results
-        /// </summary>
         private GridSearchResult _gridSearchResult;
         public GridSearchResult GridSearchResult
         {
@@ -162,19 +135,10 @@ namespace MAAS_SFRThelper.ViewModels
             }
         }
 
-        /// <summary>
-        /// Flag indicating grid search has results
-        /// </summary>
         public bool HasGridSearchResults => GridSearchResult != null && GridSearchResult.Success;
 
-        /// <summary>
-        /// Flag indicating whether to show the "Best Full Count" option
-        /// </summary>
         public bool ShowBestFullOption => HasGridSearchResults && GridSearchResult.HasDifferentBestOptions;
 
-        /// <summary>
-        /// Summary text for grid search results
-        /// </summary>
         public string GridSearchResultsSummary
         {
             get
@@ -185,9 +149,6 @@ namespace MAAS_SFRThelper.ViewModels
             }
         }
 
-        /// <summary>
-        /// Flag indicating grid search is running
-        /// </summary>
         private bool _isRunningGridSearch;
         public bool IsRunningGridSearch
         {
@@ -200,7 +161,6 @@ namespace MAAS_SFRThelper.ViewModels
             }
         }
 
-        // Simple double to store target radius for display (no complex object)
         private double _targetRadius = 0;
 
         #endregion
@@ -473,18 +433,14 @@ namespace MAAS_SFRThelper.ViewModels
 
         private void PopulateStructureLists()
         {
-            // Capture dispatcher BEFORE entering worker thread
             var dispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
 
-            // Use async Run() to avoid blocking UI when Eclipse shows dialogs
             _esapiWorker.Run(sc =>
             {
-                // Collect all data first - don't update UI properties directly from worker thread!
                 var latticeList = OptimizationObjectiveCreator.GetAvailableLatticeStructures(sc.StructureSet);
                 var valleyList = OptimizationObjectiveCreator.GetAvailableValleyStructures(sc.StructureSet);
                 var ptvList = OptimizationObjectiveCreator.GetAvailablePTVStructures(sc.StructureSet);
 
-                // Determine auto-selections (but don't set properties yet)
                 string autoSelectLattice = (latticeList != null && latticeList.Count == 1) ? latticeList[0] : null;
 
                 string autoSelectValley = null;
@@ -505,7 +461,6 @@ namespace MAAS_SFRThelper.ViewModels
 
                 string autoSelectPTV = (ptvList != null && ptvList.Count == 1) ? ptvList[0] : null;
 
-                // Populate MLCs from plan beams
                 var mlcs = sc.PlanSetup.Beams
                     .Where(b => !b.IsSetupField && b.MLC != null)
                     .Select(b => b.MLC.Id)
@@ -514,7 +469,6 @@ namespace MAAS_SFRThelper.ViewModels
 
                 string autoSelectMLC = mlcs.Count >= 1 ? mlcs[0] : null;
 
-                // Populate beam list
                 var beamItems = new List<BeamSelectionItem>();
                 bool hasVMAT = false;
 
@@ -547,7 +501,6 @@ namespace MAAS_SFRThelper.ViewModels
 
                 string beamWarning = !hasVMAT ? "⚠ No VMAT arcs found. Please create VMAT arcs in Eclipse before optimizing." : "";
 
-                // Populate OAR list
                 var oarStructures = sc.StructureSet.Structures
                     .Where(s => !s.IsEmpty &&
                                 !s.Id.ToUpper().Contains("PTV") &&
@@ -593,7 +546,6 @@ namespace MAAS_SFRThelper.ViewModels
                     }
                 }
 
-                // Log output (Output property handles threading internally)
                 if (!hasVMAT)
                     Output += "\n⚠ WARNING: No VMAT arcs found in plan";
 
@@ -604,10 +556,8 @@ namespace MAAS_SFRThelper.ViewModels
                 Output += $"\nFound {beamItems.Count} beam(s) ({beamItems.Count(b => b.IsVMAT)} VMAT)";
                 Output += $"Found {oarList.Count} potential OAR(s) for geometric analysis\n";
 
-                // Update ALL UI properties via dispatcher (CRITICAL - avoid threading errors)
                 dispatcher.BeginInvoke(new Action(() =>
                 {
-                    // Update list properties
                     AvailableLatticeStructures = latticeList;
                     AvailableValleyStructures = valleyList;
                     AvailablePTVStructures = ptvList;
@@ -615,7 +565,6 @@ namespace MAAS_SFRThelper.ViewModels
                     HasVMATArcs = hasVMAT;
                     BeamWarningText = beamWarning;
 
-                    // Update selected items (triggers PropertyChanged safely on UI thread)
                     if (autoSelectLattice != null)
                         SelectedLatticeStructure = autoSelectLattice;
                     if (autoSelectValley != null)
@@ -625,7 +574,6 @@ namespace MAAS_SFRThelper.ViewModels
                     if (autoSelectMLC != null)
                         SelectedMLC = autoSelectMLC;
 
-                    // Update ObservableCollections
                     AvailableBeams.Clear();
                     foreach (var beam in beamItems)
                     {
@@ -651,8 +599,6 @@ namespace MAAS_SFRThelper.ViewModels
                 return;
 
             Output += $"\n✓ Selected lattice structure: {SelectedLatticeStructure}";
-
-            // Clear grid search results when lattice changes
             GridSearchResult = null;
         }
 
@@ -751,26 +697,22 @@ namespace MAAS_SFRThelper.ViewModels
         {
             Output += "\n\n=== Populating Objectives Table ===";
 
-            // Capture selected structures and dispatcher BEFORE entering worker
             string selectedLattice = SelectedLatticeStructure;
             string selectedValley = SelectedValleyStructure;
             var dispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
 
-            // Use async Run() to avoid blocking UI
             _esapiWorker.Run(sc =>
             {
                 try
                 {
-                    // Collect all data in worker thread - don't update UI properties directly!
                     var latticeList = OptimizationObjectiveCreator.GetAvailableLatticeStructures(sc.StructureSet);
                     var valleyList = OptimizationObjectiveCreator.GetAvailableValleyStructures(sc.StructureSet);
 
                     Output += $"\nFound {latticeList?.Count ?? 0} lattice structure(s)";
                     Output += $"\nFound {valleyList?.Count ?? 0} valley structure(s)";
 
-                    // Determine which lattice to use - prefer _Opt version
                     string latticeToUse = selectedLattice;
-                    string newSelectedLattice = null;  // Will be set via dispatcher
+                    string newSelectedLattice = null;
 
                     if (!string.IsNullOrEmpty(selectedLattice))
                     {
@@ -789,7 +731,6 @@ namespace MAAS_SFRThelper.ViewModels
                     var defaultConstraints = ProstateOARConstraints.GetConstraints();
                     var objectivesList = new List<ObjectiveDefinition>();
 
-                    // Add Peak objectives for selected lattice
                     if (!string.IsNullOrEmpty(latticeToUse))
                     {
                         objectivesList.Add(new ObjectiveDefinition
@@ -819,9 +760,8 @@ namespace MAAS_SFRThelper.ViewModels
                         Output += $"\n  ✓ Added Peak objectives for {latticeToUse}";
                     }
 
-                    // Find valley structure - prefer Valley_Opt if it exists
                     string valleyToUse = null;
-                    string newSelectedValley = null;  // Will be set via dispatcher
+                    string newSelectedValley = null;
 
                     var valleyStructure = sc.StructureSet.Structures.FirstOrDefault(s =>
                         s.Id.StartsWith("Valley_Opt", StringComparison.OrdinalIgnoreCase));
@@ -877,7 +817,6 @@ namespace MAAS_SFRThelper.ViewModels
                         Output += "\n  ⚠ WARNING: Valley structure not found, skipping valley objectives";
                     }
 
-                    // Add OAR objectives
                     var structures = sc.StructureSet.Structures
                         .Where(s => !s.IsEmpty)
                         .OrderBy(s => s.Id)
@@ -929,20 +868,16 @@ namespace MAAS_SFRThelper.ViewModels
                     Output += $"\n  ✓ Added {oarCount} OAR objectives";
                     Output += $"\n\n✓ Total: {objectivesList.Count} objectives ready";
 
-                    // Update ALL UI properties via dispatcher (CRITICAL - avoid threading errors)
                     dispatcher.BeginInvoke(new Action(() =>
                     {
-                        // Update dropdown lists
                         AvailableLatticeStructures = latticeList;
                         AvailableValleyStructures = valleyList;
 
-                        // Update selected items (this triggers property changed events safely on UI thread)
                         if (newSelectedLattice != null)
                             SelectedLatticeStructure = newSelectedLattice;
                         if (newSelectedValley != null)
                             SelectedValleyStructure = newSelectedValley;
 
-                        // Update objectives collection
                         Objectives.Clear();
                         foreach (var obj in objectivesList)
                         {
@@ -1009,6 +944,25 @@ namespace MAAS_SFRThelper.ViewModels
                         return;
                     }
 
+                    DoseValue.DoseUnit systemDoseUnit = DoseValue.DoseUnit.Gy;
+
+                    try
+                    {
+                        if (externalPlan.TotalDose.Unit == DoseValue.DoseUnit.cGy)
+                        {
+                            systemDoseUnit = DoseValue.DoseUnit.cGy;
+                            Output += "\nDetected system dose unit: cGy";
+                        }
+                        else
+                        {
+                            Output += "\nDetected system dose unit: Gy";
+                        }
+                    }
+                    catch
+                    {
+                        Output += "\nUsing default dose unit: Gy";
+                    }
+
                     Output += "\nClearing existing objectives...";
                     var existingObjectives = externalPlan.OptimizationSetup.Objectives.ToList();
                     foreach (var obj in existingObjectives)
@@ -1031,12 +985,18 @@ namespace MAAS_SFRThelper.ViewModels
 
                         try
                         {
+                            double doseValue = objective.Dose;
+                            if (systemDoseUnit == DoseValue.DoseUnit.cGy)
+                            {
+                                doseValue = objective.Dose * 100.0;
+                            }
+
                             if (objective.ObjectiveType == "Point")
                             {
                                 externalPlan.OptimizationSetup.AddPointObjective(
                                     structure,
                                     objective.Operator,
-                                    new DoseValue(objective.Dose, DoseValue.DoseUnit.Gy),
+                                    new DoseValue(doseValue, systemDoseUnit),
                                     objective.Volume,
                                     objective.Priority);
 
@@ -1046,7 +1006,7 @@ namespace MAAS_SFRThelper.ViewModels
                             {
                                 externalPlan.OptimizationSetup.AddMeanDoseObjective(
                                     structure,
-                                    new DoseValue(objective.Dose, DoseValue.DoseUnit.Gy),
+                                    new DoseValue(doseValue, systemDoseUnit),
                                     objective.Priority);
 
                                 Output += $"\n  ✓ {structure.Id}: Mean {objective.Dose} Gy";
@@ -1118,7 +1078,7 @@ namespace MAAS_SFRThelper.ViewModels
             }
 
             IsOptimizing = true;
-            _optimizationCompleted = false;  // Reset using backing field
+            _optimizationCompleted = false;
             var startTime = DateTime.Now;
             Output += $"\n\n=== Running VMAT Optimization ===";
             Output += $"\nStarted at: {startTime:HH:mm:ss}";
@@ -1130,7 +1090,6 @@ namespace MAAS_SFRThelper.ViewModels
 
             Output += $"\nBeams to optimize: {string.Join(", ", beamIdsToOptimize)}";
 
-            // CRITICAL: Capture the UI dispatcher BEFORE entering the worker
             var uiDispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
 
             _esapiWorker.Run(sc =>
@@ -1185,7 +1144,6 @@ namespace MAAS_SFRThelper.ViewModels
                     catch { }
                 }
 
-                // Final status
                 try
                 {
                     var duration = endTime - startTime;
@@ -1207,7 +1165,6 @@ namespace MAAS_SFRThelper.ViewModels
                 }
                 catch { }
 
-                // Update UI on the UI thread using captured dispatcher
                 try
                 {
                     uiDispatcher.BeginInvoke(new Action(() =>
@@ -1222,7 +1179,6 @@ namespace MAAS_SFRThelper.ViewModels
                                 RaisePropertyChanged(nameof(OptimizationCompleted));
                             }
 
-                            // Force command re-evaluation
                             RunOptimizationCommand?.RaiseCanExecuteChanged();
                             CalculateDoseCommand?.RaiseCanExecuteChanged();
                             CreateObjectivesCommand?.RaiseCanExecuteChanged();
@@ -1235,44 +1191,10 @@ namespace MAAS_SFRThelper.ViewModels
             });
         }
 
-        //private bool RunVMATOptimization(ExternalPlanSetup plan, string mlcId, bool useIntermediateDose)
-        //{
-        //    try
-        //    {
-        //        Output += $"\n  [{DateTime.Now:HH:mm:ss}] Calling OptimizeVMAT...";
-
-        //        var intermediateOption = useIntermediateDose
-        //            ? OptimizationIntermediateDoseOption.UseIntermediateDose
-        //            : OptimizationIntermediateDoseOption.NoIntermediateDose;
-
-        //        var options = new OptimizationOptionsVMAT(intermediateOption, mlcId);
-
-        //        var result = plan.OptimizeVMAT(options);
-
-
-        //        Output += $"\n  [{DateTime.Now:HH:mm:ss}] Optimization result: {result}";
-
-        //        // Use backing field directly to avoid threading issues with RaiseCanExecuteChanged
-        //        _optimizationCompleted = true;
-
-        //        return true;
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        try
-        //        {
-        //            Output += $"\n  [{DateTime.Now:HH:mm:ss}] Optimization failed: {ex.Message}";
-        //        }
-        //        catch { }
-        //        return false;
-        //    }
-        //}
-
         private bool RunVMATOptimization(ExternalPlanSetup plan, string mlcId, bool useIntermediateDose)
         {
             try
             {
-                // Run multiple optimization cycles
                 int numberOfCycles = 5;
 
                 for (int cycle = 1; cycle <= numberOfCycles; cycle++)
@@ -1281,13 +1203,11 @@ namespace MAAS_SFRThelper.ViewModels
 
                     try
                     {
-                        // Try parameterless first
                         var result = plan.OptimizeVMAT();
                         Output += $" Done.";
                     }
                     catch
                     {
-                        // Fallback to MLC-specified version
                         var result = plan.OptimizeVMAT(mlcId);
                         Output += $" Done (with MLC).";
                     }
@@ -1355,7 +1275,6 @@ namespace MAAS_SFRThelper.ViewModels
                     success = true;
                     endTime = DateTime.Now;
 
-                    // Display DVH summary
                     try
                     {
                         DisplayDVHSummary(externalPlan, sc.StructureSet, selectedLattice);
@@ -1580,7 +1499,6 @@ namespace MAAS_SFRThelper.ViewModels
             string latticeId = SelectedLatticeStructure;
             Output += $"Selected structure: {latticeId}\n";
 
-            // Use async Run() to avoid blocking UI
             _esapiWorker.Run(sc =>
             {
                 try
@@ -1642,19 +1560,11 @@ namespace MAAS_SFRThelper.ViewModels
 
         #region Geometric Analysis
 
-        /// <summary>
-        /// Populate the OAR list from structure set
-        /// Call this after structure set is loaded
-        /// </summary>
         private void PopulateOARList()
         {
             // OAR list is now populated inside PopulateStructureLists to avoid threading issues
-            // This method is kept for backward compatibility but does nothing
         }
 
-        /// <summary>
-        /// Check if geometric metrics calculation can run
-        /// </summary>
         private bool CanCalculateGeometricMetrics()
         {
             return !IsCalculatingMetrics &&
@@ -1664,9 +1574,6 @@ namespace MAAS_SFRThelper.ViewModels
                    !string.IsNullOrEmpty(SelectedPTVStructure);
         }
 
-        /// <summary>
-        /// Calculate geometric surrogate metrics - FIXED THREADING
-        /// </summary>
         private void OnCalculateGeometricMetrics()
         {
             IsCalculatingMetrics = true;
@@ -1687,7 +1594,6 @@ namespace MAAS_SFRThelper.ViewModels
             Output += $"Target: {targetId}\n";
             Output += $"OARs selected: {selectedOARNames.Count}\n";
 
-            // CRITICAL: Capture the UI dispatcher BEFORE entering the worker
             var uiDispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
 
             _esapiWorker.Run(sc =>
@@ -1724,7 +1630,6 @@ namespace MAAS_SFRThelper.ViewModels
                         return;
                     }
 
-                    // Step 1: Extract spheres
                     log.AppendLine("\n--- Step 1: Extracting Spheres ---");
                     var sphereExtractor = new SphereExtractor();
                     var extractionLog = new StringBuilder();
@@ -1739,15 +1644,12 @@ namespace MAAS_SFRThelper.ViewModels
 
                     log.AppendLine($"Extracted {extractionResult.Spheres.Count} spheres, radius = {extractionResult.MeanRadius:F1} mm");
 
-                    // Step 2: Create target info
                     log.AppendLine("\n--- Step 2: Analyzing Target ---");
                     var targetInfo = TargetInfo.FromStructure(targetStructure);
                     log.AppendLine($"Target: {targetInfo}");
 
-                    // Capture target radius for grid search display
                     targetRadius = targetInfo.Radius;
 
-                    // Step 3: Create OAR info list
                     log.AppendLine("\n--- Step 3: Analyzing OARs ---");
                     var oarInfoList = new List<OARInfo>();
 
@@ -1770,7 +1672,6 @@ namespace MAAS_SFRThelper.ViewModels
                         log.AppendLine("  No OARs selected (OSI will default to 1.0)");
                     }
 
-                    // Step 4: Calculate geometric metrics
                     log.AppendLine("\n--- Step 4: Calculating Metrics ---");
                     log.AppendLine("  Gantry angles: 0 to 355 in 5 deg steps (72 angles)");
 
@@ -1784,7 +1685,6 @@ namespace MAAS_SFRThelper.ViewModels
                         targetInfo,
                         oarInfoList);
 
-                    // Step 5: Display results
                     if (results.Success)
                     {
                         log.AppendLine("\n" + results.GetSummary());
@@ -1800,12 +1700,10 @@ namespace MAAS_SFRThelper.ViewModels
                 }
                 finally
                 {
-                    // Capture final values for UI update
                     string logOutput = log.ToString();
                     var finalResults = results;
                     var finalRadius = targetRadius;
 
-                    // FIX: Use captured dispatcher instead of Application.Current.Dispatcher
                     try
                     {
                         uiDispatcher.BeginInvoke(new Action(() =>
@@ -1820,7 +1718,6 @@ namespace MAAS_SFRThelper.ViewModels
                                     GeometricResultsSummary = FormatResultsSummary(finalResults);
                                     _targetRadius = finalRadius;
 
-                                    // Update search range display
                                     if (_targetRadius > 0)
                                     {
                                         double rangeMm = _targetRadius * GridSearchRangePercent / 100.0;
@@ -1830,7 +1727,6 @@ namespace MAAS_SFRThelper.ViewModels
 
                                 IsCalculatingMetrics = false;
 
-                                // Force all commands to re-evaluate
                                 RunGridSearchCommand?.RaiseCanExecuteChanged();
                                 ApplyBestOverallCommand?.RaiseCanExecuteChanged();
                                 ApplyBestFullCountCommand?.RaiseCanExecuteChanged();
@@ -1843,9 +1739,6 @@ namespace MAAS_SFRThelper.ViewModels
             });
         }
 
-        /// <summary>
-        /// Format results for compact UI display
-        /// </summary>
         private string FormatResultsSummary(GeometricResults results)
         {
             var sb = new System.Text.StringBuilder();
@@ -1868,9 +1761,6 @@ namespace MAAS_SFRThelper.ViewModels
 
         #region Grid Search
 
-        /// <summary>
-        /// Check if grid search can run
-        /// </summary>
         private bool CanRunGridSearch()
         {
             return !IsRunningGridSearch &&
@@ -1878,12 +1768,9 @@ namespace MAAS_SFRThelper.ViewModels
                    !IsOptimizing &&
                    !string.IsNullOrEmpty(SelectedLatticeStructure) &&
                    !string.IsNullOrEmpty(SelectedPTVStructure) &&
-                   GeometricResults != null;  // Must have baseline first
+                   GeometricResults != null;
         }
 
-        /// <summary>
-        /// Run grid search to find optimal X/Y offset - FIXED THREADING
-        /// </summary>
         private void OnRunGridSearch()
         {
             IsRunningGridSearch = true;
@@ -1901,7 +1788,6 @@ namespace MAAS_SFRThelper.ViewModels
                 .Select(o => o.Name)
                 .ToList();
 
-            // CRITICAL: Capture the UI dispatcher BEFORE entering the worker
             var uiDispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
 
             _esapiWorker.Run(sc =>
@@ -1912,7 +1798,6 @@ namespace MAAS_SFRThelper.ViewModels
 
                 try
                 {
-                    // Get structures
                     var latticeStructure = sc.StructureSet.Structures
                         .FirstOrDefault(s => s.Id.Equals(latticeId, StringComparison.OrdinalIgnoreCase));
                     var targetStructure = sc.StructureSet.Structures
@@ -1925,7 +1810,6 @@ namespace MAAS_SFRThelper.ViewModels
                         return;
                     }
 
-                    // Extract spheres
                     var extractor = new SphereExtractor();
                     var extractionLog = new System.Text.StringBuilder();
                     var extraction = extractor.ExtractSpheres(latticeStructure, sc.Image, extractionLog);
@@ -1941,13 +1825,13 @@ namespace MAAS_SFRThelper.ViewModels
                     result.OriginalSphereCount = baseSpheres.Count;
                     result.SphereRadius = extraction.MeanRadius;
 
-                    // Get target info
                     var targetInfo = TargetInfo.FromStructure(targetStructure);
                     result.SearchRangePercent = rangePercent;
                     result.SearchRangeMm = targetInfo.Radius * rangePercent / 100.0;
                     result.StepsPerAxis = steps;
 
-                    // Get OAR info
+                    // Get BOTH oarStructures (for ESAPI filtering) AND oarInfoList (for metrics calculation)
+                    var oarStructures = new List<Structure>();
                     var oarInfoList = new List<OARInfo>();
                     foreach (var oarName in selectedOARNames)
                     {
@@ -1955,23 +1839,21 @@ namespace MAAS_SFRThelper.ViewModels
                             .FirstOrDefault(s => s.Id.Equals(oarName, StringComparison.OrdinalIgnoreCase));
                         if (oarStructure != null && !oarStructure.IsEmpty)
                         {
+                            oarStructures.Add(oarStructure);
                             var oarInfo = OARInfo.FromStructure(oarStructure);
                             oarInfo.IsSelected = true;
                             oarInfoList.Add(oarInfo);
                         }
                     }
 
-                    // Create calculator
                     var calculator = new GeometricSurrogateCalculator(gantryAngleStep: 5.0);
 
-                    // Calculate grid offsets
                     double maxOffset = result.SearchRangeMm;
                     double stepSize = steps > 1 ? (2.0 * maxOffset) / (steps - 1) : 0;
 
                     log.AppendLine($"Search range: ±{maxOffset:F1}mm, Step size: {stepSize:F1}mm");
                     log.AppendLine($"Testing {steps}x{steps} = {steps * steps} positions...");
 
-                    // Run grid search
                     for (int xi = 0; xi < steps; xi++)
                     {
                         for (int yi = 0; yi < steps; yi++)
@@ -1979,16 +1861,15 @@ namespace MAAS_SFRThelper.ViewModels
                             double offsetX = -maxOffset + xi * stepSize;
                             double offsetY = -maxOffset + yi * stepSize;
 
-                            // Shift sphere centers
                             var shiftedSpheres = ShiftSpheres(baseSpheres, offsetX, offsetY);
 
-                            // Filter invalid spheres
-                            var validSpheres = FilterValidSpheres(shiftedSpheres, targetInfo, oarInfoList, extraction.MeanRadius);
+                            // Use ESAPI-based filtering with actual Structure objects
+                            var validSpheres = FilterValidSpheres(shiftedSpheres, targetStructure, oarStructures, extraction.MeanRadius);
 
                             if (validSpheres.Count == 0)
                                 continue;
 
-                            // Calculate metrics
+                            // Use OARInfo list for metrics calculation
                             var metrics = calculator.Calculate(validSpheres, targetInfo, oarInfoList);
 
                             if (!metrics.Success)
@@ -2010,7 +1891,6 @@ namespace MAAS_SFRThelper.ViewModels
 
                             result.AllResults.Add(posResult);
 
-                            // Track baseline (0,0)
                             if (Math.Abs(offsetX) < 0.01 && Math.Abs(offsetY) < 0.01)
                             {
                                 result.Baseline = posResult;
@@ -2027,12 +1907,13 @@ namespace MAAS_SFRThelper.ViewModels
                         return;
                     }
 
-                    // Find best overall
+                    // Find best overall - with tiebreakers favoring more spheres and closer to baseline
                     result.BestOverall = result.AllResults
                         .OrderByDescending(r => r.CombinedScore)
+                        .ThenByDescending(r => r.ValidSphereCount)
+                        .ThenBy(r => Math.Abs(r.OffsetX) + Math.Abs(r.OffsetY))
                         .First();
 
-                    // Find best with full sphere count
                     var fullCountResults = result.AllResults
                         .Where(r => r.ValidSphereCount == result.OriginalSphereCount)
                         .ToList();
@@ -2041,15 +1922,14 @@ namespace MAAS_SFRThelper.ViewModels
                     {
                         result.BestFullCount = fullCountResults
                             .OrderByDescending(r => r.CombinedScore)
+                            .ThenBy(r => Math.Abs(r.OffsetX) + Math.Abs(r.OffsetY))
                             .First();
                     }
                     else
                     {
-                        // No position keeps all spheres - use best overall
                         result.BestFullCount = result.BestOverall;
                     }
 
-                    // If baseline wasn't found (rare), use (0,0) result or closest
                     if (result.Baseline == null)
                     {
                         result.Baseline = result.AllResults
@@ -2069,11 +1949,9 @@ namespace MAAS_SFRThelper.ViewModels
                 }
                 finally
                 {
-                    // Capture final values for UI update
                     string logOutput = log.ToString();
                     var finalResult = result;
 
-                    // FIX: Use captured dispatcher instead of Application.Current.Dispatcher
                     try
                     {
                         uiDispatcher.BeginInvoke(new Action(() =>
@@ -2093,9 +1971,6 @@ namespace MAAS_SFRThelper.ViewModels
             });
         }
 
-        /// <summary>
-        /// Shift sphere centers by given offset
-        /// </summary>
         private List<ExtractedSphere> ShiftSpheres(List<ExtractedSphere> spheres, double offsetX, double offsetY)
         {
             return spheres.Select(s => new ExtractedSphere
@@ -2108,94 +1983,115 @@ namespace MAAS_SFRThelper.ViewModels
         }
 
         /// <summary>
-        /// Filter out spheres that are outside target or too close to OARs
+        /// Filter out spheres that are outside target or overlap with OARs.
+        /// Uses ESAPI IsPointInsideSegment for accurate boundary checking.
         /// </summary>
         private List<ExtractedSphere> FilterValidSpheres(
             List<ExtractedSphere> spheres,
-            TargetInfo target,
-            List<OARInfo> oars,
+            Structure targetStructure,
+            List<Structure> oarStructures,
             double sphereRadius)
         {
             var validSpheres = new List<ExtractedSphere>();
 
             foreach (var sphere in spheres)
             {
-                // Check if sphere center is inside target (with margin for sphere radius)
-                double distToTargetCenter = Math.Sqrt(
-                    Math.Pow(sphere.CenterX - target.CenterX, 2) +
-                    Math.Pow(sphere.CenterY - target.CenterY, 2) +
-                    Math.Pow(sphere.CenterZ - target.CenterZ, 2));
+                var centerPoint = new VVector(sphere.CenterX, sphere.CenterY, sphere.CenterZ);
 
-                // Sphere must fit entirely within target (spherical approximation)
-                if (distToTargetCenter + sphereRadius > target.Radius)
+                // Check if sphere center is inside target
+                if (!targetStructure.IsPointInsideSegment(centerPoint))
                     continue;
 
-                // Check distance to each OAR
-                bool tooCloseToOAR = false;
-                foreach (var oar in oars)
+                // Check if sphere surface fits inside target (test 6 cardinal points)
+                bool fitsInTarget = true;
+                var testOffsets = new[]
                 {
-                    double distToOAR = Math.Sqrt(
-                        Math.Pow(sphere.CenterX - oar.CenterX, 2) +
-                        Math.Pow(sphere.CenterY - oar.CenterY, 2) +
-                        Math.Pow(sphere.CenterZ - oar.CenterZ, 2));
+                    new VVector(sphereRadius, 0, 0),
+                    new VVector(-sphereRadius, 0, 0),
+                    new VVector(0, sphereRadius, 0),
+                    new VVector(0, -sphereRadius, 0),
+                    new VVector(0, 0, sphereRadius),
+                    new VVector(0, 0, -sphereRadius)
+                };
 
-                    // Sphere must not overlap OAR (using OAR's XY radius as approximation)
-                    if (distToOAR < sphereRadius + oar.RadiusXY)
+                foreach (var offset in testOffsets)
+                {
+                    var testPoint = new VVector(
+                        centerPoint.x + offset.x,
+                        centerPoint.y + offset.y,
+                        centerPoint.z + offset.z);
+
+                    if (!targetStructure.IsPointInsideSegment(testPoint))
                     {
-                        tooCloseToOAR = true;
+                        fitsInTarget = false;
                         break;
                     }
                 }
 
-                if (!tooCloseToOAR)
+                if (!fitsInTarget)
+                    continue;
+
+                // Check if sphere overlaps any OAR
+                bool overlapsOAR = false;
+                foreach (var oar in oarStructures)
                 {
-                    validSpheres.Add(sphere);
+                    // Check if sphere center is inside OAR
+                    if (oar.IsPointInsideSegment(centerPoint))
+                    {
+                        overlapsOAR = true;
+                        break;
+                    }
+
+                    // Check if any surface point of sphere is inside OAR
+                    foreach (var offset in testOffsets)
+                    {
+                        var testPoint = new VVector(
+                            centerPoint.x + offset.x,
+                            centerPoint.y + offset.y,
+                            centerPoint.z + offset.z);
+
+                        if (oar.IsPointInsideSegment(testPoint))
+                        {
+                            overlapsOAR = true;
+                            break;
+                        }
+                    }
+
+                    if (overlapsOAR)
+                        break;
                 }
+
+                if (overlapsOAR)
+                    continue;
+
+                validSpheres.Add(sphere);
             }
 
             return validSpheres;
         }
 
-        /// <summary>
-        /// Check if apply best overall is available
-        /// </summary>
         private bool CanApplyBestOverall()
         {
             return HasGridSearchResults && GridSearchResult.BestOverall != null;
         }
 
-        /// <summary>
-        /// Check if apply best full count is available
-        /// </summary>
         private bool CanApplyBestFullCount()
         {
             return HasGridSearchResults && GridSearchResult.BestFullCount != null;
         }
 
-        /// <summary>
-        /// Apply the best overall position
-        /// </summary>
         private void OnApplyBestOverall()
         {
             if (GridSearchResult?.BestOverall == null) return;
             ApplyOptimalOffset(GridSearchResult.BestOverall.OffsetX, GridSearchResult.BestOverall.OffsetY, "Opt");
         }
 
-        /// <summary>
-        /// Apply the best full-count position
-        /// </summary>
         private void OnApplyBestFullCount()
         {
             if (GridSearchResult?.BestFullCount == null) return;
             ApplyOptimalOffset(GridSearchResult.BestFullCount.OffsetX, GridSearchResult.BestFullCount.OffsetY, "OptFull");
         }
 
-        /// <summary>
-        /// Create new lattice structure at optimal offset and auto-create valley - FIXED THREADING
-        /// </summary>
-        /// <summary>
-        /// Create new lattice structure at optimal offset - uses async Run() to avoid freezing
-        /// </summary>
         private void ApplyOptimalOffset(double offsetX, double offsetY, string suffix)
         {
             Output += $"\n\n=== Applying Optimal Offset ===\n";
@@ -2205,7 +2101,6 @@ namespace MAAS_SFRThelper.ViewModels
             string targetId = SelectedPTVStructure;
             var selectedOARNames = AvailableOARs.Where(o => o.IsSelected).Select(o => o.Name).ToList();
 
-            // Use async Run() to avoid blocking UI (RunWithWait causes freezes with dialogs)
             _esapiWorker.Run(sc =>
             {
                 try
@@ -2223,7 +2118,6 @@ namespace MAAS_SFRThelper.ViewModels
                         return;
                     }
 
-                    // Extract spheres
                     var extractor = new SphereExtractor();
                     var extractionLog = new System.Text.StringBuilder();
                     var extraction = extractor.ExtractSpheres(latticeStructure, sc.Image, extractionLog);
@@ -2236,24 +2130,20 @@ namespace MAAS_SFRThelper.ViewModels
 
                     Output += $"Extracted {extraction.Spheres.Count} spheres, radius = {extraction.MeanRadius:F1} mm\n";
 
-                    // Create target info for filtering
-                    var targetInfo = TargetInfo.FromStructure(targetStructure);
-
-                    // Get selected OARs
-                    var oarInfoList = new List<OARInfo>();
+                    // Get OAR structures for filtering
+                    var oarStructures = new List<Structure>();
                     foreach (var oarName in selectedOARNames)
                     {
                         var oarStructure = sc.StructureSet.Structures
                             .FirstOrDefault(s => s.Id.Equals(oarName, StringComparison.OrdinalIgnoreCase));
                         if (oarStructure != null && !oarStructure.IsEmpty)
                         {
-                            oarInfoList.Add(OARInfo.FromStructure(oarStructure));
+                            oarStructures.Add(oarStructure);
                         }
                     }
 
-                    // Shift and filter spheres
                     var shiftedSpheres = ShiftSpheres(extraction.Spheres, offsetX, offsetY);
-                    var validSpheres = FilterValidSpheres(shiftedSpheres, targetInfo, oarInfoList, extraction.MeanRadius);
+                    var validSpheres = FilterValidSpheres(shiftedSpheres, targetStructure, oarStructures, extraction.MeanRadius);
 
                     Output += $"After filtering: {validSpheres.Count} valid spheres\n";
 
@@ -2263,13 +2153,11 @@ namespace MAAS_SFRThelper.ViewModels
                         return;
                     }
 
-                    // Generate new structure name
                     string baseName = latticeId.Length > 10 ? latticeId.Substring(0, 10) : latticeId;
                     string newLatticeId = $"{baseName}_{suffix}";
                     if (newLatticeId.Length > 16)
                         newLatticeId = newLatticeId.Substring(0, 16);
 
-                    // Remove existing if present
                     var existingLattice = sc.StructureSet.Structures
                         .FirstOrDefault(s => s.Id.Equals(newLatticeId, StringComparison.OrdinalIgnoreCase));
                     if (existingLattice != null)
@@ -2278,12 +2166,10 @@ namespace MAAS_SFRThelper.ViewModels
                         Output += $"Removed existing structure: {newLatticeId}\n";
                     }
 
-                    // Create new structure
                     Output += $"Creating new lattice structure: {newLatticeId}\n";
                     var newLattice = sc.StructureSet.AddStructure("PTV", newLatticeId);
                     newLattice.ConvertToHighResolution();
 
-                    // Build spheres
                     Output += "Building spheres...\n";
                     foreach (var sphere in validSpheres)
                     {
@@ -2294,7 +2180,6 @@ namespace MAAS_SFRThelper.ViewModels
 
                     Output += $"Built spheres, volume before crop: {newLattice.Volume:F2} cc\n";
 
-                    // Handle resolution mismatch for boolean operations
                     Structure targetForBoolean = targetStructure;
                     Structure tempTarget = null;
 
@@ -2321,11 +2206,9 @@ namespace MAAS_SFRThelper.ViewModels
                         Output += $"Created high-res target copy\n";
                     }
 
-                    // Crop to target
                     newLattice.SegmentVolume = newLattice.SegmentVolume.And(targetForBoolean);
                     Output += $"✓ Created: {newLatticeId} ({newLattice.Volume:F2} cc)\n";
 
-                    // Auto-create valley structure
                     string valleyId = $"Valley_{suffix}";
                     if (valleyId.Length > 16)
                         valleyId = valleyId.Substring(0, 16);
@@ -2341,7 +2224,6 @@ namespace MAAS_SFRThelper.ViewModels
                     valleyStructure.ConvertToHighResolution();
                     valleyStructure.SegmentVolume = targetForBoolean.Sub(newLattice);
 
-                    // Clean up temporary structure
                     if (tempTarget != null)
                     {
                         sc.StructureSet.RemoveStructure(tempTarget);
@@ -2359,21 +2241,14 @@ namespace MAAS_SFRThelper.ViewModels
                     Output += $"Stack: {ex.StackTrace}\n";
                 }
             });
-
-            // Don't try to refresh dropdowns here - Run() is async so this executes immediately
-            // User must click "Populate Objectives" which will refresh the lists
         }
 
-        /// <summary>
-        /// Build a sphere on a structure (same logic as SphereDialogViewModel.BuildSphere)
-        /// </summary>
         private void BuildSphereOnStructure(
             VMS.TPS.Common.Model.API.Structure parentStruct,
             VMS.TPS.Common.Model.Types.VVector center,
             float radius,
             VMS.TPS.Common.Model.API.Image image)
         {
-            // Calculate slice sign for Z direction
             double sliceSign = Math.Sign(
                 image.XDirection.x * image.YDirection.y -
                 image.XDirection.y * image.YDirection.x);
@@ -2392,9 +2267,6 @@ namespace MAAS_SFRThelper.ViewModels
             }
         }
 
-        /// <summary>
-        /// Create a circular contour
-        /// </summary>
         private VMS.TPS.Common.Model.Types.VVector[] CreateCircleContour(
             VMS.TPS.Common.Model.Types.VVector center,
             double radius,

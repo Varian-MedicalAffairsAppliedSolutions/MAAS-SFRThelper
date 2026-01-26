@@ -105,7 +105,7 @@
                    Foreground="Gray"/>
 
                     <!-- Test Extraction Button (keep existing) -->
-                    <Button Content="Test Sphere Extraction" 
+                    <Button Content="Extract Sphere Locations" 
                 Command="{Binding TestSphereExtractionCommand}"
                 Width="160" 
                 Height="30"
@@ -285,7 +285,14 @@
                                 FontWeight="SemiBold"
                                 ToolTip="Create new lattice at the best position (may have fewer spheres)"/>
 
-                        </StackPanel>
+                        <Button Content="Apply Baseline" 
+                                Command="{Binding ApplyBestFullCountCommand}"
+                                Width="140"
+                                Height="30"
+                                Visibility="{Binding HasGridSearchResults, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                ToolTip="Apply at original position (0,0) without shifting"/>          
+
+                    </StackPanel>
 
                     <TextBlock Text="After applying, select the new lattice from the dropdown above, then proceed to Populate Objectives."
                                TextWrapping="Wrap"
