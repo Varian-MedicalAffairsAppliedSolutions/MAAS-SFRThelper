@@ -20,6 +20,7 @@ using VMS.TPS.Common.Model.Types;
 using System.Windows.Media.Media3D;
 using System.Windows.Media;
 using System.Windows.Input;
+using MAAS_SFRThelper.Services;
 
 namespace MAAS_SFRThelper.ViewModels
 {
@@ -40,18 +41,44 @@ namespace MAAS_SFRThelper.ViewModels
     {
         public List<PVCluster> Peaks { get; set; } = new List<PVCluster>();
         public List<PVCluster> Valleys { get; set; } = new List<PVCluster>();
-        public double EffectivePVDR { get; set; } // Volume-weighted PVDR
+
+        // Sphere extraction info
+        public int SphereCountExpected { get; set; }
+        public int SphereCountExtracted { get; set; }
+        public double SphereRadius { get; set; }  // mm
+        public bool SphereCountMatch { get; set; }
+
+        // PVDR metrics
+        public double EffectivePVDR { get; set; }     // Volume-weighted mean peak / mean valley
+        public double PointPVDR_MaxMin { get; set; }   // Max peak voxel / Min valley voxel
+
+        // Dose statistics
         public double MeanPeakDose { get; set; }
         public double MeanValleyDose { get; set; }
+        public double MaxPeakDose { get; set; }
+        public double MinValleyDose { get; set; }
+
+        // Volume metrics
         public double PeakVolumePercent { get; set; }
         public double ValleyVolumePercent { get; set; }
+        public double TotalPeakVolume { get; set; }   // cc
+        public double TotalValleyVolume { get; set; }  // cc
+
+        // Heterogeneity
         public double HeterogeneityIndex { get; set; }
         public double CoefficientOfVariation { get; set; }
-        public double MeanPeakSeparation { get; set; } // mm
+
+        // Spatial
+        public double MeanPeakSeparation { get; set; } // mm, from sphere centers
+
+        // Sampling info
         public int TotalVoxels { get; set; }
-        public double DosePercentile80 { get; set; }
-        public double DosePercentile20 { get; set; }
+        public int PeakVoxels { get; set; }
+        public int ValleyVoxels { get; set; }
+        public double GridResolution { get; set; }  // mm
     }
+
+
 
     // 3D Grid for dose sampling
     public class DoseGrid3D
@@ -3394,19 +3421,6 @@ namespace MAAS_SFRThelper.ViewModels
                 targetCanvas.Children.Add(colorbarLabel);
             }
 
-            // Add depth information subtitle
-            //var depthInfo = new TextBlock
-            //{
-            //    Text = $"Depth: {CurrentDepthValue:F1}mm (Slice {CurrentDepthIndex + 1}/{_depthValues.Count})",
-            //    FontSize = 14,
-            //    FontStyle = FontStyles.Italic,
-            //    Foreground = Brushes.DarkBlue
-            //};
-            //depthInfo.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-            //Canvas.SetLeft(depthInfo, (totalPlotWidth - depthInfo.DesiredSize.Width) / 2);
-            //Canvas.SetTop(depthInfo, titleHeight - 5);
-            //targetCanvas.Children.Add(depthInfo);
-
             OutputLog += "=== Multi-depth visualization complete ===\n";
         }
 
@@ -3654,11 +3668,11 @@ namespace MAAS_SFRThelper.ViewModels
 
         private void Run3DPVAnalysis(string tumorId, PlanSetup plan)
         {
-            OutputLog += "\n===== Starting 3D P/V Clustering Analysis =====\n";
+            OutputLog += "\n===== Starting 3D P/V Geometric Analysis =====\n";
 
             try
             {
-                // Get the structure
+                // Get the tumor structure
                 var structure = plan.StructureSet.Structures.FirstOrDefault(s => s.Id == tumorId);
                 if (structure == null)
                 {
@@ -3666,7 +3680,33 @@ namespace MAAS_SFRThelper.ViewModels
                     return;
                 }
 
-                // Extract mesh for structure outline (keeping your existing code)
+                // Get the lattice structure from PtvAllId
+                string latticeId = PtvAllId;
+                if (string.IsNullOrEmpty(latticeId))
+                {
+                    OutputLog += "ERROR: No lattice structure selected.\n";
+                    OutputLog += "Please select the lattice/sphere structure in the 'Lattice Structure' dropdown.\n";
+                    return;
+                }
+
+                var latticeStructure = plan.StructureSet.Structures
+                    .FirstOrDefault(s => s.Id.Equals(latticeId, StringComparison.OrdinalIgnoreCase));
+
+                if (latticeStructure == null || latticeStructure.IsEmpty)
+                {
+                    OutputLog += $"ERROR: Lattice structure '{latticeId}' not found or empty.\n";
+                    return;
+                }
+
+                //var image = plan.StructureSet.Image;
+                var image = (VMS.TPS.Common.Model.API.Image)plan.StructureSet.Image;
+                if (image == null)
+                {
+                    OutputLog += "ERROR: No image available for sphere extraction.\n";
+                    return;
+                }
+
+                // Extract mesh for structure outline (for 3D visualization)
                 _currentStructureMesh = new MeshData();
                 try
                 {
@@ -3696,9 +3736,10 @@ namespace MAAS_SFRThelper.ViewModels
                 }
 
                 OutputLog += $"Analyzing structure: {tumorId}\n";
+                OutputLog += $"Lattice structure: {latticeId}\n";
                 OutputLog += $"Structure volume: {structure.Volume:F2} cc\n";
 
-                // Compute 2D slices using existing method
+                // Compute 2D slices for visualization (unchanged)
                 OutputLog += "Computing standardized axial slices for 3D visualization...\n";
                 var beamData = Compute2DAllBeamsStandardized(structure, plan);
 
@@ -3708,7 +3749,7 @@ namespace MAAS_SFRThelper.ViewModels
                     return;
                 }
 
-                // Store the slice data
+                // Store the slice data for visualization
                 _doseSlices = beamData.DoseSlices;
                 _structSlices = beamData.StructSlices;
                 _uGridSlices = beamData.UGridSlices;
@@ -3718,9 +3759,10 @@ namespace MAAS_SFRThelper.ViewModels
 
                 OutputLog += $"Computed {_doseSlices.Count} axial slices\n";
 
-                // NOW ADD P/V CLUSTERING ANALYSIS
-                OutputLog += "\n=== Starting Peak-Valley Clustering Analysis ===\n";
-                _pvClusterResults = PerformPVClusteringAnalysis();
+                // RUN GEOMETRIC P/V ANALYSIS
+                OutputLog += "\n=== Starting Geometric Peak-Valley Analysis ===\n";
+                _pvClusterResults = PerformGeometricPVAnalysis(
+                    structure, latticeStructure, image, plan);
 
                 if (_pvClusterResults != null)
                 {
@@ -3731,258 +3773,297 @@ namespace MAAS_SFRThelper.ViewModels
                 _has3DData = true;
                 _has2DPlotData = true;
 
-                OutputLog += "===== 3D P/V Analysis Complete =====\n";
+                OutputLog += "===== 3D P/V Geometric Analysis Complete =====\n";
             }
             catch (Exception ex)
             {
                 OutputLog += $"Error in 3D P/V Analysis: {ex.Message}\n";
+                OutputLog += $"Stack trace: {ex.StackTrace}\n";
             }
         }
 
+
+
         // Add this new method for P/V clustering analysis
-        private PVAnalysisResultsClustered PerformPVClusteringAnalysis()
+        private PVAnalysisResultsClustered PerformGeometricPVAnalysis(
+            Structure tumorStructure,
+            Structure latticeStructure,
+            VMS.TPS.Common.Model.API.Image image,
+            PlanSetup plan)
         {
             try
             {
                 var results = new PVAnalysisResultsClustered();
 
-                // Step 1: Collect all dose values within structure
+                // -------------------------------------------------------
+                // STEP 1: Extract sphere centers and radius
+                // -------------------------------------------------------
+                OutputLog += "\n--- Step 1: Extracting Spheres via SphereExtractor ---\n";
+
+                var extractor = new SphereExtractor();
+                var extractionLog = new StringBuilder();
+                var extraction = extractor.ExtractSpheres(latticeStructure, image, extractionLog);
+                OutputLog += extractionLog.ToString();
+
+                if (!extraction.Success || extraction.Spheres.Count == 0)
+                {
+                    OutputLog += $"ERROR: Sphere extraction failed - {extraction.Message}\n";
+                    OutputLog += "Ensure a valid lattice structure with separate sphere parts is selected.\n";
+                    return null;
+                }
+
+                results.SphereCountExpected = extraction.SphereCount;
+                results.SphereCountExtracted = extraction.Spheres.Count;
+                results.SphereRadius = extraction.MeanRadius;
+                results.SphereCountMatch = (extraction.SphereCount == extraction.Spheres.Count);
+
+                OutputLog += $"Extracted {extraction.Spheres.Count} spheres (expected {extraction.SphereCount})\n";
+                OutputLog += $"Mean radius: {extraction.MeanRadius:F1} mm\n";
+
+                if (!results.SphereCountMatch)
+                {
+                    OutputLog += $"⚠ WARNING: Sphere count mismatch! Expected {extraction.SphereCount}, got {extraction.Spheres.Count}\n";
+                    OutputLog += "  Proceeding with extracted spheres, but results may be inaccurate.\n";
+                }
+
+                var spheres = extraction.Spheres;
+                double sphereRadius = extraction.MeanRadius;
+
+                // -------------------------------------------------------
+                // STEP 2: Define 3D sampling grid within tumor bounds
+                // -------------------------------------------------------
+                OutputLog += "\n--- Step 2: Setting up 3D sampling grid ---\n";
+
+                var bounds = tumorStructure.MeshGeometry.Bounds;
+                double gridRes = 2.0; // mm
+                results.GridResolution = gridRes;
+
+                double xStart = bounds.X;
+                double xEnd = bounds.X + bounds.SizeX;
+                double yStart = bounds.Y;
+                double yEnd = bounds.Y + bounds.SizeY;
+                double zStart = bounds.Z;
+                double zEnd = bounds.Z + bounds.SizeZ;
+
+                int nX = (int)Math.Ceiling((xEnd - xStart) / gridRes);
+                int nY = (int)Math.Ceiling((yEnd - yStart) / gridRes);
+                int nZ = (int)Math.Ceiling((zEnd - zStart) / gridRes);
+
+                OutputLog += $"Grid: {nX} x {nY} x {nZ} = {(long)nX * nY * nZ} potential voxels\n";
+                OutputLog += $"Bounds X:[{xStart:F1},{xEnd:F1}] Y:[{yStart:F1},{yEnd:F1}] Z:[{zStart:F1},{zEnd:F1}]\n";
+
+                // -------------------------------------------------------
+                // STEP 3: Sample dose and classify voxels
+                // -------------------------------------------------------
+                OutputLog += "\n--- Step 3: Sampling dose and classifying voxels ---\n";
+
+                // Per-sphere data collectors
+                var sphereDoses = new List<List<double>>();
+                for (int s = 0; s < spheres.Count; s++)
+                {
+                    sphereDoses.Add(new List<double>());
+                }
+
+                var valleyDoses = new List<double>();
                 var allDoses = new List<double>();
-                var voxelData = new List<(int slice, int x, int y, double dose, double u, double v)>();
 
-                for (int sliceIdx = 0; sliceIdx < _doseSlices.Count; sliceIdx++)
+                // Per-sphere voxel lists (for PVCluster objects)
+                var sphereVoxelLists = new List<List<(int slice, int x, int y)>>();
+                for (int s = 0; s < spheres.Count; s++)
                 {
-                    var doseSlice = _doseSlices[sliceIdx];
-                    var structSlice = _structSlices[sliceIdx];
-                    var uGrid = _uGridSlices[sliceIdx];
-                    var vGrid = _vGridSlices[sliceIdx];
-                    var (nX, nY) = _sliceDimensions[sliceIdx];
+                    sphereVoxelLists.Add(new List<(int, int, int)>());
+                }
+                var valleyVoxelList = new List<(int slice, int x, int y)>();
 
-                    for (int i = 0; i < nX; i++)
+                int totalSampled = 0;
+                int peakCount = 0;
+                int valleyCount = 0;
+                int outsideCount = 0;
+                int noDoseCount = 0;
+
+                // Pre-compute sphere centers as arrays for fast distance calculation
+                double[] sx = new double[spheres.Count];
+                double[] sy = new double[spheres.Count];
+                double[] sz = new double[spheres.Count];
+                for (int s = 0; s < spheres.Count; s++)
+                {
+                    sx[s] = spheres[s].CenterX;
+                    sy[s] = spheres[s].CenterY;
+                    sz[s] = spheres[s].CenterZ;
+                }
+
+                double radiusSq = sphereRadius * sphereRadius;
+
+                for (int ix = 0; ix < nX; ix++)
+                {
+                    double px = xStart + ix * gridRes;
+
+                    for (int iy = 0; iy < nY; iy++)
                     {
-                        for (int j = 0; j < nY; j++)
+                        double py = yStart + iy * gridRes;
+
+                        for (int iz = 0; iz < nZ; iz++)
                         {
-                            if (structSlice[i, j] && !double.IsNaN(doseSlice[i, j]) && doseSlice[i, j] > 0)
+                            double pz = zStart + iz * gridRes;
+
+                            var point = new VVector(px, py, pz);
+
+                            // Check if inside tumor structure
+                            if (!tumorStructure.IsPointInsideSegment(point))
                             {
-                                double dose = doseSlice[i, j];
-                                allDoses.Add(dose);
-                                voxelData.Add((sliceIdx, i, j, dose, uGrid[i, j], vGrid[i, j]));
+                                outsideCount++;
+                                continue;
                             }
-                        }
-                    }
-                }
 
-                results.TotalVoxels = allDoses.Count;
-                OutputLog += $"Total voxels in structure: {results.TotalVoxels}\n";
-
-                if (allDoses.Count == 0)
-                {
-                    OutputLog += "No valid dose voxels found!\n";
-                    return results;
-                }
-
-                // Step 2: Calculate percentile thresholds
-                allDoses.Sort();
-                int idx80 = (int)(allDoses.Count * 0.80);
-                int idx20 = (int)(allDoses.Count * 0.20);
-
-                results.DosePercentile80 = allDoses[Math.Min(idx80, allDoses.Count - 1)];
-                results.DosePercentile20 = allDoses[Math.Max(0, idx20)];
-
-                OutputLog += $"Dose thresholds - Peaks: > {results.DosePercentile80:F2} Gy (80th percentile)\n";
-                OutputLog += $"                 Valleys: < {results.DosePercentile20:F2} Gy (20th percentile)\n";
-
-                // Step 3: Create binary masks for peaks and valleys
-                var peakMask = new Dictionary<(int, int, int), bool>();
-                var valleyMask = new Dictionary<(int, int, int), bool>();
-
-                foreach (var voxel in voxelData)
-                {
-                    var key = (voxel.slice, voxel.x, voxel.y);
-                    peakMask[key] = voxel.dose > results.DosePercentile80;
-                    valleyMask[key] = voxel.dose < results.DosePercentile20;
-                }
-
-                // Step 4: Perform 3D clustering for peaks
-                OutputLog += "\nClustering peaks...\n";
-                var peakClusters = Perform3DClustering(peakMask, voxelData, true, results.DosePercentile80);
-                results.Peaks = peakClusters;
-
-                // Step 5: Perform 3D clustering for valleys
-                OutputLog += "Clustering valleys...\n";
-                var valleyClusters = Perform3DClustering(valleyMask, voxelData, false, results.DosePercentile20);
-                results.Valleys = valleyClusters;
-
-                OutputLog += $"Found {results.Peaks.Count} peak clusters and {results.Valleys.Count} valley clusters\n";
-
-                // Step 6: Calculate biological metrics
-                CalculateBiologicalMetrics(results, voxelData);
-
-                return results;
-            }
-            catch (Exception ex)
-            {
-                OutputLog += $"Error in P/V clustering analysis: {ex.Message}\n";
-                return null;
-            }
-        }
-
-        // Add 3D clustering method
-        private List<PVCluster> Perform3DClustering(
-            Dictionary<(int, int, int), bool> mask,
-            List<(int slice, int x, int y, double dose, double u, double v)> voxelData,
-            bool isPeak,
-            double threshold)
-        {
-            var clusters = new List<PVCluster>();
-            var visited = new HashSet<(int, int, int)>();
-            int clusterId = 0;
-
-            // Convert voxelData to dictionary for quick lookup
-            var voxelDict = voxelData.ToDictionary(
-                v => (v.slice, v.x, v.y),
-                v => (v.dose, v.u, v.v)
-            );
-
-            foreach (var kvp in mask)
-            {
-                if (!kvp.Value || visited.Contains(kvp.Key))
-                    continue;
-
-                // Start new cluster
-                var cluster = new PVCluster
-                {
-                    Id = clusterId++,
-                    IsPeak = isPeak
-                };
-
-                // BFS to find connected voxels
-                var queue = new Queue<(int, int, int)>();
-                queue.Enqueue(kvp.Key);
-                visited.Add(kvp.Key);
-
-                double sumDose = 0;
-                double sumX = 0, sumY = 0, sumZ = 0;
-                double maxDose = double.MinValue;
-                double minDose = double.MaxValue;
-
-                while (queue.Count > 0)
-                {
-                    var current = queue.Dequeue();
-                    cluster.Voxels.Add(current);
-
-                    if (voxelDict.TryGetValue(current, out var voxelInfo))
-                    {
-                        sumDose += voxelInfo.dose;
-                        sumX += voxelInfo.u;
-                        sumY += _depthValues[current.Item1]; // Use depth value for Y
-                        sumZ += voxelInfo.v;
-                        maxDose = Math.Max(maxDose, voxelInfo.dose);
-                        minDose = Math.Min(minDose, voxelInfo.dose);
-                    }
-
-                    // Check 26-connectivity neighbors
-                    for (int ds = -1; ds <= 1; ds++)
-                    {
-                        for (int dx = -1; dx <= 1; dx++)
-                        {
-                            for (int dy = -1; dy <= 1; dy++)
+                            // Sample dose
+                            double dose;
+                            try
                             {
-                                if (ds == 0 && dx == 0 && dy == 0) continue;
-
-                                int newSlice = current.Item1 + ds;
-                                int newX = current.Item2 + dx;
-                                int newY = current.Item3 + dy;
-
-                                // Check bounds
-                                if (newSlice < 0 || newSlice >= _doseSlices.Count) continue;
-                                var (nX, nY) = _sliceDimensions[newSlice];
-                                if (newX < 0 || newX >= nX || newY < 0 || newY >= nY) continue;
-
-                                var neighbor = (newSlice, newX, newY);
-
-                                if (mask.ContainsKey(neighbor) && mask[neighbor] && !visited.Contains(neighbor))
+                                var dv = plan.Dose.GetDoseToPoint(point);
+                                if (dv == null)
                                 {
-                                    queue.Enqueue(neighbor);
-                                    visited.Add(neighbor);
+                                    noDoseCount++;
+                                    continue;
+                                }
+                                dose = dv.Dose;
+                                if (dose <= 0)
+                                {
+                                    noDoseCount++;
+                                    continue;
                                 }
                             }
+                            catch
+                            {
+                                noDoseCount++;
+                                continue;
+                            }
+
+                            totalSampled++;
+                            allDoses.Add(dose);
+
+                            // Find nearest sphere — classify as peak or valley
+                            int nearestSphere = -1;
+                            double nearestDistSq = double.MaxValue;
+
+                            for (int s = 0; s < spheres.Count; s++)
+                            {
+                                double dx = px - sx[s];
+                                double dy = py - sy[s];
+                                double dz = pz - sz[s];
+                                double distSq = dx * dx + dy * dy + dz * dz;
+
+                                if (distSq < nearestDistSq)
+                                {
+                                    nearestDistSq = distSq;
+                                    nearestSphere = s;
+                                }
+                            }
+
+                            if (nearestDistSq <= radiusSq)
+                            {
+                                // Inside a sphere → Peak
+                                sphereDoses[nearestSphere].Add(dose);
+                                sphereVoxelLists[nearestSphere].Add((ix, iy, iz));
+                                peakCount++;
+                            }
+                            else
+                            {
+                                // Outside all spheres → Valley
+                                valleyDoses.Add(dose);
+                                valleyVoxelList.Add((ix, iy, iz));
+                                valleyCount++;
+                            }
                         }
                     }
                 }
 
-                // Calculate cluster properties
-                if (cluster.Voxels.Count > 0)
+                OutputLog += $"Sampling complete:\n";
+                OutputLog += $"  Total voxels sampled: {totalSampled}\n";
+                OutputLog += $"  Peak voxels (inside spheres): {peakCount}\n";
+                OutputLog += $"  Valley voxels (outside spheres): {valleyCount}\n";
+                OutputLog += $"  Outside structure: {outsideCount}\n";
+                OutputLog += $"  No dose data: {noDoseCount}\n";
+
+                results.TotalVoxels = totalSampled;
+                results.PeakVoxels = peakCount;
+                results.ValleyVoxels = valleyCount;
+
+                if (totalSampled == 0)
                 {
-                    int count = cluster.Voxels.Count;
-                    cluster.MeanDose = sumDose / count;
-                    cluster.MaxDose = maxDose;
-                    cluster.MinDose = minDose;
-                    cluster.Centroid = new VVector(sumX / count, sumY / count, sumZ / count);
+                    OutputLog += "ERROR: No valid dose voxels found!\n";
+                    return null;
+                }
 
-                    // Estimate volume (assuming 1.5mm x 1.5mm x 2-3mm voxels)
-                    double voxelVolume = 1.5 * 1.5 * 2.5 / 1000.0; // in cc
-                    cluster.Volume = count * voxelVolume;
+                // -------------------------------------------------------
+                // STEP 4: Build PVCluster objects for each sphere
+                // -------------------------------------------------------
+                OutputLog += "\n--- Step 4: Building per-sphere clusters ---\n";
 
-                    // Only keep clusters with minimum size (avoid noise)
-                    int minClusterSize = isPeak ? 3 : 5; // Peaks can be smaller
-                    if (cluster.Voxels.Count >= minClusterSize)
+                double voxelVolume_cc = (gridRes * gridRes * gridRes) / 1000.0; // mm³ to cc
+
+                for (int s = 0; s < spheres.Count; s++)
+                {
+                    var doses = sphereDoses[s];
+
+                    if (doses.Count == 0)
                     {
-                        clusters.Add(cluster);
+                        OutputLog += $"  Sphere {s + 1}: 0 voxels (may be outside tumor or clipped)\n";
+                        continue;
                     }
-                }
-            }
 
-            OutputLog += $"  Found {clusters.Count} {(isPeak ? "peak" : "valley")} clusters\n";
+                    var cluster = new PVCluster
+                    {
+                        Id = s,
+                        IsPeak = true,
+                        Voxels = sphereVoxelLists[s],
+                        MeanDose = doses.Average(),
+                        MaxDose = doses.Max(),
+                        MinDose = doses.Min(),
+                        Volume = doses.Count * voxelVolume_cc,
+                        Centroid = new VVector(spheres[s].CenterX, spheres[s].CenterY, spheres[s].CenterZ)
+                    };
 
-            // Sort clusters by volume (largest first)
-            clusters.Sort((a, b) => b.Volume.CompareTo(a.Volume));
-
-            // Log largest clusters
-            int reportCount = Math.Min(5, clusters.Count);
-            for (int i = 0; i < reportCount; i++)
-            {
-                var c = clusters[i];
-                OutputLog += $"    Cluster {i + 1}: {c.Voxels.Count} voxels, ";
-                OutputLog += $"Mean dose: {c.MeanDose:F2} Gy, Volume: {c.Volume:F3} cc\n";
-            }
-
-            return clusters;
-        }
-
-        // Calculate biological metrics
-        private void CalculateBiologicalMetrics(PVAnalysisResultsClustered results,
-            List<(int slice, int x, int y, double dose, double u, double v)> voxelData)
-        {
-            try
-            {
-                OutputLog += "\n=== Calculating Biological Metrics ===\n";
-
-                // 1. Volume percentages
-                int peakVoxelCount = results.Peaks.Sum(p => p.Voxels.Count);
-                int valleyVoxelCount = results.Valleys.Sum(v => v.Voxels.Count);
-
-                results.PeakVolumePercent = 100.0 * peakVoxelCount / results.TotalVoxels;
-                results.ValleyVolumePercent = 100.0 * valleyVoxelCount / results.TotalVoxels;
-
-                OutputLog += $"Peak volume: {results.PeakVolumePercent:F1}% of structure\n";
-                OutputLog += $"Valley volume: {results.ValleyVolumePercent:F1}% of structure\n";
-
-                // 2. Mean doses
-                if (results.Peaks.Count > 0)
-                {
-                    results.MeanPeakDose = results.Peaks.Average(p => p.MeanDose);
+                    results.Peaks.Add(cluster);
+                    OutputLog += $"  Sphere {s + 1}: {doses.Count} voxels, Mean: {cluster.MeanDose:F2} Gy, Vol: {cluster.Volume:F3} cc\n";
                 }
 
-                if (results.Valleys.Count > 0)
+                // Build valley cluster
+                if (valleyDoses.Count > 0)
                 {
-                    results.MeanValleyDose = results.Valleys.Average(v => v.MeanDose);
+                    // Valley centroid is approximate center of all valley voxels
+                    double vcx = 0, vcy = 0, vcz = 0;
+                    foreach (var v in valleyVoxelList)
+                    {
+                        vcx += xStart + v.slice * gridRes;
+                        vcy += yStart + v.x * gridRes;
+                        vcz += zStart + v.y * gridRes;
+                    }
+                    int vc = valleyVoxelList.Count;
+
+                    var valleyCluster = new PVCluster
+                    {
+                        Id = 0,
+                        IsPeak = false,
+                        Voxels = valleyVoxelList,
+                        MeanDose = valleyDoses.Average(),
+                        MaxDose = valleyDoses.Max(),
+                        MinDose = valleyDoses.Min(),
+                        Volume = valleyDoses.Count * voxelVolume_cc,
+                        Centroid = new VVector(vcx / vc, vcy / vc, vcz / vc)
+                    };
+
+                    results.Valleys.Add(valleyCluster);
+                    OutputLog += $"\n  Valley: {valleyDoses.Count} voxels, Mean: {valleyCluster.MeanDose:F2} Gy, Vol: {valleyCluster.Volume:F3} cc\n";
                 }
 
-                // 3. Effective PVDR (volume-weighted)
-                if (results.Valleys.Count > 0 && results.MeanValleyDose > 0)
+                // -------------------------------------------------------
+                // STEP 5: Calculate PVDR metrics
+                // -------------------------------------------------------
+                OutputLog += "\n--- Step 5: Calculating PVDR metrics ---\n";
+
+                // ePVDR (volume-weighted)
+                if (results.Peaks.Count > 0 && valleyDoses.Count > 0)
                 {
-                    // Weight by cluster volumes
                     double weightedPeakDose = 0;
                     double totalPeakVolume = 0;
 
@@ -3992,125 +4073,162 @@ namespace MAAS_SFRThelper.ViewModels
                         totalPeakVolume += peak.Volume;
                     }
 
-                    double weightedValleyDose = 0;
-                    double totalValleyVolume = 0;
+                    double effectivePeakDose = totalPeakVolume > 0 ? weightedPeakDose / totalPeakVolume : 0;
+                    double meanValleyDose = valleyDoses.Average();
 
-                    foreach (var valley in results.Valleys)
-                    {
-                        weightedValleyDose += valley.MeanDose * valley.Volume;
-                        totalValleyVolume += valley.Volume;
-                    }
+                    results.EffectivePVDR = meanValleyDose > 0 ? effectivePeakDose / meanValleyDose : 0;
+                    results.MeanPeakDose = effectivePeakDose;
+                    results.MeanValleyDose = meanValleyDose;
+                    results.TotalPeakVolume = totalPeakVolume;
+                    results.TotalValleyVolume = valleyDoses.Count * voxelVolume_cc;
 
-                    if (totalPeakVolume > 0 && totalValleyVolume > 0)
-                    {
-                        double effectivePeakDose = weightedPeakDose / totalPeakVolume;
-                        double effectiveValleyDose = weightedValleyDose / totalValleyVolume;
-                        results.EffectivePVDR = effectivePeakDose / effectiveValleyDose;
-                    }
-                    else
-                    {
-                        // Fallback to simple mean
-                        results.EffectivePVDR = results.MeanPeakDose / results.MeanValleyDose;
-                    }
+                    OutputLog += $"  ePVDR (volume-weighted): {results.EffectivePVDR:F3}\n";
+                    OutputLog += $"    Weighted mean peak dose: {effectivePeakDose:F2} Gy\n";
+                    OutputLog += $"    Mean valley dose: {meanValleyDose:F2} Gy\n";
                 }
 
-                OutputLog += $"Effective PVDR: {results.EffectivePVDR:F2}\n";
+                // Point PVDR (max/min)
+                if (results.Peaks.Count > 0 && valleyDoses.Count > 0)
+                {
+                    results.MaxPeakDose = results.Peaks.Max(p => p.MaxDose);
+                    results.MinValleyDose = valleyDoses.Min();
 
-                // 4. Heterogeneity Index (HI)
-                var allDosesInVoxels = voxelData.Select(v => v.dose).ToList();
-                double maxDose = allDosesInVoxels.Max();
-                double minDose = allDosesInVoxels.Min();
-                results.HeterogeneityIndex = (maxDose - minDose) / maxDose;
+                    results.PointPVDR_MaxMin = results.MinValleyDose > 0
+                        ? results.MaxPeakDose / results.MinValleyDose
+                        : 0;
 
-                OutputLog += $"Heterogeneity Index: {results.HeterogeneityIndex:F3}\n";
+                    OutputLog += $"  Point PVDR (max/min): {results.PointPVDR_MaxMin:F3}\n";
+                    OutputLog += $"    Max peak dose: {results.MaxPeakDose:F2} Gy\n";
+                    OutputLog += $"    Min valley dose: {results.MinValleyDose:F2} Gy\n";
+                }
 
-                // 5. Coefficient of Variation (CV)
-                double meanDose = allDosesInVoxels.Average();
-                double stdDev = Math.Sqrt(allDosesInVoxels.Average(d => Math.Pow(d - meanDose, 2)));
-                results.CoefficientOfVariation = stdDev / meanDose;
+                // -------------------------------------------------------
+                // STEP 6: Volume percentages
+                // -------------------------------------------------------
+                results.PeakVolumePercent = 100.0 * peakCount / totalSampled;
+                results.ValleyVolumePercent = 100.0 * valleyCount / totalSampled;
 
-                OutputLog += $"Coefficient of Variation: {results.CoefficientOfVariation:F3}\n";
+                OutputLog += $"\n  Peak volume: {results.PeakVolumePercent:F1}% ({results.TotalPeakVolume:F2} cc)\n";
+                OutputLog += $"  Valley volume: {results.ValleyVolumePercent:F1}% ({results.TotalValleyVolume:F2} cc)\n";
 
-                // 6. Mean Peak Separation
-                if (results.Peaks.Count > 1)
+                // -------------------------------------------------------
+                // STEP 7: Heterogeneity metrics (over all voxels)
+                // -------------------------------------------------------
+                if (allDoses.Count > 0)
+                {
+                    double maxDose = allDoses.Max();
+                    double minDose = allDoses.Min();
+                    double meanDose = allDoses.Average();
+                    double stdDev = Math.Sqrt(allDoses.Average(d => Math.Pow(d - meanDose, 2)));
+
+                    results.HeterogeneityIndex = maxDose > 0 ? (maxDose - minDose) / maxDose : 0;
+                    results.CoefficientOfVariation = meanDose > 0 ? stdDev / meanDose : 0;
+
+                    OutputLog += $"  HI: {results.HeterogeneityIndex:F3}\n";
+                    OutputLog += $"  CV: {results.CoefficientOfVariation:F3}\n";
+                }
+
+                // -------------------------------------------------------
+                // STEP 8: Mean peak separation (from sphere centers, exact)
+                // -------------------------------------------------------
+                if (spheres.Count > 1)
                 {
                     var separations = new List<double>();
 
-                    for (int i = 0; i < results.Peaks.Count; i++)
+                    for (int i = 0; i < spheres.Count; i++)
                     {
-                        for (int j = i + 1; j < results.Peaks.Count; j++)
+                        for (int j = i + 1; j < spheres.Count; j++)
                         {
-                            var c1 = results.Peaks[i].Centroid;
-                            var c2 = results.Peaks[j].Centroid;
-
-                            double dx = c1.x - c2.x;
-                            double dy = c1.y - c2.y;
-                            double dz = c1.z - c2.z;
-                            double distance = Math.Sqrt(dx * dx + dy * dy + dz * dz);
-
-                            separations.Add(distance);
+                            double dx = spheres[i].CenterX - spheres[j].CenterX;
+                            double dy = spheres[i].CenterY - spheres[j].CenterY;
+                            double dz = spheres[i].CenterZ - spheres[j].CenterZ;
+                            separations.Add(Math.Sqrt(dx * dx + dy * dy + dz * dz));
                         }
                     }
 
-                    if (separations.Count > 0)
-                    {
-                        results.MeanPeakSeparation = separations.Average();
-                        OutputLog += $"Mean peak separation: {results.MeanPeakSeparation:F1} mm\n";
-
-                        // Determine if this is SFRT or minibeam scale
-                        if (results.MeanPeakSeparation > 5.0)
-                        {
-                            OutputLog += "Pattern scale: SFRT (cm-scale spacing)\n";
-                        }
-                        else
-                        {
-                            OutputLog += "Pattern scale: Minibeam (mm-scale spacing)\n";
-                        }
-                    }
+                    results.MeanPeakSeparation = separations.Average();
+                    OutputLog += $"  Mean peak separation: {results.MeanPeakSeparation:F1} mm (from sphere centers)\n";
                 }
 
-                OutputLog += "=== Biological Metrics Complete ===\n";
+                OutputLog += "\n=== Geometric P/V Analysis Complete ===\n";
+                return results;
             }
             catch (Exception ex)
             {
-                OutputLog += $"Error calculating biological metrics: {ex.Message}\n";
+                OutputLog += $"Error in geometric P/V analysis: {ex.Message}\n";
+                OutputLog += $"Stack trace: {ex.StackTrace}\n";
+                return null;
             }
         }
-
-        // Display P/V clustering results in metrics grid
+        
         private void DisplayPVClusterResults()
         {
             if (_pvClusterResults == null) return;
 
-            OutputLog += "\nUpdating metrics display with P/V results...\n";
+            OutputLog += "\nUpdating metrics display with geometric P/V results...\n";
 
             // Clear previous metrics
             AllMetrics.Clear();
 
-            // Add P/V clustering metrics
+            // --- Sphere Extraction Info ---
             AllMetrics.Add(new MetricData
             {
-                metric = "=== PEAK-VALLEY ANALYSIS ===",
+                metric = "=== SPHERE EXTRACTION ===",
                 value = ""
             });
 
             AllMetrics.Add(new MetricData
             {
-                metric = "Number of Peak Clusters",
-                value = _pvClusterResults.Peaks.Count.ToString()
+                metric = "Spheres Expected (ESAPI parts)",
+                value = _pvClusterResults.SphereCountExpected.ToString()
             });
 
             AllMetrics.Add(new MetricData
             {
-                metric = "Number of Valley Clusters",
-                value = _pvClusterResults.Valleys.Count.ToString()
+                metric = "Spheres Extracted",
+                value = _pvClusterResults.SphereCountExtracted.ToString()
             });
 
             AllMetrics.Add(new MetricData
             {
-                metric = "Effective PVDR",
-                value = double.IsNaN(_pvClusterResults.EffectivePVDR) ? "N/A" :
-                        Math.Round(_pvClusterResults.EffectivePVDR, 2).ToString()
+                metric = "Count Match",
+                value = _pvClusterResults.SphereCountMatch ? "✓ Yes" : "⚠ MISMATCH"
+            });
+
+            AllMetrics.Add(new MetricData
+            {
+                metric = "Mean Sphere Radius (mm)",
+                value = Math.Round(_pvClusterResults.SphereRadius, 1).ToString()
+            });
+
+            // --- PVDR Metrics ---
+            AllMetrics.Add(new MetricData
+            {
+                metric = "=== PVDR METRICS ===",
+                value = ""
+            });
+
+            AllMetrics.Add(new MetricData
+            {
+                metric = "ePVDR (volume-weighted)",
+                value = _pvClusterResults.EffectivePVDR > 0
+                    ? Math.Round(_pvClusterResults.EffectivePVDR, 3).ToString()
+                    : "N/A"
+            });
+
+            AllMetrics.Add(new MetricData
+            {
+                metric = "Point PVDR (max peak / min valley)",
+                value = _pvClusterResults.PointPVDR_MaxMin > 0
+                    ? Math.Round(_pvClusterResults.PointPVDR_MaxMin, 3).ToString()
+                    : "N/A"
+            });
+
+            // --- Dose Statistics ---
+            AllMetrics.Add(new MetricData
+            {
+                metric = "=== DOSE STATISTICS ===",
+                value = ""
             });
 
             AllMetrics.Add(new MetricData
@@ -4121,8 +4239,27 @@ namespace MAAS_SFRThelper.ViewModels
 
             AllMetrics.Add(new MetricData
             {
+                metric = "Max Peak Dose (Gy)",
+                value = Math.Round(_pvClusterResults.MaxPeakDose, 2).ToString()
+            });
+
+            AllMetrics.Add(new MetricData
+            {
                 metric = "Mean Valley Dose (Gy)",
                 value = Math.Round(_pvClusterResults.MeanValleyDose, 2).ToString()
+            });
+
+            AllMetrics.Add(new MetricData
+            {
+                metric = "Min Valley Dose (Gy)",
+                value = Math.Round(_pvClusterResults.MinValleyDose, 2).ToString()
+            });
+
+            // --- Volume Metrics ---
+            AllMetrics.Add(new MetricData
+            {
+                metric = "=== VOLUME METRICS ===",
+                value = ""
             });
 
             AllMetrics.Add(new MetricData
@@ -4133,8 +4270,27 @@ namespace MAAS_SFRThelper.ViewModels
 
             AllMetrics.Add(new MetricData
             {
+                metric = "Peak Volume (cc)",
+                value = Math.Round(_pvClusterResults.TotalPeakVolume, 2).ToString()
+            });
+
+            AllMetrics.Add(new MetricData
+            {
                 metric = "Valley Volume (%)",
                 value = Math.Round(_pvClusterResults.ValleyVolumePercent, 1).ToString()
+            });
+
+            AllMetrics.Add(new MetricData
+            {
+                metric = "Valley Volume (cc)",
+                value = Math.Round(_pvClusterResults.TotalValleyVolume, 2).ToString()
+            });
+
+            // --- Heterogeneity ---
+            AllMetrics.Add(new MetricData
+            {
+                metric = "=== HETEROGENEITY ===",
+                value = ""
             });
 
             AllMetrics.Add(new MetricData
@@ -4152,63 +4308,58 @@ namespace MAAS_SFRThelper.ViewModels
             AllMetrics.Add(new MetricData
             {
                 metric = "Mean Peak Separation (mm)",
-                value = _pvClusterResults.MeanPeakSeparation > 0 ?
-                        Math.Round(_pvClusterResults.MeanPeakSeparation, 1).ToString() : "N/A"
+                value = _pvClusterResults.MeanPeakSeparation > 0
+                    ? Math.Round(_pvClusterResults.MeanPeakSeparation, 1).ToString()
+                    : "N/A"
             });
 
+            // --- Sampling Info ---
             AllMetrics.Add(new MetricData
             {
-                metric = "Pattern Type",
-                value = _pvClusterResults.MeanPeakSeparation > 5.0 ? "SFRT (cm-scale)" : "Minibeam (mm-scale)"
-            });
-
-            // Add threshold information
-            AllMetrics.Add(new MetricData
-            {
-                metric = "=== THRESHOLDS USED ===",
+                metric = "=== SAMPLING INFO ===",
                 value = ""
             });
 
             AllMetrics.Add(new MetricData
             {
-                metric = "Peak Threshold (80th %ile)",
-                value = $"{Math.Round(_pvClusterResults.DosePercentile80, 2)} Gy"
+                metric = "Grid Resolution (mm)",
+                value = _pvClusterResults.GridResolution.ToString()
             });
 
             AllMetrics.Add(new MetricData
             {
-                metric = "Valley Threshold (20th %ile)",
-                value = $"{Math.Round(_pvClusterResults.DosePercentile20, 2)} Gy"
-            });
-
-            AllMetrics.Add(new MetricData
-            {
-                metric = "Total Structure Voxels",
+                metric = "Total Voxels Sampled",
                 value = _pvClusterResults.TotalVoxels.ToString()
             });
 
-            // Add top 3 peaks info
+            AllMetrics.Add(new MetricData
+            {
+                metric = "Peak Voxels",
+                value = _pvClusterResults.PeakVoxels.ToString()
+            });
+
+            AllMetrics.Add(new MetricData
+            {
+                metric = "Valley Voxels",
+                value = _pvClusterResults.ValleyVoxels.ToString()
+            });
+
+            // --- Per-Sphere Detail ---
             if (_pvClusterResults.Peaks.Count > 0)
             {
                 AllMetrics.Add(new MetricData
                 {
-                    metric = "=== LARGEST PEAKS ===",
+                    metric = "=== PER-SPHERE DETAIL ===",
                     value = ""
                 });
 
-                for (int i = 0; i < Math.Min(3, _pvClusterResults.Peaks.Count); i++)
+                for (int i = 0; i < _pvClusterResults.Peaks.Count; i++)
                 {
                     var peak = _pvClusterResults.Peaks[i];
                     AllMetrics.Add(new MetricData
                     {
-                        metric = $"Peak {i + 1} Volume (cc)",
-                        value = Math.Round(peak.Volume, 3).ToString()
-                    });
-
-                    AllMetrics.Add(new MetricData
-                    {
-                        metric = $"Peak {i + 1} Mean Dose (Gy)",
-                        value = Math.Round(peak.MeanDose, 2).ToString()
+                        metric = $"Sphere {i + 1}",
+                        value = $"Mean: {peak.MeanDose:F2} Gy | Max: {peak.MaxDose:F2} Gy | Vol: {peak.Volume:F3} cc"
                     });
                 }
             }
@@ -4216,10 +4367,12 @@ namespace MAAS_SFRThelper.ViewModels
             // Force UI update
             RaisePropertyChanged(nameof(AllMetrics));
 
-            OutputLog += $"Added {AllMetrics.Count} P/V metrics to display\n";
+            OutputLog += $"Added {AllMetrics.Count} metrics to display\n";
         }
 
-                      
+
+
+
 
         private void AddStructureMesh(Model3DGroup modelGroup)
         {
