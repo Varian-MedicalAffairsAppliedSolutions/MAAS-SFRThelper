@@ -17,6 +17,7 @@ using System.Diagnostics.Eventing.Reader;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using MAAS_SFRThelper.Services;
+using MAAS_SFRThelper.Services.MayoLattice;
 using System.Windows.Interop;
 using System.Windows.Media.Media3D;
 using System.Security.Policy;
@@ -289,6 +290,155 @@ namespace MAAS_SFRThelper.ViewModels
 
         #endregion
 
+        #region Mayo Properties
+
+        private bool _isMayo;
+        public bool IsMayo
+        {
+            get { return _isMayo; }
+            set
+            {
+                SetProperty(ref _isMayo, value);
+                if (_isMayo)
+                {
+                    // Disable controls not used by Mayo
+                    LSFVisibility = false;
+                    ShiftEnabled = false;
+                    NullVoidsEnabled = false;
+                    CreateNullsVoids = false;
+                    ThresholdEnabled = false;
+                    VThresh = 100;
+                }
+                else if (!IsCVT3D)
+                {
+                    LSFVisibility = true;
+                    ShiftEnabled = true;
+                    NullVoidsEnabled = true;
+                    ThresholdEnabled = true;
+                }
+                RaisePropertyChanged(nameof(MayoPanelVisible));
+                RaisePropertyChanged(nameof(SpacingEnabled));
+            }
+        }
+
+        /// <summary>
+        /// Controls visibility of the Mayo-specific parameter panel in XAML.
+        /// </summary>
+        public bool MayoPanelVisible => _isMayo;
+
+        /// <summary>
+        /// Spacing combo is disabled for Mayo (algorithm determines its own count).
+        /// </summary>
+        public bool SpacingEnabled => !_isMayo;
+
+        // ─── OAR Selection ───
+
+        private List<string> _mayoAvailableOars;
+        public List<string> MayoAvailableOars
+        {
+            get { return _mayoAvailableOars; }
+            set { SetProperty(ref _mayoAvailableOars, value); }
+        }
+
+        private ObservableCollection<string> _mayoSelectedOars;
+        public ObservableCollection<string> MayoSelectedOars
+        {
+            get { return _mayoSelectedOars; }
+            set { SetProperty(ref _mayoSelectedOars, value); }
+        }
+
+        // ─── Centralization ───
+
+        private double _mayoCentralization;
+        /// <summary>
+        /// Centralization pressure slider: 0 (no pressure) to 1 (max central).
+        /// Displayed as (1 - mu). Default 0.8, matching paper's UI.
+        /// </summary>
+        public double MayoCentralization
+        {
+            get { return _mayoCentralization; }
+            set { SetProperty(ref _mayoCentralization, value); }
+        }
+
+        // ─── Gradient Walk ───
+
+        private bool _mayoUseGradientWalk;
+        public bool MayoUseGradientWalk
+        {
+            get { return _mayoUseGradientWalk; }
+            set { SetProperty(ref _mayoUseGradientWalk, value); }
+        }
+
+        // ─── Random Seed ───
+
+        private string _mayoRandomSeed;
+        /// <summary>
+        /// Random seed as string. Empty or whitespace = non-deterministic.
+        /// </summary>
+        public string MayoRandomSeed
+        {
+            get { return _mayoRandomSeed; }
+            set { SetProperty(ref _mayoRandomSeed, value); }
+        }
+
+        // ─── Advanced Constraint Parameters ───
+
+        private bool _mayoShowAdvanced;
+        public bool MayoShowAdvanced
+        {
+            get { return _mayoShowAdvanced; }
+            set { SetProperty(ref _mayoShowAdvanced, value); }
+        }
+
+        private double _mayoDGtv;
+        /// <summary>GTV margin in mm (excluding RSphere). Default 5.0.</summary>
+        public double MayoDGtv
+        {
+            get { return _mayoDGtv; }
+            set { SetProperty(ref _mayoDGtv, value); }
+        }
+
+        private double _mayoDOar;
+        /// <summary>OAR margin in mm (excluding RSphere). Default 10.0.</summary>
+        public double MayoDOar
+        {
+            get { return _mayoDOar; }
+            set { SetProperty(ref _mayoDOar, value); }
+        }
+
+        private double _mayoDCenter;
+        /// <summary>Minimum center-to-center spacing in mm. Default 30.0.</summary>
+        public double MayoDCenter
+        {
+            get { return _mayoDCenter; }
+            set { SetProperty(ref _mayoDCenter, value); }
+        }
+
+        private double _mayoZSep;
+        /// <summary>Z-separation threshold in mm. Default 20.0.</summary>
+        public double MayoZSep
+        {
+            get { return _mayoZSep; }
+            set { SetProperty(ref _mayoZSep, value); }
+        }
+
+        private double _mayoDCoAxial;
+        /// <summary>Co-axial minimum distance in mm. Default 80.0.</summary>
+        public double MayoDCoAxial
+        {
+            get { return _mayoDCoAxial; }
+            set { SetProperty(ref _mayoDCoAxial, value); }
+        }
+
+        private string _mayoStatusText;
+        public string MayoStatusText
+        {
+            get { return _mayoStatusText; }
+            set { SetProperty(ref _mayoStatusText, value); }
+        }
+
+        #endregion
+
         #region Export Properties and Container
         // Container class for export data
         public class ExportDataContainer
@@ -361,6 +511,21 @@ namespace MAAS_SFRThelper.ViewModels
             ExportDataCommand = new DelegateCommand(ExportData, () => DataReadyForExport);
             LSFVisibility = true;
 
+            // Mayo defaults (Deufel et al. 2024, Table 1)
+            _isMayo = false;
+            MayoAvailableOars = new List<string>();
+            MayoSelectedOars = new ObservableCollection<string>();
+            MayoCentralization = 0.8;
+            MayoUseGradientWalk = true;
+            MayoRandomSeed = "";
+            MayoShowAdvanced = false;
+            MayoDGtv = 5.0;
+            MayoDOar = 10.0;
+            MayoDCenter = 30.0;
+            MayoZSep = 20.0;
+            MayoDCoAxial = 80.0;
+            MayoStatusText = "";
+
             // Set valid spacings based on CT img z resolution
             // ValidSpacings = new List<Spacing>();
             for (int i = 1; i < 80; i++) // changed to 80 to allow larger spacings with small slice thicknesses (0.625mm slices gives up to 50mm)
@@ -377,6 +542,7 @@ namespace MAAS_SFRThelper.ViewModels
             //string planTargetId = null;
 
             SetStructures();
+            SetMayoOars();
 
         }
 
@@ -401,8 +567,63 @@ namespace MAAS_SFRThelper.ViewModels
             });
         }
 
+        private void SetMayoOars()
+        {
+            _esapiWorker.Run(sc =>
+            {
+                var oarList = new List<string>();
+                foreach (var s in sc.StructureSet.Structures)
+                {
+                    // Show all non-empty structures that aren't the selected target
+                    if (!s.IsEmpty && s.Id != targetSelected)
+                    {
+                        oarList.Add(s.Id);
+                    }
+                }
+                MayoAvailableOars = oarList;
+                MayoSelectedOars = new ObservableCollection<string>();
+            });
+        }
+
+        private MayoConstraints BuildMayoConstraints()
+        {
+            var constraints = new MayoConstraints
+            {
+                RSphere = Radius,
+                Mu = 1.0 - MayoCentralization, // slider shows (1-mu)
+                UseGradientWalk = MayoUseGradientWalk,
+                DGtv = MayoDGtv,
+                DOar = MayoDOar,
+                DCenter = MayoDCenter,
+                ZSep = MayoZSep,
+                DCoAxial = MayoDCoAxial
+            };
+
+            // Parse random seed
+            if (!string.IsNullOrWhiteSpace(MayoRandomSeed) &&
+                int.TryParse(MayoRandomSeed, out int seed))
+            {
+                constraints.RandomSeed = seed;
+            }
+
+            return constraints;
+        }
+
         private bool CanCreateLattice()
         {
+            // Mayo only needs radius
+            if (IsMayo)
+            {
+                if (radius <= 0)
+                {
+                    LatticeValidationText = "Please set radius.";
+                    LVVis = true;
+                    return false;
+                }
+                LVVis = false;
+                return true;
+            }
+
             if (radius == 0)
             {
                 LatticeValidationText = "Please set radius.";
@@ -907,7 +1128,7 @@ namespace MAAS_SFRThelper.ViewModels
         private bool PreSpheres()
         {
             // Check if we are ready to make spheres
-            if (!IsHex && !IsRect && !IsRectAlt && !IsCVT3D)
+            if (!IsHex && !IsRect && !IsRectAlt && !IsCVT3D && !IsMayo)
             {
                 var msg = "No pattern selected. Returning.";
                 Output += "\n" + msg;
@@ -936,11 +1157,8 @@ namespace MAAS_SFRThelper.ViewModels
                 return false;
             }
 
-            // this checks for sphere spacing - let's make this 1.1 x to be safer otherwise spheres will touch and we don't want that
-            // at some point we should also check whether spheres are larger than a value - there are a bunch of values given in the drop down value
-            // may need to clean them up a little bit and only show values that make sense for the given PTV - JP
-
-            if (SpacingSelected.Value < 1.1 * (Radius * 2))
+            // Mayo doesn't use spacing — skip this check
+            if (!IsMayo && SpacingSelected.Value < 1.1 * (Radius * 2))
             {
                 var buttons = MessageBoxButton.OKCancel;
                 var result = MessageBox.Show($"WARNING: Sphere center spacing is less than sphere diameter ({Radius * 2}) mm.\n Continue?", "", buttons);
@@ -1102,10 +1320,6 @@ namespace MAAS_SFRThelper.ViewModels
                 else if (IsCVT3D)
                 {
                     // Extra dialog box for calculating number of points for seed placement CVT
-                    // MessageBox.Show("Calculating number of spheres needed.");
-                    // Output += "\nEvaluating number of spheres, this could take several minutes ...";
-                    // spacingSelected.Value = spacingSelected.Value * 2;
-                    // Create a temporary export data for the BuildHexGrid call
                     var tempExportData = new ExportDataContainer();
                     var gridhex = BuildHexGrid(10.0, bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract, ptvRetractVoid, tempExportData);
 
@@ -1117,31 +1331,13 @@ namespace MAAS_SFRThelper.ViewModels
                     foreach (VVector pos in gridhex.Where(r => r.SeedType == SeedTypeEnum.Sphere).Select(r => r.Position))
                     {
                         gridhexSph.Add(new Point3D(pos.x, pos.y, pos.z));
-                        //if (rand.Next(1, 10) % 2 == 0)
-                        //{
-                        //    gridhexSph.Add(new Point3D(pos.x, pos.y, pos.z));
-                        //}
-
                     }
 
-
-
-                    // MessageBox.Show("Total seeds in gridhex", gridhex.Count.ToString());
                     Output += "\nEvaluating sphere locations using 3D CVT, this could take several minutes ...";
-                    // var cvt = new CVT3D(target.MeshGeometry, new CVTSettings(gridhex.Count));
-                    //var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(gridhex.Count(g => g.SeedType == SeedTypeEnum.Sphere)));
-                    // var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(gridhex.Count(g => g.SeedType == SeedTypeEnum.Sphere), bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, SpacingSelected.Value, Radius));
                     var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(gridhexSph, gridhex.Count(g => g.SeedType == SeedTypeEnum.Sphere)));
 
-                    //var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(gridhexSph, gridhexVoid, gridhex.Count(g => g.SeedType == SeedTypeEnum.Sphere)));
                     var cvtGenerators = cvt.CalculateGenerators();
                     ProgressValue += 15.0;
-                    // Check to make sure each point is at least SelectedSpacing distance away from every other point. If not  
-                    // remove that point from the list. We could search for another point if one gets rejected to preserve
-                    // total number of points but for that we'd have to change Voronio3D. Alternatively, we could add another option
-                    // in Voronoi3D to be able to use cubic or hex grids. But that would also require modification of Voronoi3D which we 
-                    // will look into later. For now we just do a simple check to make sure included point is at least a minimum distance away from
-                    // every other point.
 
                     var retval = new List<seedPointModel>();
                     int idx = -1;
@@ -1157,7 +1353,6 @@ namespace MAAS_SFRThelper.ViewModels
                             int num_points = retval.Count;
                             double[] dists = Enumerable.Repeat(1.0, num_points).ToArray();
                             int j = 0;
-                            // foreach (int j = 0; j < num_points; j++)
                             foreach (VVector pos in retval.Where(r => r.SeedType == SeedTypeEnum.Sphere).Select(r => r.Position))
                             {
                                 double dist = Math.Sqrt(
@@ -1179,22 +1374,17 @@ namespace MAAS_SFRThelper.ViewModels
                         else
                         {
                             d = 2.10 * sphereRadius;
-                            // d = SpacingSelected.Value;
                         }
 
-                        // Uncomment below if CVT uses random sampling to avoid spheres clubbing together
-
-                        // if (SpacingSelected.Value <= d)
                         if (2.10 * sphereRadius <= d)
 
                         {
                             retval.Add(new seedPointModel(cvtpt, SeedTypeEnum.Sphere));
                         }
-                        //retval.Add(new seedPointModel(cvtpt, SeedTypeEnum.Sphere));
 
                     }
 
-                    grid = retval; // cvtGenerators.Select(p => new VVector(p.X, p.Y, p.Z)).ToList();
+                    grid = retval;
                     foreach (var pos in gridhex.Where(r => r.SeedType == SeedTypeEnum.Void))
                     {
                         grid.Add(pos);
@@ -1206,12 +1396,90 @@ namespace MAAS_SFRThelper.ViewModels
                     // CVT3D doesn't calculate centroids same way
                     exportData.CentroidOffset = new VVector(0, 0, 0);
                 }
+                else if (IsMayo)
+                {
+                    Output += "\nStarting Mayo Monte Carlo lattice placement...";
+                    ProgressValue = 5;
+
+                    // Build constraints from UI
+                    var mayoConstraints = BuildMayoConstraints();
+
+                    // Validate constraints
+                    string validationError = mayoConstraints.Validate();
+                    if (validationError != null)
+                    {
+                        Output += $"\nValidation error: {validationError}";
+                        MessageBox.Show(validationError, "Mayo Placement Error");
+                        return;
+                    }
+
+                    Output += $"\n{mayoConstraints}";
+
+                    // Get selected OAR structures
+                    var oarStructures = new List<Structure>();
+                    foreach (var oarName in MayoSelectedOars)
+                    {
+                        var oar = structureSet.Structures
+                            .FirstOrDefault(s => s.Id.Equals(oarName, StringComparison.OrdinalIgnoreCase));
+                        if (oar != null && !oar.IsEmpty)
+                        {
+                            oarStructures.Add(oar);
+                        }
+                    }
+                    Output += $"\nOARs for avoidance: {oarStructures.Count}";
+
+                    // Run the placement service
+                    var placementService = new MayoPlacementService();
+                    placementService.OnProgress = (msg, pct) =>
+                    {
+                        ProgressValue = pct * 0.75; // scale to 0-75% (leave 25% for sphere creation)
+                        MayoStatusText = msg;
+                    };
+
+                    var placementResult = placementService.Execute(
+                        structureSet, ptv, oarStructures, sc.Image, mayoConstraints);
+
+                    Output += $"\n{placementResult.Message}";
+                    Output += $"\nExecution time: {placementResult.ExecutionTime.TotalSeconds:F1} seconds";
+
+                    if (!placementResult.Success || placementResult.SphereCount == 0)
+                    {
+                        Output += "\nMayo placement failed or produced no spheres.";
+                        if (!string.IsNullOrEmpty(placementResult.Log))
+                        {
+                            Output += $"\n--- Log ---\n{placementResult.Log}";
+                        }
+                        return;
+                    }
+
+                    // Convert positions to grid format (spheres only, no voids)
+                    grid = placementResult.SpherePositions
+                        .Select(pos => new seedPointModel(pos, SeedTypeEnum.Sphere))
+                        .ToList();
+
+                    structMain = CreateStructure(sc.StructureSet, "LatticeMayo", false, true);
+                    exportData.GridData = new List<seedPointModel>(grid);
+
+                    // Log detailed results
+                    Output += $"\nPlaced {placementResult.SphereCount} spheres";
+                    Output += $"\nFeasible points: {placementResult.FeasiblePointCount}";
+                    Output += $"\nAxial COMs: {placementResult.COMCount}";
+
+                    if (ptv.Volume > 0)
+                    {
+                        double density = (placementResult.SphereCount / ptv.Volume) * 100.0;
+                        Output += $"\nDensity: {density:F3} points per 100 cc of GTV";
+                    }
+
+                    // Mayo handles its own centroid alignment
+                    exportData.CentroidOffset = new VVector(0, 0, 0);
+                }
 
                 // Store configuration and statistics for export
                 exportData.Statistics["TargetStructure"] = targetSelected;
-                exportData.Statistics["Pattern"] = IsHex ? "Hexagonal" : IsRect ? "SimpleCubic" : IsRectAlt ? "AlternatingCubic" : IsCVT3D ? "CVT3D" : "Unknown";
+                exportData.Statistics["Pattern"] = IsHex ? "Hexagonal" : IsRect ? "SimpleCubic" : IsRectAlt ? "AlternatingCubic" : IsCVT3D ? "CVT3D" : IsMayo ? "MayoMC" : "Unknown";
                 exportData.Statistics["Radius"] = sphereRadius;
-                exportData.Statistics["Spacing"] = SpacingSelected.Value;
+                exportData.Statistics["Spacing"] = IsMayo ? 0.0 : SpacingSelected.Value;
                 exportData.Statistics["XShift"] = XShift;
                 exportData.Statistics["YShift"] = YShift;
                 exportData.Statistics["LateralScalingFactor"] = LateralScalingFactor;
@@ -1424,17 +1692,7 @@ namespace MAAS_SFRThelper.ViewModels
 
                         if (isHex)
                         {
-                            //string structName = "Voids";
                             int voidCount = 0;
-                            ////var prevStruct = structureSet.Structures.FirstOrDefault(x => x.Id == structName);
-                            //if (prevStruct != null)
-                            //{
-                            //    structureSet.RemoveStructure(prevStruct);
-
-                            //}
-
-                            //var voidStructure = structureSet.AddStructure("CONTROL", structName);
-                            //voidStructure.ConvertToHighResolution(); // all structures are high res - if structures are made not hi-res comment this
 
                             foreach (VVector ctr in grid.Where(g => g.SeedType == SeedTypeEnum.Void).Select(g => g.Position))
                             {
@@ -1467,7 +1725,6 @@ namespace MAAS_SFRThelper.ViewModels
 
 
                             Output += "\n Voids have been created";
-                            // voidStructureL3.SegmentVolume = target.Margin(-1 * spacingSelected.Value / 2).Sub(structMain.Margin(1.2 * voidFactor));
 
 
                         }
@@ -1475,20 +1732,12 @@ namespace MAAS_SFRThelper.ViewModels
 
                         if (isCVT3D)
                         {
-                            //var gridhex = BuildHexGrid(10.0, bounds.X + XShift, bounds.SizeX, bounds.Y + YShift, bounds.SizeY, z0, bounds.SizeZ, ptvRetract, ptvRetractVoid);
-
-                            // make list of the points in gridhex_sph, gridhex_void
                             List<Point3D> gridcvtVoid = new List<Point3D>();
                             Random rand = new Random();
 
                             foreach (VVector pos in grid.Where(r => r.SeedType == SeedTypeEnum.Void).Select(r => r.Position))
                             {
                                 gridcvtVoid.Add(new Point3D(pos.x, pos.y, pos.z));
-                                //if (rand.Next(1, 10) % 2 == 0)
-                                //{
-                                //    gridhexVoid.Add(new Point3D(pos.x, pos.y, pos.z));
-                                //}
-
                             }
 
                             List<Point3D> gridcvtSph = new List<Point3D>();
@@ -1496,14 +1745,8 @@ namespace MAAS_SFRThelper.ViewModels
                             foreach (VVector pos in grid.Where(r => r.SeedType == SeedTypeEnum.Sphere).Select(r => r.Position))
                             {
                                 gridcvtSph.Add(new Point3D(pos.x, pos.y, pos.z));
-                                //if (rand.Next(1, 10) % 2 == 0)
-                                //{
-                                //    gridhexVoid.Add(new Point3D(pos.x, pos.y, pos.z));
-                                //}
-
                             }
 
-                            // var cvt = new CVT3D(ptvRetractVoid.MeshGeometry, new CVTSettings(gridhexVoid, gridhexVoid.Count()));
                             var cvt = new CVT3D(ptvRetract.MeshGeometry, new CVTSettings(
                                                                             gridcvtSph,
                                                                             bounds.X + XShift,
@@ -1514,13 +1757,11 @@ namespace MAAS_SFRThelper.ViewModels
                                                                             bounds.SizeZ,
                                                                             SpacingSelected.Value,
                                                                             sphereRadius,
-                                                                            true, // Set this to false initially until the void calculation is fully working
+                                                                            true,
                                                                             gridcvtSph.Count > 0 ? gridcvtSph.Count : 32)); var cvtGenerators = cvt.CalculateGenerators();
                             var retval = grid.Where(r => r.SeedType == SeedTypeEnum.Sphere).ToList();
 
                             double d = 0;
-                            //check to make sure cvt spheres don't overlap
-                            //foreach (var i in cvtGenerators)
                             foreach (var i in gridcvtVoid)
                             {
 
@@ -1529,7 +1770,6 @@ namespace MAAS_SFRThelper.ViewModels
                                 int num_points = retval.Count();
                                 double[] dists = Enumerable.Repeat(1.0, num_points).ToArray();
                                 int j = 0;
-                                // foreach (int j = 0; j < num_points; j++)
                                 foreach (VVector pos in retval.Select(r => r.Position))
                                 {
                                     double dist = Math.Sqrt(
@@ -1547,9 +1787,6 @@ namespace MAAS_SFRThelper.ViewModels
                                     d = dists.Min();
                                 }
 
-                                // Uncomment below if CVT uses random sampling to avoid spheres clubbing together
-
-                                // if (SpacingSelected.Value <= d)
                                 if (1.01 * sphereRadius <= d)
                                 {
                                     bool isInsideptvRetractVoid = ptvRetractVoid.IsPointInsideSegment(cvtpt);
@@ -1557,15 +1794,12 @@ namespace MAAS_SFRThelper.ViewModels
                                     {
                                         retval.Add(new seedPointModel(cvtpt, SeedTypeEnum.Void));
                                     }
-                                    //   retval.Add(new seedPointModel(cvtpt, SeedTypeEnum.Void));
                                 }
-                                //retval.Add(new seedPointModel(cvtpt, SeedTypeEnum.Sphere));
 
                             }
 
-                            grid = retval; // cvtGenerators.Select(p => new VVector(p.X, p.Y, p.Z)).ToList();
+                            grid = retval;
 
-                            //string structName = "Voids";
                             int voidCount = 0;
 
                             var cvtSphereBox = new Rect3D(sphereBox.X + SpacingSelected.Value / 4,
@@ -1641,20 +1875,12 @@ namespace MAAS_SFRThelper.ViewModels
             DataReadyForExport = true;
             ExportDataCommand.RaiseCanExecuteChanged();
 
-            // And the main structure with target
-            // Output += "\nCreated spheres. Please close the tool to view";
-            //MessageBox.Show("Created spheres close tool to view. \nFor different sphere locations rerun with different x and y shift values.");
-
         }
 
         private bool isPointInsideBBox(Rect3D bbox, VVector point)
         {
             Point3D p = new Point3D(point.x, point.y, point.z);
             return bbox.Contains(p);
-            // Check if the point's coordinates are within the bounds of the 3D rectangle
-            //return (point.x >= bbox.X && point.x <= bbox.X + bbox.SizeX) &&
-            //        (point.y >= bbox.Y && point.y <= bbox.Y + bbox.SizeY) &&
-            //        (point.z >= bbox.Z && point.z <= bbox.Z + bbox.SizeZ);
         }
 
 
@@ -1698,16 +1924,14 @@ namespace MAAS_SFRThelper.ViewModels
                 if (visited.Contains(point))
                     continue;
 
-                // Find k-nearest neighbors for the point, excluding the point itself
                 var neighbors = points
                     .Where(p => p != point && !visited.Contains(p))
                     .OrderBy(p => Distance(point, p))
-                    .Take(k) // Take only k neighbors
+                    .Take(k)
                     .ToList();
 
                 clusters.Add(neighbors);
 
-                // Mark neighbors as visited
                 foreach (var neighbor in neighbors)
                 {
                     visited.Add(neighbor);
@@ -1726,7 +1950,6 @@ namespace MAAS_SFRThelper.ViewModels
                 z: cluster.Average(p => p.z)
             );
 
-            // Add a small random perturbation to the centroid
             centroid = (
                 x: centroid.x + (random.NextDouble() - 0.5) * 2 * perturbation,
                 y: centroid.y + (random.NextDouble() - 0.5) * 2 * perturbation,

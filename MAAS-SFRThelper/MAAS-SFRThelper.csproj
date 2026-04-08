@@ -126,6 +126,12 @@
     <Compile Include="Services\AppConfigHelper.cs" />
     <Compile Include="Services\EsapiWorker.cs" />
     <Compile Include="Services\GeometricSurrogateCalculator.cs" />
+    <Compile Include="Services\MayoLattice\FeasibleRegionBuilder.cs" />
+    <Compile Include="Services\MayoLattice\HdbscanClustering.cs" />
+    <Compile Include="Services\MayoLattice\MayoConstraints.cs" />
+    <Compile Include="Services\MayoLattice\MayoPlacementService.cs" />
+    <Compile Include="Services\MayoLattice\MonteCarloEngine.cs" />
+    <Compile Include="Services\MayoLattice\SliceCOMCalculator.cs" />
     <Compile Include="Services\OptimizationObjectiveCreator.cs" />
     <Compile Include="Services\SphereExtractor.cs" />
     <Compile Include="Services\StructureExtension.cs" />

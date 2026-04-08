@@ -55,8 +55,20 @@ namespace MAAS_SFRThelper.Views
             Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri));
             e.Handled = true;
         }
+       
+        private void MayoOarListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (sender is ListBox listBox && DataContext is SphereDialogViewModel vm)
+            {
+                vm.MayoSelectedOars.Clear();
+                foreach (var item in listBox.SelectedItems)
+                {
+                    vm.MayoSelectedOars.Add(item.ToString());
+                }
+            }
+        }
 
-        
+
     }
 }
 
