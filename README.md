@@ -16,6 +16,7 @@ Options available:
   - Simple Cubic (SCP)
   - Alternating Cubic (AC)
   - Centroidal Voronoi Tessellation in 3D (CVT3D)
+  - Mayo MC (this method is still experimental)
 - Radius (mm): Defines the radius of each sphere.
 - Spacing (mm): Defines center-to-center spacing between spheres.
 - Lattice X / Y Shift (mm): Allows you to laterally shift the lattice in the transverse plane.
@@ -25,7 +26,8 @@ Options available:
 - Create void structures: Generates complementary voids (valleys) to guide dose distribution and improve plan optimization.
 - Option to export sphere/void locations and specifications in csv file.
 
-  <img width="717" height="465" alt="image" src="https://github.com/user-attachments/assets/0ea82290-cf05-4d70-8a26-d4b2673d3b28" />
+  <img width="718" height="772" alt="image" src="https://github.com/user-attachments/assets/ac8ede67-b49c-45f0-b6d5-bffac8b09965" />
+
 
 
 ### SCART
