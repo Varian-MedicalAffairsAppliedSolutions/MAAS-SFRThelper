@@ -16,6 +16,7 @@ Options available:
   - Simple Cubic (SCP)
   - Alternating Cubic (AC)
   - Centroidal Voronoi Tessellation in 3D (CVT3D)
+  - Mayo MC (this method is still experimental)
 - Radius (mm): Defines the radius of each sphere.
 - Spacing (mm): Defines center-to-center spacing between spheres.
 - Lattice X / Y Shift (mm): Allows you to laterally shift the lattice in the transverse plane.
@@ -25,7 +26,8 @@ Options available:
 - Create void structures: Generates complementary voids (valleys) to guide dose distribution and improve plan optimization.
 - Option to export sphere/void locations and specifications in csv file.
 
-  <img width="717" height="465" alt="image" src="https://github.com/user-attachments/assets/0ea82290-cf05-4d70-8a26-d4b2673d3b28" />
+  <img width="718" height="772" alt="image" src="https://github.com/user-attachments/assets/ac8ede67-b49c-45f0-b6d5-bffac8b09965" />
+
 
 
 ### SCART
@@ -98,7 +100,8 @@ Workflow
 - After optimization completes, click "Calculate Dose"
 - DVH summary displays automatically upon completion
 
-<img width="732" height="845" alt="image" src="https://github.com/user-attachments/assets/7c3755ed-1b3d-4160-a877-9bce4e676ff0" />
+<img width="713" height="773" alt="image" src="https://github.com/user-attachments/assets/d8dd97af-c6e8-4efc-a145-c46a57eec939" />
+<img width="717" height="774" alt="image" src="https://github.com/user-attachments/assets/e5ba23ff-d3ba-4eb3-9a27-d699da45dd52" />
 
 This module is currently under heavy development. This module is experimental. Please reach out with comments and suggestions on how to improve. 
 
