@@ -347,6 +347,7 @@ namespace MAAS_SFRThelper.ViewModels
             {
                 SetProperty(ref _selectedObjective, value);
                 RemoveObjectiveCommand?.RaiseCanExecuteChanged();
+                AddObjectiveCommand?.RaiseCanExecuteChanged();
             }
         }
 
@@ -468,7 +469,7 @@ namespace MAAS_SFRThelper.ViewModels
             PopulateObjectivesCommand = new DelegateCommand(OnPopulateObjectives, CanPopulateObjectives);
             CreateObjectivesCommand = new DelegateCommand(OnCreateObjectives, CanCreateObjectives);
             RemoveObjectiveCommand = new DelegateCommand(OnRemoveObjective, CanRemoveObjective);
-            AddObjectiveCommand = new DelegateCommand(OnAddObjective);
+            AddObjectiveCommand = new DelegateCommand(OnAddObjective, CanAddObjective);
             ResetToDefaultsCommand = new DelegateCommand(OnResetToDefaults);
             CreateValleyStructureCommand = new DelegateCommand(OnCreateValleyStructure, CanCreateValleyStructure);
             RunOptimizationCommand = new DelegateCommand(OnRunOptimization, CanRunOptimization);
@@ -754,7 +755,6 @@ namespace MAAS_SFRThelper.ViewModels
 
             string selectedLattice = SelectedLatticeStructure;
             string selectedValley = SelectedValleyStructure;
-            string currentDoseUnit = SelectedDoseUnit;
             var dispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
 
             _esapiWorker.Run(sc =>
@@ -783,25 +783,12 @@ namespace MAAS_SFRThelper.ViewModels
                     Output += $"\nFound {latticeList?.Count ?? 0} lattice structure(s)";
                     Output += $"\nFound {valleyList?.Count ?? 0} valley structure(s)";
 
+                    // Use whatever the user selected — no auto-switching
                     string latticeToUse = selectedLattice;
-                    string newSelectedLattice = null;
-
-                    if (!string.IsNullOrEmpty(selectedLattice))
-                    {
-                        string optVersion = latticeList?.FirstOrDefault(l =>
-                            l.StartsWith(selectedLattice.Substring(0, Math.Min(10, selectedLattice.Length))) &&
-                            l.Contains("_Opt"));
-                        if (optVersion != null)
-                        {
-                            latticeToUse = optVersion;
-                            newSelectedLattice = optVersion;
-                            Output += $"\n  → Using optimized lattice: {optVersion}";
-                        }
-                    }
 
                     var objectivesList = new List<ObjectiveDefinition>();
 
-                    // Peak objectives — structure and type auto-filled, dose/priority left for user
+                    // Peak objectives for selected lattice
                     if (!string.IsNullOrEmpty(latticeToUse))
                     {
                         objectivesList.Add(new ObjectiveDefinition
@@ -813,7 +800,7 @@ namespace MAAS_SFRThelper.ViewModels
                             Volume = 100,
                             Priority = 0,
                             Role = "Peak",
-                            IsIncluded = true
+                            IsIncluded = false
                         });
 
                         objectivesList.Add(new ObjectiveDefinition
@@ -825,97 +812,128 @@ namespace MAAS_SFRThelper.ViewModels
                             Volume = 0,
                             Priority = 0,
                             Role = "Peak",
-                            IsIncluded = true
+                            IsIncluded = false
                         });
 
-                        Output += $"\n  ✓ Added Peak objectives for {latticeToUse} (enter dose and priority)";
+                        Output += $"\n  ✓ Peak objectives for {latticeToUse} (enter dose and priority)";
                     }
 
-                    // Valley structure detection
-                    string newSelectedValley = null;
-
-                    var valleyStructure = sc.StructureSet.Structures.FirstOrDefault(s =>
-                        s.Id.StartsWith("Valley_Opt", StringComparison.OrdinalIgnoreCase));
-
-                    if (valleyStructure == null && !string.IsNullOrEmpty(selectedValley) &&
-                        selectedValley != "[Auto-create Valley]")
+                    // Valley objectives for selected valley
+                    string valleyToUse = null;
+                    if (!string.IsNullOrEmpty(selectedValley) && selectedValley != "[Auto-create Valley]")
                     {
-                        valleyStructure = sc.StructureSet.Structures.FirstOrDefault(s =>
-                            s.Id.Equals(selectedValley, StringComparison.OrdinalIgnoreCase));
-                    }
+                        var valleyStructure = sc.StructureSet.Structures.FirstOrDefault(s =>
+                            s.Id.Equals(selectedValley, StringComparison.OrdinalIgnoreCase) && !s.IsEmpty);
 
-                    if (valleyStructure == null)
-                    {
-                        valleyStructure = sc.StructureSet.Structures.FirstOrDefault(s =>
-                            s.Id.StartsWith("Valley", StringComparison.OrdinalIgnoreCase) ||
-                            s.Id.Equals("Voids", StringComparison.OrdinalIgnoreCase) ||
-                            s.Id.Equals("coreVoid", StringComparison.OrdinalIgnoreCase));
-                    }
-
-                    // Valley objectives — structure and type auto-filled, dose/priority left for user
-                    if (valleyStructure != null)
-                    {
-                        newSelectedValley = valleyStructure.Id;
-
-                        objectivesList.Add(new ObjectiveDefinition
+                        if (valleyStructure != null)
                         {
-                            StructureName = valleyStructure.Id,
-                            ObjectiveType = "Point",
-                            Operator = OptimizationObjectiveOperator.Upper,
-                            Dose = 0,
-                            Volume = 0,
-                            Priority = 0,
-                            Role = "Valley",
-                            IsIncluded = true
-                        });
+                            valleyToUse = valleyStructure.Id;
 
-                        objectivesList.Add(new ObjectiveDefinition
-                        {
-                            StructureName = valleyStructure.Id,
-                            ObjectiveType = "Mean",
-                            Operator = OptimizationObjectiveOperator.Upper,
-                            Dose = 0,
-                            Volume = 0,
-                            Priority = 0,
-                            Role = "Valley",
-                            IsIncluded = true
-                        });
+                            objectivesList.Add(new ObjectiveDefinition
+                            {
+                                StructureName = valleyStructure.Id,
+                                ObjectiveType = "Point",
+                                Operator = OptimizationObjectiveOperator.Upper,
+                                Dose = 0,
+                                Volume = 0,
+                                Priority = 0,
+                                Role = "Valley",
+                                IsIncluded = false
+                            });
 
-                        Output += $"\n  ✓ Added Valley objectives for {valleyStructure.Id} (enter dose and priority)";
+                            objectivesList.Add(new ObjectiveDefinition
+                            {
+                                StructureName = valleyStructure.Id,
+                                ObjectiveType = "Mean",
+                                Operator = OptimizationObjectiveOperator.Upper,
+                                Dose = 0,
+                                Volume = 0,
+                                Priority = 0,
+                                Role = "Valley",
+                                IsIncluded = false
+                            });
+
+                            Output += $"\n  ✓ Valley objectives for {valleyStructure.Id} (enter dose and priority)";
+                        }
                     }
-                    else
-                    {
-                        Output += "\n  ⚠ WARNING: Valley structure not found, skipping valley objectives";
-                    }
 
-                    // OAR objectives — all non-lattice/valley structures, dose/priority left for user
+                    // All remaining structures — auto-assign roles, no filtering
+                    var peakPatterns = new[] { "Lattice", "CVT", "Sphere" };
+                    var valleyPatterns = new[] { "Valley", "Void", "coreVoid" };
+                    var alreadyAdded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                    // Track what we already added as Peak/Valley
+                    if (!string.IsNullOrEmpty(latticeToUse)) alreadyAdded.Add(latticeToUse);
+                    if (!string.IsNullOrEmpty(valleyToUse)) alreadyAdded.Add(valleyToUse);
+
                     var structures = sc.StructureSet.Structures
                         .Where(s => !s.IsEmpty)
                         .OrderBy(s => s.Id)
                         .ToList();
 
-                    int oarCount = 0;
+                    int peakCount = 0, valleyCount = 0, oarCount = 0;
                     foreach (var structure in structures)
                     {
-                        var skipPatterns = new[] { "Lattice", "CVT", "Sphere", "Valley", "Void" };
-                        if (skipPatterns.Any(p => structure.Id.IndexOf(p, StringComparison.OrdinalIgnoreCase) >= 0))
+                        if (alreadyAdded.Contains(structure.Id))
                             continue;
+
+                        // Auto-assign role based on name
+                        bool isPeak = peakPatterns.Any(p => structure.Id.IndexOf(p, StringComparison.OrdinalIgnoreCase) >= 0);
+                        bool isValley = valleyPatterns.Any(p => structure.Id.IndexOf(p, StringComparison.OrdinalIgnoreCase) >= 0);
+
+                        string role;
+                        var op = OptimizationObjectiveOperator.Upper;
+                        bool included = false;
+
+                        if (isPeak)
+                        {
+                            role = "Peak";
+                            op = OptimizationObjectiveOperator.Lower;
+                            peakCount++;
+                        }
+                        else if (isValley)
+                        {
+                            role = "Valley";
+                            op = OptimizationObjectiveOperator.Upper;
+                            valleyCount++;
+                        }
+                        else
+                        {
+                            role = "OAR";
+                            op = OptimizationObjectiveOperator.Upper;
+                            oarCount++;
+                        }
 
                         objectivesList.Add(new ObjectiveDefinition
                         {
                             StructureName = structure.Id,
                             ObjectiveType = "Point",
-                            Operator = OptimizationObjectiveOperator.Upper,
+                            Operator = op,
                             Dose = 0,
-                            Volume = 0,
+                            Volume = isPeak ? 100 : 0,
                             Priority = 0,
-                            Role = "OAR",
+                            Role = role,
                             IsIncluded = false
                         });
-                        oarCount++;
+
+                        // Peak and Valley structures also get a Mean row
+                        if (isPeak || isValley)
+                        {
+                            objectivesList.Add(new ObjectiveDefinition
+                            {
+                                StructureName = structure.Id,
+                                ObjectiveType = "Mean",
+                                Operator = op,
+                                Dose = 0,
+                                Volume = 0,
+                                Priority = 0,
+                                Role = role,
+                                IsIncluded = false
+                            });
+                        }
                     }
 
-                    Output += $"\n  ✓ Added {oarCount} OAR structure(s) (unchecked — select and enter values as needed)";
+                    Output += $"\n  ✓ {peakCount} additional Peak, {valleyCount} Valley, {oarCount} OAR structure(s)";
                     Output += $"\n\n✓ Total: {objectivesList.Count} rows ready";
                     Output += $"\n\nEnter dose values in {detectedUnit} and set priorities, then click 'Create Objectives'.";
 
@@ -927,11 +945,6 @@ namespace MAAS_SFRThelper.ViewModels
 
                         AvailableLatticeStructures = latticeList;
                         AvailableValleyStructures = valleyList;
-
-                        if (newSelectedLattice != null)
-                            SelectedLatticeStructure = newSelectedLattice;
-                        if (newSelectedValley != null)
-                            SelectedValleyStructure = newSelectedValley;
 
                         Objectives.Clear();
                         foreach (var obj in objectivesList)
@@ -1487,46 +1500,31 @@ namespace MAAS_SFRThelper.ViewModels
 
         #region Objective Management
 
+        private bool CanAddObjective()
+        {
+            return SelectedObjective != null;
+        }
+
         private void OnAddObjective()
         {
-            ObjectiveDefinition newObjective;
+            if (SelectedObjective == null) return;
 
-            if (SelectedObjective != null)
+            var newObjective = new ObjectiveDefinition
             {
-                newObjective = new ObjectiveDefinition
-                {
-                    StructureName = SelectedObjective.StructureName,
-                    ObjectiveType = SelectedObjective.ObjectiveType,
-                    Operator = SelectedObjective.Operator,
-                    Dose = SelectedObjective.Dose,
-                    Volume = SelectedObjective.Volume,
-                    Priority = SelectedObjective.Priority,
-                    Role = SelectedObjective.Role,
-                    IsIncluded = true
-                };
+                StructureName = SelectedObjective.StructureName,
+                ObjectiveType = SelectedObjective.ObjectiveType == "Point" ? "Mean" : "Point",
+                Operator = SelectedObjective.Operator,
+                Dose = 0,
+                Volume = 0,
+                Priority = 0,
+                Role = SelectedObjective.Role,
+                IsIncluded = false
+            };
 
-                int selectedIndex = Objectives.IndexOf(SelectedObjective);
-                Objectives.Insert(selectedIndex + 1, newObjective);
+            int selectedIndex = Objectives.IndexOf(SelectedObjective);
+            Objectives.Insert(selectedIndex + 1, newObjective);
 
-                Output += $"\n✓ Added duplicate objective for {newObjective.StructureName}";
-            }
-            else
-            {
-                newObjective = new ObjectiveDefinition
-                {
-                    StructureName = "Select Structure",
-                    ObjectiveType = "Point",
-                    Operator = OptimizationObjectiveOperator.Upper,
-                    Dose = 15.0,
-                    Volume = 0,
-                    Priority = 100,
-                    Role = "OAR",
-                    IsIncluded = true
-                };
-
-                Objectives.Add(newObjective);
-                Output += "\n✓ Added new blank objective";
-            }
+            Output += $"\n✓ Added objective for {newObjective.StructureName} ({newObjective.ObjectiveType})";
         }
 
         private bool CanRemoveObjective()
@@ -2297,6 +2295,71 @@ namespace MAAS_SFRThelper.ViewModels
                     var valleyStructure = sc.StructureSet.AddStructure("CONTROL", valleyId);
                     valleyStructure.ConvertToHighResolution();
                     valleyStructure.SegmentVolume = targetForBoolean.Sub(newLattice);
+
+                    // --- Translate void structures if they exist ---
+                    var voidNames = new[] { "Voids", "coreVoid" };
+                    int voidsTranslated = 0;
+
+                    foreach (var voidName in voidNames)
+                    {
+                        var originalVoid = sc.StructureSet.Structures
+                            .FirstOrDefault(s => s.Id.Equals(voidName, StringComparison.OrdinalIgnoreCase) && !s.IsEmpty);
+
+                        if (originalVoid == null)
+                            continue;
+
+                        string newVoidId = $"{voidName}_{suffix}";
+                        if (newVoidId.Length > 16)
+                            newVoidId = newVoidId.Substring(0, 16);
+
+                        // Remove existing shifted void if present
+                        var existingShiftedVoid = sc.StructureSet.Structures
+                            .FirstOrDefault(s => s.Id.Equals(newVoidId, StringComparison.OrdinalIgnoreCase));
+                        if (existingShiftedVoid != null)
+                        {
+                            sc.StructureSet.RemoveStructure(existingShiftedVoid);
+                        }
+
+                        var newVoid = sc.StructureSet.AddStructure("CONTROL", newVoidId);
+                        newVoid.ConvertToHighResolution();
+
+                        // Copy contours with (offsetX, offsetY) shift
+                        for (int z = 0; z < sc.StructureSet.Image.ZSize; z++)
+                        {
+                            var contours = originalVoid.GetContoursOnImagePlane(z);
+                            foreach (var contour in contours)
+                            {
+                                if (contour.Length == 0)
+                                    continue;
+
+                                var shiftedContour = new VMS.TPS.Common.Model.Types.VVector[contour.Length];
+                                for (int i = 0; i < contour.Length; i++)
+                                {
+                                    shiftedContour[i] = new VMS.TPS.Common.Model.Types.VVector(
+                                        contour[i].x + offsetX,
+                                        contour[i].y + offsetY,
+                                        contour[i].z);
+                                }
+                                newVoid.AddContourOnImagePlane(shiftedContour, z);
+                            }
+                        }
+
+                        // Clip to target boundary
+                        newVoid.SegmentVolume = newVoid.SegmentVolume.And(targetForBoolean);
+
+                        Output += $"✓ Translated: {voidName} → {newVoidId} ({newVoid.Volume:F2} cc)\n";
+                        voidsTranslated++;
+                    }
+
+                    if (voidsTranslated > 0)
+                    {
+                        Output += $"\nNote: {voidsTranslated} void structure(s) rigidly translated by ({offsetX:+0.0;-0.0}, {offsetY:+0.0;-0.0}) mm.\n";
+                        Output += "Geometric surrogate metrics do not incorporate void geometry — void placement was not evaluated during grid search.\n";
+                    }
+                    else
+                    {
+                        Output += "\nNo void structures found to translate.\n";
+                    }
 
                     if (tempTarget != null)
                     {

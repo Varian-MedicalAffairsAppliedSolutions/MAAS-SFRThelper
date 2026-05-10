@@ -409,15 +409,18 @@ namespace MAAS_SFRThelper.Services
             if (structureSet == null)
                 return valleyStructures;
 
-            // Look for common void/valley structure names
-            var voidNames = new[] { "coreVoid", "Voids", "Valley", "LowDose" };
+            // Exact name matches
+            var exactNames = new[] { "coreVoid", "Voids", "Valley", "LowDose" };
 
-            foreach (var name in voidNames)
+            // Prefix matches (catches Valley_Opt, Voids_Opt, coreVoid_Opt, etc.)
+            var prefixPatterns = new[] { "Valley", "Voids", "coreVoid" };
+
+            foreach (var structure in structureSet.Structures.Where(s => !s.IsEmpty).OrderBy(s => s.Id))
             {
-                var structure = structureSet.Structures.FirstOrDefault(s =>
-                    s.Id.Equals(name, StringComparison.OrdinalIgnoreCase) && !s.IsEmpty);
+                bool isMatch = exactNames.Any(n => structure.Id.Equals(n, StringComparison.OrdinalIgnoreCase))
+                            || prefixPatterns.Any(p => structure.Id.StartsWith(p, StringComparison.OrdinalIgnoreCase));
 
-                if (structure != null)
+                if (isMatch && !valleyStructures.Contains(structure.Id))
                 {
                     valleyStructures.Add(structure.Id);
                 }

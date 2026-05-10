@@ -64,11 +64,9 @@
                               Height="25"/>
 
                     <TextBlock Grid.Row="2" Grid.Column="0" 
-                               Text="PTV Structure:" 
-                               VerticalAlignment="Center"
-                               Visibility="{Binding PTVSelectionVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                    <Grid Grid.Row="2" Grid.Column="1"
-                          Visibility="{Binding PTVSelectionVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                               Text="Target (PTV):" 
+                               VerticalAlignment="Center"/>
+                    <Grid Grid.Row="2" Grid.Column="1">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
@@ -95,7 +93,7 @@
             <!-- 2. GEOMETRIC ANALYSIS & POSITION OPTIMIZATION -->
             <!-- ============================================================ -->
             <Expander Grid.Row="1" 
-                      Header="Geometric Analysis &amp; Lattice Position Optimization" 
+                      Header="Geometric Analysis &amp; Position Optimization" 
                       IsExpanded="False"
                       Margin="0,0,0,5"
                       Padding="10">
@@ -245,7 +243,7 @@
             <!-- 3. OPTIMIZATION OBJECTIVES -->
             <!-- ============================================================ -->
             <Expander Grid.Row="2" 
-                      Header="Plan Optimization Objectives" 
+                      Header="Optimization Objectives" 
                       IsExpanded="False"
                       Margin="0,0,0,5"
                       Padding="10">
@@ -329,7 +327,7 @@
                     </DataGrid>
 
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                        <Button Content="Add Objective" Command="{Binding AddObjectiveCommand}" Width="120" Height="25" Margin="0,0,10,0" ToolTip="Duplicate selected objective or add new blank objective"/>
+                        <Button Content="Add Objective" Command="{Binding AddObjectiveCommand}" Width="120" Height="25" Margin="0,0,10,0" ToolTip="Duplicate selected row with alternate type (Point/Mean)"/>
                         <Button Content="Remove Selected" Command="{Binding RemoveObjectiveCommand}" Width="120" Height="25" Margin="0,0,10,0"/>
                         <Button Content="Reset to Defaults" Command="{Binding ResetToDefaultsCommand}" Width="120" Height="25" ToolTip="Clear all objectives"/>
                     </StackPanel>
@@ -345,7 +343,7 @@
             <!-- 4. OPTIMIZATION & DOSE CALCULATION -->
             <!-- ============================================================ -->
             <Expander Grid.Row="3" 
-                      Header="Plan Optimization &amp; Dose Calculation" 
+                      Header="Optimization &amp; Dose Calculation" 
                       IsExpanded="False"
                       Margin="0,0,0,5"
                       Padding="10">
@@ -374,7 +372,7 @@
                                                     <TextBlock Text="{Binding BeamId}" Width="100" FontWeight="SemiBold"/>
                                                     <TextBlock Text="{Binding Technique}" Width="100"/>
                                                     <TextBlock Text="{Binding Description}" Width="200"/>
-                                                    <TextBlock Text=" VMAT" Foreground="Green" FontWeight="Bold"
+                                                    <TextBlock Text=" ✓ VMAT" Foreground="Green" FontWeight="Bold"
                                                                Visibility="{Binding IsVMAT, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                                                 </StackPanel>
                                             </CheckBox.Content>
