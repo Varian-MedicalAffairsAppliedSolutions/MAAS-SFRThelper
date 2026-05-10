@@ -1161,7 +1161,8 @@ namespace MAAS_SFRThelper.ViewModels
                         if (_structureSet != null)
                         {
                             foreach (var structure in _structureSet.Structures
-                                .Where(s => !s.IsEmpty && s.DicomType != "EXTERNAL" && s.DicomType != "BODY"))
+                                .Where(s => !s.IsEmpty && s.DicomType != "EXTERNAL" && s.DicomType != "BODY")
+                                .OrderBy(s => s.Id))
                             {
                                 PotentialTargets.Add(structure.Id);
                             }

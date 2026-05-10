@@ -63,7 +63,7 @@
             </RadioButton>
             <RadioButton IsEnabled="{Binding PatternEnabled}" IsChecked="{Binding IsMayo}" GroupName="Pattern" Margin="2">
                 <Hyperlink NavigateUri="https://doi.org/10.1088/1361-6560/ad2ee8" RequestNavigate="Hyperlink_RequestNavigate">
-                    Mayo MC
+                    Constraint-based MC
                 </Hyperlink>
             </RadioButton>
         </StackPanel>
