@@ -290,7 +290,7 @@
                                 Width="140"
                                 Height="30"
                                 Visibility="{Binding HasGridSearchResults, Converter={StaticResource BooleanToVisibilityConverter}}"
-                                ToolTip="Apply at original position (0,0) without shifting"/>          
+                                ToolTip="Apply at original position (0,0) without shifting"/>
 
                     </StackPanel>
 
@@ -316,11 +316,31 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <TextBlock Grid.Row="0" 
-                               Text="Click 'Populate Objectives' below to fill this table. Edit as needed before creating in Eclipse."
-                               FontStyle="Italic"
-                               Margin="0,0,0,10"
-                               TextWrapping="Wrap"/>
+                    <StackPanel Grid.Row="0" Margin="0,0,0,10">
+                        <TextBlock Text="Click 'Populate Objectives' below to fill this table. Enter dose and priority values before creating in Eclipse."
+                                   FontStyle="Italic"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,5"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,3">
+                            <TextBlock Text="Dose Unit:" 
+                                       VerticalAlignment="Center" 
+                                       Margin="0,0,8,0"
+                                       FontWeight="SemiBold"/>
+                            <ComboBox ItemsSource="{Binding AvailableDoseUnits}" 
+                                      SelectedItem="{Binding SelectedDoseUnit, UpdateSourceTrigger=PropertyChanged}"
+                                      Width="70"
+                                      VerticalAlignment="Center"/>
+                            <TextBlock Text="  (auto-detected from Eclipse plan)"
+                                       VerticalAlignment="Center"
+                                       Foreground="Gray"
+                                       FontStyle="Italic"/>
+                        </StackPanel>
+                        <TextBlock Text="{Binding DoseUnitMismatchWarning}" 
+                                   Foreground="DarkOrange" 
+                                   FontWeight="Bold"
+                                   TextWrapping="Wrap"
+                                   Visibility="{Binding ShowDoseUnitMismatch, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    </StackPanel>
 
                     <DataGrid Grid.Row="1"
                               ItemsSource="{Binding Objectives}"
@@ -379,14 +399,19 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellEditingTemplate>
                             </DataGridTemplateColumn>
-                            <DataGridTextColumn Header="Dose (Gy)" 
-                                                Binding="{Binding Dose, UpdateSourceTrigger=PropertyChanged}" 
-                                                Width="80"/>
+                            <DataGridTextColumn Binding="{Binding Dose}" 
+                                                Width="80">
+                                <DataGridTextColumn.HeaderTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding DataContext.DoseColumnHeader, RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+                                    </DataTemplate>
+                                </DataGridTextColumn.HeaderTemplate>
+                            </DataGridTextColumn>
                             <DataGridTextColumn Header="Vol (%)" 
-                                                Binding="{Binding Volume, UpdateSourceTrigger=PropertyChanged}" 
+                                                Binding="{Binding Volume}" 
                                                 Width="70"/>
                             <DataGridTextColumn Header="Priority" 
-                                                Binding="{Binding Priority, UpdateSourceTrigger=PropertyChanged}" 
+                                                Binding="{Binding Priority}" 
                                                 Width="70"/>
                             <DataGridTextColumn Header="Role" 
                                                 Binding="{Binding Role}" 
