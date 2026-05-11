@@ -100,8 +100,7 @@ Workflow
 - After optimization completes, click "Calculate Dose"
 - DVH summary displays automatically upon completion
 
-<img width="713" height="773" alt="image" src="https://github.com/user-attachments/assets/d8dd97af-c6e8-4efc-a145-c46a57eec939" />
-<img width="717" height="774" alt="image" src="https://github.com/user-attachments/assets/e5ba23ff-d3ba-4eb3-9a27-d699da45dd52" />
+<img width="722" height="791" alt="image" src="https://github.com/user-attachments/assets/b521f360-3d17-48e4-bf90-640202ad66ab" />
 
 This module is currently under heavy development. This module is experimental. Please reach out with comments and suggestions on how to improve. 
 
