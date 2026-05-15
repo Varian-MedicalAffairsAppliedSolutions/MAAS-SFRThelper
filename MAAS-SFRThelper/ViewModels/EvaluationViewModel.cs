@@ -663,8 +663,29 @@ namespace MAAS_SFRThelper.ViewModels
 
         // ESAPI references
         private PlanSetup _plan;
+        private string _planDoseUnit = "Gy";
+        private double _prescriptionDose = 0;
         private StructureSet _structureSet;
         private EsapiWorker _esapiWorker;
+        private bool _doseConversionLogged = false;
+
+        /// <summary>
+        /// Converts a DoseValue to absolute dose in the plan's native unit.
+        /// Handles the case where Eclipse returns relative (percentage) dose values.
+        /// </summary>
+        private double GetAbsoluteDose(DoseValue dv)
+        {
+            if (dv.Unit == DoseValue.DoseUnit.Percent && _prescriptionDose > 0)
+            {
+                if (!_doseConversionLogged)
+                {
+                    OutputLog += $"[Dose Conversion] Converting from relative (%) to absolute ({_planDoseUnit}). Sample: {dv.Dose:F1}% → {dv.Dose / 100.0 * _prescriptionDose:F2} {_planDoseUnit}\n";
+                    _doseConversionLogged = true;
+                }
+                return dv.Dose / 100.0 * _prescriptionDose;
+            }
+            return dv.Dose;
+        }
 
         // For 2D grid storage and plotting (legacy single-depth)
         private double[,] _dose2DGrid;  // [nX, nY]
@@ -873,6 +894,31 @@ namespace MAAS_SFRThelper.ViewModels
                         else
                         {
                             OutputLog += $"Plan loaded: {_plan.Id}\n";
+                            try
+                            {
+                                if (_plan.TotalDose != null)
+                                    _planDoseUnit = _plan.TotalDose.Unit.ToString();
+                                if (_plan.DosePerFraction != null)
+                                    _prescriptionDose = _plan.DosePerFraction.Dose;
+
+                                var presentation = _plan.DoseValuePresentation;
+                                OutputLog += $"  Dose presentation mode: {presentation}\n";
+                                OutputLog += $"  Dose unit: {_planDoseUnit}\n";
+                                OutputLog += $"  Prescription dose/fraction: {_prescriptionDose} {_planDoseUnit}\n";
+
+                                if (presentation == DoseValuePresentation.Relative)
+                                {
+                                    if (_prescriptionDose > 0)
+                                        OutputLog += $"  → Relative mode detected. Dose values will be converted from % to absolute {_planDoseUnit}.\n";
+                                    else
+                                        OutputLog += "  ⚠ Relative mode detected but no prescription dose set — dose values may be displayed as percentages.\n";
+                                }
+                                else
+                                {
+                                    OutputLog += $"  → Absolute mode. Dose values will be used as-is in {_planDoseUnit}.\n";
+                                }
+                            }
+                            catch { }
                         }
                     }
                     catch (Exception ex)
@@ -1247,7 +1293,7 @@ namespace MAAS_SFRThelper.ViewModels
                 MessageBox.Show($"Error loading beams: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-                
+
         private void ExecuteComputeDose()
         {
             try
@@ -1340,7 +1386,7 @@ namespace MAAS_SFRThelper.ViewModels
                 MessageBox.Show($"Error computing dose: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-        
+
 
         public bool CanExecuteSaveCsv()
         {
@@ -1394,7 +1440,7 @@ namespace MAAS_SFRThelper.ViewModels
             }
         }
 
-       
+
         private void ExecuteSaveCsv()
         {
             try
@@ -1445,7 +1491,7 @@ namespace MAAS_SFRThelper.ViewModels
             string tumorId = SelectedTumorId?.Replace(' ', '_').Replace('\\', '_').Replace('/', '_') ?? "NoTumor";
 
             var lines = new List<string>();
-            lines.Add("Distance(mm),Dose(Gy),IsInsideTumor");
+            lines.Add($"Distance(mm),Dose({_planDoseUnit}),IsInsideTumor");
 
             int minCount = Math.Min(Math.Min(_distances.Count, _doseValues.Count), _insideTumorFlags.Count);
 
@@ -1476,7 +1522,7 @@ namespace MAAS_SFRThelper.ViewModels
             string tumorId = SelectedTumorId?.Replace(' ', '_').Replace('\\', '_').Replace('/', '_') ?? "NoTumor";
 
             var lines = new List<string>();
-            lines.Add("SliceIndex,Depth(mm),X(mm),Y(mm),Dose(Gy),InsideStructure");
+            lines.Add($"SliceIndex,Depth(mm),X(mm),Y(mm),Dose({_planDoseUnit}),InsideStructure");
 
             for (int sliceIdx = 0; sliceIdx < _doseSlices.Count; sliceIdx++)
             {
@@ -1567,7 +1613,7 @@ namespace MAAS_SFRThelper.ViewModels
 
                 // Peak clusters details
                 lines.Add("# Peak Clusters");
-                lines.Add("ClusterID,Type,VoxelCount,Volume(cc),MeanDose(Gy),MaxDose(Gy),MinDose(Gy),CentroidX(mm),CentroidY(mm),CentroidZ(mm)");
+                lines.Add($"ClusterID,Type,VoxelCount,Volume(cc),MeanDose({_planDoseUnit}),MaxDose({_planDoseUnit}),MinDose({_planDoseUnit}),CentroidX(mm),CentroidY(mm),CentroidZ(mm)");
 
                 foreach (var peak in _pvClusterResults.Peaks)
                 {
@@ -1955,7 +2001,7 @@ namespace MAAS_SFRThelper.ViewModels
 
                 TextBlock yAxisLabel = new TextBlock
                 {
-                    Text = "Dose (Gy)",
+                    Text = $"Dose ({_planDoseUnit})",
                     FontSize = labelFontSize,
                     HorizontalAlignment = HorizontalAlignment.Center,
                     LayoutTransform = new RotateTransform(-90)
@@ -2213,9 +2259,9 @@ namespace MAAS_SFRThelper.ViewModels
                         OutputLog += $"Beam: {selectedBeamId}\n";
                         OutputLog += $"Entry Dist: {_entryDist:F1} mm, Exit Dist: {_exitDist:F1} mm\n";
                         OutputLog += $"Tumor length along axis: {_exitDist - _entryDist:F1} mm\n";
-                        OutputLog += $"Max Dose: {tumorDoses.Max():F3} Gy\n";
-                        OutputLog += $"Min Dose: {tumorDoses.Min():F3} Gy\n";
-                        OutputLog += $"Avg Dose: {tumorDoses.Average():F3} Gy\n";
+                        OutputLog += $"Max Dose: {tumorDoses.Max():F3} {_planDoseUnit}\n";
+                        OutputLog += $"Min Dose: {tumorDoses.Min():F3} {_planDoseUnit}\n";
+                        OutputLog += $"Avg Dose: {tumorDoses.Average():F3} {_planDoseUnit}\n";
                         OutputLog += $"Total samples: {_distances.Count}\n";
                         OutputLog += "================================\n";
                     }
@@ -2355,7 +2401,7 @@ namespace MAAS_SFRThelper.ViewModels
                     if (doseValue != null)
                     {
                         result.Distances.Add(dist);
-                        result.DoseValues.Add(doseValue.Dose);
+                        result.DoseValues.Add(GetAbsoluteDose(doseValue));
                         result.InsideFlags.Add(isInside);
                     }
                 }
@@ -2434,7 +2480,7 @@ namespace MAAS_SFRThelper.ViewModels
                     if (doseValue != null)
                     {
                         result.Distances.Add(dist);
-                        result.DoseValues.Add(doseValue.Dose);
+                        result.DoseValues.Add(GetAbsoluteDose(doseValue));
                         result.InsideFlags.Add(isInside);
                     }
                 }
@@ -2567,8 +2613,35 @@ namespace MAAS_SFRThelper.ViewModels
                 }
                 else if (selectedPvdrMode == "VMAT")
                 {
-                    RunSphericalPVDRMetric(tumorId, plan);
-                    return;
+                    OutputLog += "VMAT mode: Computing composite dose using All Beams approach...\n";
+
+                    var structure = plan.StructureSet.Structures.FirstOrDefault(s => s.Id == tumorId);
+                    if (structure == null)
+                    {
+                        OutputLog += $"Structure '{tumorId}' not found.\n";
+                        return;
+                    }
+
+                    var beamData = Compute2DAllBeamsStandardized(structure, plan);
+
+                    if (beamData != null && beamData.HasData)
+                    {
+                        _beamDoseSlicesCache["All Beams"] = beamData.DoseSlices;
+                        _beamStructSlicesCache["All Beams"] = beamData.StructSlices;
+                        _beamUGridSlicesCache["All Beams"] = beamData.UGridSlices;
+                        _beamVGridSlicesCache["All Beams"] = beamData.VGridSlices;
+                        _beamDepthValuesCache["All Beams"] = beamData.DepthValues;
+                        _beamSliceDimensionsCache["All Beams"] = beamData.SliceDimensions;
+
+                        LoadCached2DBeamData("All Beams");
+                        _hasMultiBeamData = true;
+
+                        OutputLog += $"VMAT composite dose computed - {beamData.DoseSlices.Count} slices\n";
+                    }
+                    else
+                    {
+                        OutputLog += "Failed to compute VMAT composite dose.\n";
+                    }
                 }
             }
             catch (Exception ex)
@@ -2731,7 +2804,7 @@ namespace MAAS_SFRThelper.ViewModels
                                     var dv = plan.Dose.GetDoseToPoint(samplePoint);
                                     if (dv != null)
                                     {
-                                        doseSlice[ix, iy] = dv.Dose;
+                                        doseSlice[ix, iy] = GetAbsoluteDose(dv);
                                     }
                                     else
                                     {
@@ -2938,7 +3011,7 @@ namespace MAAS_SFRThelper.ViewModels
                                     var dv = doseMatrix.GetDoseToPoint(samplePoint);
                                     if (dv != null)
                                     {
-                                        doseSlice[ix, iy] = dv.Dose;
+                                        doseSlice[ix, iy] = GetAbsoluteDose(dv);
                                     }
                                     else
                                     {
@@ -3342,7 +3415,7 @@ namespace MAAS_SFRThelper.ViewModels
             // Colorbar title
             var colorbarTitle = new TextBlock
             {
-                Text = "Dose (Gy)",
+                Text = $"Dose ({_planDoseUnit})",
                 FontSize = 16,
                 FontWeight = FontWeights.Bold,
                 HorizontalAlignment = HorizontalAlignment.Center
@@ -3541,7 +3614,7 @@ namespace MAAS_SFRThelper.ViewModels
             // Dose per fraction
             AllMetrics.Add(new MetricData
             {
-                metric = "Prescription Dose per Fraction (Gy)",
+                metric = $"Prescription Dose per Fraction ({_planDoseUnit})",
                 value = plan.DosePerFraction.ToString()
             });
 
@@ -3638,7 +3711,7 @@ namespace MAAS_SFRThelper.ViewModels
                 OutputLog += $"Error calculating Dose: {ex.Message}\n";
                 AllMetrics.Add(new MetricData
                 {
-                    metric = "Dose Covering x% of Target (Dx) (Gy)",
+                    metric = $"Dose Covering x% of Target (Dx) ({_planDoseUnit})",
                     value = "Error - Unable to calculate Dose/DVH"
                 });
             }
@@ -3926,7 +3999,7 @@ namespace MAAS_SFRThelper.ViewModels
                                     noDoseCount++;
                                     continue;
                                 }
-                                dose = dv.Dose;
+                                dose = GetAbsoluteDose(dv);
                                 if (dose <= 0)
                                 {
                                     noDoseCount++;
@@ -4025,7 +4098,7 @@ namespace MAAS_SFRThelper.ViewModels
                     };
 
                     results.Peaks.Add(cluster);
-                    OutputLog += $"  Sphere {s + 1}: {doses.Count} voxels, Mean: {cluster.MeanDose:F2} Gy, Vol: {cluster.Volume:F3} cc\n";
+                    OutputLog += $"  Sphere {s + 1}: {doses.Count} voxels, Mean: {cluster.MeanDose:F2} {_planDoseUnit}, Vol: {cluster.Volume:F3} cc\n";
                 }
 
                 // Build valley cluster
@@ -4054,7 +4127,7 @@ namespace MAAS_SFRThelper.ViewModels
                     };
 
                     results.Valleys.Add(valleyCluster);
-                    OutputLog += $"\n  Valley: {valleyDoses.Count} voxels, Mean: {valleyCluster.MeanDose:F2} Gy, Vol: {valleyCluster.Volume:F3} cc\n";
+                    OutputLog += $"\n  Valley: {valleyDoses.Count} voxels, Mean: {valleyCluster.MeanDose:F2} {_planDoseUnit}, Vol: {valleyCluster.Volume:F3} cc\n";
                 }
 
                 // -------------------------------------------------------
@@ -4084,8 +4157,8 @@ namespace MAAS_SFRThelper.ViewModels
                     results.TotalValleyVolume = valleyDoses.Count * voxelVolume_cc;
 
                     OutputLog += $"  ePVDR (volume-weighted): {results.EffectivePVDR:F3}\n";
-                    OutputLog += $"    Weighted mean peak dose: {effectivePeakDose:F2} Gy\n";
-                    OutputLog += $"    Mean valley dose: {meanValleyDose:F2} Gy\n";
+                    OutputLog += $"    Weighted mean peak dose: {effectivePeakDose:F2} {_planDoseUnit}\n";
+                    OutputLog += $"    Mean valley dose: {meanValleyDose:F2} {_planDoseUnit}\n";
                 }
 
                 // Point PVDR (max/min)
@@ -4099,8 +4172,8 @@ namespace MAAS_SFRThelper.ViewModels
                         : 0;
 
                     OutputLog += $"  Point PVDR (max/min): {results.PointPVDR_MaxMin:F3}\n";
-                    OutputLog += $"    Max peak dose: {results.MaxPeakDose:F2} Gy\n";
-                    OutputLog += $"    Min valley dose: {results.MinValleyDose:F2} Gy\n";
+                    OutputLog += $"    Max peak dose: {results.MaxPeakDose:F2} {_planDoseUnit}\n";
+                    OutputLog += $"    Min valley dose: {results.MinValleyDose:F2} {_planDoseUnit}\n";
                 }
 
                 // -------------------------------------------------------
@@ -4161,7 +4234,7 @@ namespace MAAS_SFRThelper.ViewModels
                 return null;
             }
         }
-        
+
         private void DisplayPVClusterResults()
         {
             if (_pvClusterResults == null) return;
@@ -4234,25 +4307,25 @@ namespace MAAS_SFRThelper.ViewModels
 
             AllMetrics.Add(new MetricData
             {
-                metric = "Mean Peak Dose (Gy)",
+                metric = $"Mean Peak Dose ({_planDoseUnit})",
                 value = Math.Round(_pvClusterResults.MeanPeakDose, 2).ToString()
             });
 
             AllMetrics.Add(new MetricData
             {
-                metric = "Max Peak Dose (Gy)",
+                metric = $"Max Peak Dose ({_planDoseUnit})",
                 value = Math.Round(_pvClusterResults.MaxPeakDose, 2).ToString()
             });
 
             AllMetrics.Add(new MetricData
             {
-                metric = "Mean Valley Dose (Gy)",
+                metric = $"Mean Valley Dose ({_planDoseUnit})",
                 value = Math.Round(_pvClusterResults.MeanValleyDose, 2).ToString()
             });
 
             AllMetrics.Add(new MetricData
             {
-                metric = "Min Valley Dose (Gy)",
+                metric = $"Min Valley Dose ({_planDoseUnit})",
                 value = Math.Round(_pvClusterResults.MinValleyDose, 2).ToString()
             });
 
@@ -4360,7 +4433,7 @@ namespace MAAS_SFRThelper.ViewModels
                     AllMetrics.Add(new MetricData
                     {
                         metric = $"Sphere {i + 1}",
-                        value = $"Mean: {peak.MeanDose:F2} Gy | Max: {peak.MaxDose:F2} Gy | Vol: {peak.Volume:F3} cc"
+                        value = $"Mean: {peak.MeanDose:F2} {_planDoseUnit} | Max: {peak.MaxDose:F2} {_planDoseUnit} | Vol: {peak.Volume:F3} cc"
                     });
                 }
             }
@@ -4437,7 +4510,7 @@ namespace MAAS_SFRThelper.ViewModels
                     double targetDose = doseMin + isoLevel.level * (doseMax - doseMin);
                     var surfaceMesh = new MeshGeometry3D();
 
-                    OutputLog += $"Creating {isoLevel.name} isodose surface at {targetDose:F1} Gy...\n";
+                    OutputLog += $"Creating {isoLevel.name} isodose surface at {targetDose:F1} {_planDoseUnit}...\n";
 
                     var surfacePoints = new List<Point3D>();
 
@@ -4524,7 +4597,7 @@ namespace MAAS_SFRThelper.ViewModels
                 OutputLog += $"Error creating onion layers: {ex.Message}\n";
             }
         }
-        
+
         private void Create3DVisualization()
         {
             try
@@ -4627,15 +4700,17 @@ namespace MAAS_SFRThelper.ViewModels
                 double percentile95 = GetPercentile(allDoseValues, 95);
 
                 OutputLog += $"\n=== Dose Distribution Analysis ===\n";
-                OutputLog += $"Absolute: Min={absoluteMin:F2} Gy, Max={absoluteMax:F2} Gy\n";
-                OutputLog += $"5th percentile: {percentile5:F2} Gy\n";
-                OutputLog += $"95th percentile: {percentile95:F2} Gy\n";
+                OutputLog += $"Absolute: Min={absoluteMin:F2} {_planDoseUnit}, Max={absoluteMax:F2} {_planDoseUnit}\n";
+                OutputLog += $"5th percentile: {percentile5:F2} {_planDoseUnit}\n";
+                OutputLog += $"95th percentile: {percentile95:F2} {_planDoseUnit}\n";
 
-                // USE PERCENTILE-BASED NORMALIZATION
-                double doseMin_forNormalization = percentile5;
-                double doseMax_forNormalization = percentile95;
+                // USE ACTUAL MIN-MAX NORMALIZATION WITH PADDING
+                double doseRange = absoluteMax - absoluteMin;
+                double padding = doseRange * 0.02; // 2% padding
+                double doseMin_forNormalization = Math.Max(0, absoluteMin - padding);
+                double doseMax_forNormalization = absoluteMax + padding;
 
-                OutputLog += $"\nUsing percentile normalization: {doseMin_forNormalization:F2} - {doseMax_forNormalization:F2} Gy\n";
+                OutputLog += $"\nUsing min-max normalization: {doseMin_forNormalization:F2} - {doseMax_forNormalization:F2} {_planDoseUnit}\n";
 
                 // STEP 3: CALCULATE ADAPTIVE SCALING
                 const double TARGET_SIZE = 100.0;
@@ -4745,9 +4820,9 @@ namespace MAAS_SFRThelper.ViewModels
                         double minDose = doses.Min();
                         double maxDose = doses.Max();
 
-                        ShellHeterogeneityText = $"CV: {cv:F2} | Mean: {meanDose:F1} Gy | Range: {minDose:F1}-{maxDose:F1} Gy | Voxels: {currentShellVoxels.Count}";
+                        ShellHeterogeneityText = $"CV: {cv:F2} | Mean: {meanDose:F1} {_planDoseUnit} | Range: {minDose:F1}-{maxDose:F1} {_planDoseUnit} | Voxels: {currentShellVoxels.Count}";
 
-                        OutputLog += $"Shell heterogeneity - CV: {cv:F2}, Mean: {meanDose:F1} Gy\n";
+                        OutputLog += $"Shell heterogeneity - CV: {cv:F2}, Mean: {meanDose:F1} {_planDoseUnit}\n";
                     }
                 }
 
@@ -4952,7 +5027,7 @@ namespace MAAS_SFRThelper.ViewModels
                 OutputLog += "\n=== Visualization Complete ===\n";
                 OutputLog += $"Visual size: {dataWidth * xScale:F1} x {dataThickness * yScale:F1} x {dataHeight * zScale:F1} units\n";
                 OutputLog += $"Actual size: {dataWidth:F1} x {dataThickness:F1} x {dataHeight:F1} mm\n";
-                OutputLog += $"Dose range: {doseMin_forNormalization:F2} - {doseMax_forNormalization:F2} Gy\n";
+                OutputLog += $"Dose range: {doseMin_forNormalization:F2} - {doseMax_forNormalization:F2} {_planDoseUnit}\n";
 
                 if (ShowOnionLayers)
                 {
@@ -5306,8 +5381,8 @@ namespace MAAS_SFRThelper.ViewModels
             OutputLog += "  Green: 30-50%\n";
             OutputLog += "  Blue: 10-30%\n";
         }
-                        
-        
+
+
 
         private void AddBoxEdge(Model3DGroup group, VVector start, VVector end, double thickness, Material material)
         {
@@ -5561,7 +5636,7 @@ namespace MAAS_SFRThelper.ViewModels
                         double cv = stdDev / meanDose;
 
                         OutputLog += $"{shellNames[shell]} Shell: {voxelsInShell.Count} voxels, ";
-                        OutputLog += $"Mean: {meanDose:F1} Gy, CV: {cv:F2}\n";
+                        OutputLog += $"Mean: {meanDose:F1} {_planDoseUnit}, CV: {cv:F2}\n";
                     }
                 }
 
@@ -5595,5 +5670,3 @@ namespace MAAS_SFRThelper.ViewModels
     }
 
 }
-
-

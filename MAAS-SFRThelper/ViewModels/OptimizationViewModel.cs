@@ -292,6 +292,8 @@ namespace MAAS_SFRThelper.ViewModels
             }
         }
 
+        private bool _objectivesCreated;
+
         private bool _optimizationCompleted;
         public bool OptimizationCompleted
         {
@@ -530,7 +532,8 @@ namespace MAAS_SFRThelper.ViewModels
 
                 foreach (var beam in sc.PlanSetup.Beams.Where(b => !b.IsSetupField))
                 {
-                    bool isVMAT = beam.MLCPlanType == MLCPlanType.VMAT;
+                    bool isVMAT = beam.MLCPlanType == MLCPlanType.VMAT
+                                 || beam.MLCPlanType == MLCPlanType.ArcDynamic;
                     if (isVMAT) hasVMAT = true;
 
                     string description;
@@ -555,7 +558,7 @@ namespace MAAS_SFRThelper.ViewModels
                     });
                 }
 
-                string beamWarning = !hasVMAT ? "⚠ No VMAT arcs found. Please create VMAT arcs in Eclipse before optimizing." : "";
+                string beamWarning = !hasVMAT ? "⚠ No VMAT or Arc fields found. Please create arc fields in Eclipse before optimizing." : "";
 
                 var oarStructures = sc.StructureSet.Structures
                     .Where(s => !s.IsEmpty &&
@@ -603,7 +606,7 @@ namespace MAAS_SFRThelper.ViewModels
                 }
 
                 if (!hasVMAT)
-                    Output += "\n⚠ WARNING: No VMAT arcs found in plan";
+                    Output += "\n⚠ WARNING: No VMAT or Arc fields found in plan";
 
                 Output += $"\nFound {latticeList?.Count ?? 0} lattice structure(s)";
                 Output += $"\nFound {valleyList?.Count ?? 0} valley structure option(s)";
@@ -1043,6 +1046,8 @@ namespace MAAS_SFRThelper.ViewModels
 
             Output += $"\nUsing dose unit: {selectedUnit}";
 
+            var uiDispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
+
             _esapiWorker.Run(sc =>
             {
                 try
@@ -1121,6 +1126,15 @@ namespace MAAS_SFRThelper.ViewModels
                     Output += $"\n\n✓ Created {successCount} objectives successfully";
                     Output += "\n\n=== Objective Creation Complete ===";
                     Output += "\nYou can now run optimization.";
+
+                    if (successCount > 0)
+                    {
+                        _objectivesCreated = true;
+                        uiDispatcher.BeginInvoke(new Action(() =>
+                        {
+                            RunOptimizationCommand?.RaiseCanExecuteChanged();
+                        }));
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -1128,8 +1142,6 @@ namespace MAAS_SFRThelper.ViewModels
                     Output += $"\n{ex.StackTrace}";
                 }
             });
-
-            RunOptimizationCommand?.RaiseCanExecuteChanged();
         }
 
         #endregion
@@ -1148,6 +1160,9 @@ namespace MAAS_SFRThelper.ViewModels
                 return false;
 
             if (!HasVMATArcs)
+                return false;
+
+            if (!_objectivesCreated)
                 return false;
 
             return true;
@@ -1186,95 +1201,100 @@ namespace MAAS_SFRThelper.ViewModels
 
                 try
                 {
-                    sc.Patient.BeginModifications();
-
-                    var externalPlan = sc.PlanSetup as ExternalPlanSetup;
-                    if (externalPlan == null)
-                    {
-                        Output += "\nERROR: Not an external beam plan!";
-                        return;
-                    }
-
-                    int objectiveCount = 0;
                     try
                     {
-                        objectiveCount = externalPlan.OptimizationSetup.Objectives.Count();
+                        sc.Patient.BeginModifications();
+
+                        var externalPlan = sc.PlanSetup as ExternalPlanSetup;
+                        if (externalPlan == null)
+                        {
+                            Output += "\nERROR: Not an external beam plan!";
+                            return;
+                        }
+
+                        int objectiveCount = 0;
+                        try
+                        {
+                            objectiveCount = externalPlan.OptimizationSetup.Objectives.Count();
+                        }
+                        catch
+                        {
+                            Output += "\nWARNING: Could not count objectives";
+                        }
+
+                        if (objectiveCount == 0)
+                        {
+                            Output += "\nERROR: No optimization objectives found in plan!";
+                            Output += "\nPlease click 'Create Objectives' first.";
+                            return;
+                        }
+
+                        Output += $"\nPlan: {externalPlan.Id}";
+                        Output += $"\nMLC: {mlcId}";
+                        Output += $"\nIntermediate Dose: {(useIntermediate ? "Yes" : "No")}";
+                        Output += $"\nObjectives in plan: {objectiveCount}";
+                        Output += $"\n\n[{DateTime.Now:HH:mm:ss}] Starting optimization...";
+
+                        success = RunVMATOptimization(externalPlan, mlcId, useIntermediate);
+
+                        endTime = DateTime.Now;
                     }
-                    catch
-                    {
-                        Output += "\nWARNING: Could not count objectives";
-                    }
-
-                    if (objectiveCount == 0)
-                    {
-                        Output += "\nERROR: No optimization objectives found in plan!";
-                        Output += "\nPlease click 'Create Objectives' first.";
-                        return;
-                    }
-
-                    Output += $"\nPlan: {externalPlan.Id}";
-                    Output += $"\nMLC: {mlcId}";
-                    Output += $"\nIntermediate Dose: {(useIntermediate ? "Yes" : "No")}";
-                    Output += $"\nObjectives in plan: {objectiveCount}";
-                    Output += $"\n\n[{DateTime.Now:HH:mm:ss}] Starting optimization...";
-
-                    success = RunVMATOptimization(externalPlan, mlcId, useIntermediate);
-
-                    endTime = DateTime.Now;
-                }
-                catch (Exception ex)
-                {
-                    try
-                    {
-                        Output += $"\n\n[{DateTime.Now:HH:mm:ss}] ERROR: {ex.Message}";
-                    }
-                    catch { }
-                }
-
-                try
-                {
-                    var duration = endTime - startTime;
-
-                    if (success)
-                    {
-                        Output += $"\n\n=== OPTIMIZATION COMPLETE ===";
-                        Output += $"\nFinished at: {endTime:HH:mm:ss}";
-                        Output += $"\nTotal time: {duration.TotalMinutes:F1} minutes";
-                        Output += "\n\n→ Click 'Calculate Dose' when ready (can take 1+ hour)";
-                        Output += "\n→ Or calculate dose manually in Eclipse";
-                    }
-                    else
-                    {
-                        Output += $"\n\nOptimization encountered issues.";
-                        Output += $"\nElapsed time: {duration.TotalMinutes:F1} minutes";
-                        Output += "\nCheck Eclipse for plan status.";
-                    }
-                }
-                catch { }
-
-                try
-                {
-                    uiDispatcher.BeginInvoke(new Action(() =>
+                    catch (Exception ex)
                     {
                         try
                         {
-                            _isOptimizing = false;
-                            RaisePropertyChanged(nameof(IsOptimizing));
-
-                            if (_optimizationCompleted)
-                            {
-                                RaisePropertyChanged(nameof(OptimizationCompleted));
-                            }
-
-                            RunOptimizationCommand?.RaiseCanExecuteChanged();
-                            CalculateDoseCommand?.RaiseCanExecuteChanged();
-                            CreateObjectivesCommand?.RaiseCanExecuteChanged();
-                            PopulateObjectivesCommand?.RaiseCanExecuteChanged();
+                            Output += $"\n\n[{DateTime.Now:HH:mm:ss}] ERROR: {ex.Message}";
                         }
                         catch { }
-                    }));
+                    }
+
+                    try
+                    {
+                        var duration = endTime - startTime;
+
+                        if (success)
+                        {
+                            Output += $"\n\n=== OPTIMIZATION COMPLETE ===";
+                            Output += $"\nFinished at: {endTime:HH:mm:ss}";
+                            Output += $"\nTotal time: {duration.TotalMinutes:F1} minutes";
+                            Output += "\n\n→ Click 'Calculate Dose' when ready (can take 1+ hour)";
+                            Output += "\n→ Or calculate dose manually in Eclipse";
+                        }
+                        else
+                        {
+                            Output += $"\n\nOptimization encountered issues.";
+                            Output += $"\nElapsed time: {duration.TotalMinutes:F1} minutes";
+                            Output += "\nCheck Eclipse for plan status.";
+                        }
+                    }
+                    catch { }
                 }
-                catch { }
+                finally
+                {
+                    try
+                    {
+                        uiDispatcher.BeginInvoke(new Action(() =>
+                        {
+                            try
+                            {
+                                _isOptimizing = false;
+                                RaisePropertyChanged(nameof(IsOptimizing));
+
+                                if (_optimizationCompleted)
+                                {
+                                    RaisePropertyChanged(nameof(OptimizationCompleted));
+                                }
+
+                                RunOptimizationCommand?.RaiseCanExecuteChanged();
+                                CalculateDoseCommand?.RaiseCanExecuteChanged();
+                                CreateObjectivesCommand?.RaiseCanExecuteChanged();
+                                PopulateObjectivesCommand?.RaiseCanExecuteChanged();
+                            }
+                            catch { }
+                        }));
+                    }
+                    catch { }
+                }
             });
         }
 
