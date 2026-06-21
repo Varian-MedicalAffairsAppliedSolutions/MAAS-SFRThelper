@@ -218,6 +218,7 @@
                         <TabItem Header="Output Log">
                             <TextBox Text="{Binding OutputLog}" IsReadOnly="True"
                                      FontFamily="Consolas" Padding="10"
+                                     Background="White" Foreground="Black"
                                      VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
                                      AcceptsReturn="True" TextWrapping="Wrap"/>
                         </TabItem>
