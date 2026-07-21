@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.13.35828.75 d17.13
+VisualStudioVersion = 17.13.35828.75
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MAAS-SFRThelper", "MAAS-SFRThelper\MAAS-SFRThelper.csproj", "{2FC15AB5-D196-45CB-AD50-CF6B7C7AB038}"
 EndProject
@@ -16,6 +16,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Actions", "Actions", "{3D5E
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Voronoi3d", "Voronoi3d\Voronoi3d.csproj", "{84E535FB-2233-4E7A-AE69-F97B944A84F6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DoseInfluenceMatrix", "DoseInfluenceMatrix\DoseInfluenceMatrix.csproj", "{F9DB2E83-E3D2-42EF-9332-EC6117D6B17E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -51,6 +53,18 @@ Global
 		{84E535FB-2233-4E7A-AE69-F97B944A84F6}.Release|x64.Build.0 = Release|Any CPU
 		{84E535FB-2233-4E7A-AE69-F97B944A84F6}.Release|x86.ActiveCfg = Release|Any CPU
 		{84E535FB-2233-4E7A-AE69-F97B944A84F6}.Release|x86.Build.0 = Release|Any CPU
+		{F9DB2E83-E3D2-42EF-9332-EC6117D6B17E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F9DB2E83-E3D2-42EF-9332-EC6117D6B17E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F9DB2E83-E3D2-42EF-9332-EC6117D6B17E}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{F9DB2E83-E3D2-42EF-9332-EC6117D6B17E}.Debug|x64.Build.0 = Debug|Any CPU
+		{F9DB2E83-E3D2-42EF-9332-EC6117D6B17E}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{F9DB2E83-E3D2-42EF-9332-EC6117D6B17E}.Debug|x86.Build.0 = Debug|Any CPU
+		{F9DB2E83-E3D2-42EF-9332-EC6117D6B17E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F9DB2E83-E3D2-42EF-9332-EC6117D6B17E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F9DB2E83-E3D2-42EF-9332-EC6117D6B17E}.Release|x64.ActiveCfg = Release|Any CPU
+		{F9DB2E83-E3D2-42EF-9332-EC6117D6B17E}.Release|x64.Build.0 = Release|Any CPU
+		{F9DB2E83-E3D2-42EF-9332-EC6117D6B17E}.Release|x86.ActiveCfg = Release|Any CPU
+		{F9DB2E83-E3D2-42EF-9332-EC6117D6B17E}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -20,6 +20,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
@@ -30,12 +31,73 @@
                    FontSize="16" FontWeight="Bold" Margin="0,0,0,8"/>
 
         <!-- ================================================================ -->
-        <!-- ROW 1: RUN CONTROL (test harness - buttons become real later)    -->
+        <!-- ROW 1: PLAN ELIGIBILITY                                          -->
         <!-- ================================================================ -->
-        <StackPanel Grid.Row="1" Margin="0,0,0,8">
+        <Border Grid.Row="1" BorderBrush="LightGray" BorderThickness="1"
+                Background="White" Padding="8" Margin="0,0,0,8">
+            <StackPanel>
+                <DockPanel Margin="0,0,0,6">
+                    <Button DockPanel.Dock="Right" Content="Refresh" Width="70" Height="24"
+                            Command="{Binding RefreshEligibilityCommand}"/>
+                    <TextBlock Text="{Binding EligibilityBanner}" FontWeight="SemiBold"
+                               VerticalAlignment="Center">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="Firebrick"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding BannerStatus}" Value="Pass">
+                                        <Setter Property="Foreground" Value="Green"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding BannerStatus}" Value="Warn">
+                                        <Setter Property="Foreground" Value="DarkOrange"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </DockPanel>
+                <ItemsControl ItemsSource="{Binding EligibilityChecks}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" Margin="0,1,0,1">
+                                <TextBlock Width="18" FontWeight="Bold">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Text" Value="✗"/>
+                                            <Setter Property="Foreground" Value="Firebrick"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Status}" Value="Pass">
+                                                    <Setter Property="Text" Value="✓"/>
+                                                    <Setter Property="Foreground" Value="Green"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Status}" Value="Warn">
+                                                    <Setter Property="Text" Value="!"/>
+                                                    <Setter Property="Foreground" Value="DarkOrange"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
+                                           Width="200" VerticalAlignment="Top"/>
+                                <TextBlock Text="{Binding Detail}" Foreground="Gray"
+                                           TextWrapping="Wrap" MaxWidth="420"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+
+        <!-- ================================================================ -->
+        <!-- ROW 2: RUN CONTROL (test harness - buttons become real later)    -->
+        <!-- ================================================================ -->
+        <StackPanel Grid.Row="2" Margin="0,0,0,8">
             <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
                 <Button Content="Run Test Workload" Width="140" Height="26"
                         Command="{Binding RunTestCommand}" Margin="0,0,8,0"/>
+                <Button Content="Test HDF5" Width="90" Height="26"
+                        Command="{Binding TestHdfCommand}" Margin="0,0,8,0"/>
                 <Button Content="Cancel" Width="90" Height="26"
                         Command="{Binding CancelCommand}"/>
             </StackPanel>
@@ -48,9 +110,9 @@
         </StackPanel>
 
         <!-- ================================================================ -->
-        <!-- ROW 2: RUN LOG                                                   -->
+        <!-- ROW 3: RUN LOG                                                   -->
         <!-- ================================================================ -->
-        <TextBox Grid.Row="2" IsReadOnly="True"
+        <TextBox Grid.Row="3" IsReadOnly="True"
                  Background="White" Foreground="Black" BorderBrush="LightGray"
                  FontFamily="Consolas" FontSize="12"
                  VerticalScrollBarVisibility="Auto" TextWrapping="Wrap"
