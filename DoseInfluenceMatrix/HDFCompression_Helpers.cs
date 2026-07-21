@@ -1,5 +1,4 @@
 ﻿using System;
-using Serilog;
 using System.IO;
 using System.Runtime.InteropServices;
 using H5S = HDF.PInvoke.H5S;
@@ -358,7 +357,7 @@ namespace CalculateInfluenceMatrix
                     HDF.PInvoke.H5D.close(datasetId);
             }
         }
-        public static void VerifyCompression(string filePath)
+        public static void VerifyCompression(string filePath, Action<string> report = null)
         {
             long fileId = -1;
             try
@@ -368,7 +367,7 @@ namespace CalculateInfluenceMatrix
 
                 // Get file size
                 long fileSize = new FileInfo(filePath).Length;
-                Log.Information($"HDF5 file size: {fileSize:N0} bytes");
+                report?.Invoke($"HDF5 file size: {fileSize:N0} bytes");
 
                 // Check dataset properties
                 void CheckDataset(string datasetPath)
@@ -388,11 +387,11 @@ namespace CalculateInfluenceMatrix
                         long storage_size = (long)HDF.PInvoke.H5D.get_storage_size(datasetId);
                         double compression_ratio = (dims[0] * dims[1] * sizeof(double)) / (double)storage_size;
 
-                        Log.Information($"Dataset: {datasetPath}");
-                        Log.Information($"Dimensions: {dims[0]} x {dims[1]}");
-                        Log.Information($"Storage size: {storage_size:N0} bytes");
-                        Log.Information($"Compression ratio: {compression_ratio:F2}:1");
-                        Log.Information($"Number of filters: {nfilters}");
+                        report?.Invoke($"Dataset: {datasetPath}");
+                        report?.Invoke($"Dimensions: {dims[0]} x {dims[1]}");
+                        report?.Invoke($"Storage size: {storage_size:N0} bytes");
+                        report?.Invoke($"Compression ratio: {compression_ratio:F2}:1");
+                        report?.Invoke($"Number of filters: {nfilters}");
 
                         HDF.PInvoke.H5P.close(dcpl_id);
                         HDF.PInvoke.H5S.close(dataspaceId);

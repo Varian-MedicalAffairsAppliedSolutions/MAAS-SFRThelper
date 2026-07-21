@@ -62,6 +62,8 @@
   <ItemGroup>
     <Compile Include="DataClasses.cs" />
     <Compile Include="HDFCompression_Helpers.cs" />
+    <Compile Include="Photon_Helpers.cs" />
+    <Compile Include="Photon_InfluenceMatrixCalc.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
