@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Windows;
 using System.Text;
+using HDF5CSharp;
 using CalculateInfluenceMatrix;
 
 
@@ -68,7 +69,7 @@ namespace PhotonCalculateInfluenceMatrix
     public static class PhotonInfluenceMatrixCalc
     {
         public static void Calculate(Patient hPatient, Course hCourse, ExternalPlanSetup hPlan, double dInfCutoffValue, bool bExportFullInfMatrix, int iMaxDoseCalcRetry,
-            float beamletSizeX, float beamletSizeY, int iNumBeamletsToBeCalcAtATime, string szEclipseVolumeDoseCalcModel, 
+            float beamletSizeX, float beamletSizeY, int iNumBeamletsToBeCalcAtATime, string szEclipseVolumeDoseCalcModel,
             string szCalculationGridSizeInCM, float fDoseScalingFactor, string szOutputRootFolder, DisplayProgress hProgress,
             Func<bool> checkCancellation = null)
         {
@@ -95,33 +96,49 @@ namespace PhotonCalculateInfluenceMatrix
             }
             ExportStructureOutlinesAndMasks(hPlan, planResultsPath, hProgress, checkCancellation);
 
-            // create beamlets course, plan
-            string szCourseId = "Backup";
-            Course backupCourse = hPatient.Courses.Where(o => o.Id == szCourseId).SingleOrDefault();
-            if (backupCourse == null)
+            // SFRThelper patch 1b (scratch-plan pattern): the clinical plan is
+            // read-only from here on. All beamlet slots and dose calculations
+            // live in a scratch plan inside a dedicated course; the upstream
+            // "Backup" machinery is gone because nothing clinical is modified,
+            // so nothing needs backing up.
+            string szCourseId = "zDIJ";
+            Course dijCourse = hPatient.Courses.Where(o => o.Id == szCourseId).SingleOrDefault();
+            if (dijCourse == null)
             {
-                backupCourse = hPatient.AddCourse();
-                backupCourse.Id = szCourseId;
+                dijCourse = hPatient.AddCourse();
+                dijCourse.Id = szCourseId;
             }
 
-            hPlan.SetCalculationModel(CalculationType.PhotonVolumeDose, szEclipseVolumeDoseCalcModel);
-            hPlan.SetCalculationOption(hPlan.GetCalculationModel(CalculationType.PhotonVolumeDose), "CalculationGridSizeInCM", szCalculationGridSizeInCM);
-            Dictionary<string, string> dictVals = hPlan.GetCalculationOptions(hPlan.GetCalculationModel(CalculationType.PhotonVolumeDose));//, "CalculationGridSizeInCM", out szVal);
+            // One scratch plan per source plan (Eclipse Id limit: 13 chars).
+            // A leftover scratch plan from a previous run is replaced;
+            // checkpoint-based resume arrives with patch 10.
+            string szScratchPlanId = "zD_" + hPlan.Id;
+            if (szScratchPlanId.Length > 13)
+                szScratchPlanId = szScratchPlanId.Substring(0, 13);
+            ExternalPlanSetup existingScratch = dijCourse.ExternalPlanSetups.Where(p => p.Id == szScratchPlanId).SingleOrDefault();
+            if (existingScratch != null)
+            {
+                hProgress?.Message($"Removing scratch plan '{szScratchPlanId}' left by a previous run.");
+                dijCourse.RemovePlanSetup(existingScratch);
+            }
+
+            ExternalPlanSetup scratchPlan = CopyPlan(hPlan, dijCourse);
+            scratchPlan.Id = GetValidObjectId(scratchPlan, szScratchPlanId);
+            hProgress?.Message($"Scratch plan '{scratchPlan.Id}' created in course '{szCourseId}'; the clinical plan will not be modified.");
+
+            scratchPlan.SetCalculationModel(CalculationType.PhotonVolumeDose, szEclipseVolumeDoseCalcModel);
+            scratchPlan.SetCalculationOption(scratchPlan.GetCalculationModel(CalculationType.PhotonVolumeDose), "CalculationGridSizeInCM", szCalculationGridSizeInCM);
+            Dictionary<string, string> dictVals = scratchPlan.GetCalculationOptions(scratchPlan.GetCalculationModel(CalculationType.PhotonVolumeDose));//, "CalculationGridSizeInCM", out szVal);
 
             // calculate number of beamlets for all beams and initialize them
             Dictionary<string, MyBeamParameters> tblBeamParameters = new Dictionary<string, MyBeamParameters>();
-            bool bHalcyon=false; //TODO: bHalcyon machines are not supported
+            bool bHalcyon = false; //TODO: bHalcyon machines are not supported
             int iMaxBeamletCount = int.MinValue;
 
-            ExternalPlanSetup backupPlan = CopyPlan(hPlan, backupCourse);
-            List<Beam> arrRemovedBeams = hPlan.Beams.ToList();
-            // make copies of orignal beams
-            foreach (Beam hBeam in arrRemovedBeams)
-                CopyBeam(hBeam, backupPlan);
-            List<Beam> arrOrigBeams = backupPlan.Beams.ToList();
-
-            foreach (Beam hBeam in arrRemovedBeams)
-                hPlan.RemoveBeam(hBeam);
+            // The clinical treatment fields themselves are the read-only
+            // geometry source (setup fields excluded - upstream excluded them
+            // implicitly because CopyBeam refuses setup fields).
+            List<Beam> arrOrigBeams = hPlan.Beams.Where(b => !b.IsSetupField).ToList();
 
             double dSumBeamWeights = 0;
             foreach (Beam origBeam in arrOrigBeams)
@@ -169,7 +186,7 @@ namespace PhotonCalculateInfluenceMatrix
                 // create beamlet beams
                 for (int i = 0; i < iNumBeamletsToBeCalcAtATime; i++)
                 {
-                    Beam hCopied = CopyBeam(origBeam, hPlan);
+                    Beam hCopied = CopyBeam(origBeam, scratchPlan);
                     bp.m_lstBeamletBeam.Add(hCopied);
 
                     presetValues.Add(new KeyValuePair<string, MetersetValue>(hCopied.Id, new MetersetValue(1, DosimeterUnit.MU)));
@@ -215,7 +232,7 @@ namespace PhotonCalculateInfluenceMatrix
                             lstCalcBeams.Add(hBeamletBeam.Id);
                         }
                     }
-                    if( !(bFirstCalc && i == 0) )
+                    if (!(bFirstCalc && i == 0))
                         iCurrBeamlet++;
                 }
                 hProgress.Message($"Progress: Beamlet {iCurrBeamlet}/{iMaxBeamletCount}.");
@@ -228,7 +245,7 @@ namespace PhotonCalculateInfluenceMatrix
                     {
                         try
                         {
-                            CalculationResult calcRes = hPlan.CalculateDoseWithPresetValues(presetValues);
+                            CalculationResult calcRes = scratchPlan.CalculateDoseWithPresetValues(presetValues);
                             bSuccess = calcRes.Success;
                         }
                         catch (Exception)
@@ -238,7 +255,7 @@ namespace PhotonCalculateInfluenceMatrix
                         iRetryCnt++;
 
                         if (!bSuccess && iRetryCnt < iMaxDoseCalcRetry)
-                            hProgress.Message($"Retry: Beamlet { iCurrBeamlet}/{ iMaxBeamletCount}.");
+                            hProgress.Message($"Retry: Beamlet {iCurrBeamlet}/{iMaxBeamletCount}.");
                     } while (!bSuccess && iRetryCnt < iMaxDoseCalcRetry);
 
                     if (!bSuccess)
@@ -249,7 +266,7 @@ namespace PhotonCalculateInfluenceMatrix
 
                     if (bFirstDoseCalc)
                     {
-                        iMaxPointCnt = ExportOptimizationVoxels(hPlan, planResultsPath);
+                        iMaxPointCnt = ExportOptimizationVoxels(scratchPlan, planResultsPath);
                         bFirstDoseCalc = false;
                     }
 
@@ -263,7 +280,7 @@ namespace PhotonCalculateInfluenceMatrix
                             if (lstCalcBeams.Contains(blb.Id))
                             {
                                 BeamDose hBeamDose = blb.Dose;
-                                int iDoseMatrixSize = hBeamDose.ZSize* hBeamDose.YSize* hBeamDose.XSize;
+                                int iDoseMatrixSize = hBeamDose.ZSize * hBeamDose.YSize * hBeamDose.XSize;
 
                                 if (arrFullDoseMatrix == null)
                                     arrFullDoseMatrix = new float[iDoseMatrixSize, 1];
@@ -287,14 +304,14 @@ namespace PhotonCalculateInfluenceMatrix
                                     arrClosedMLCDoseMatrix = bp.m_arrClosedMLCDoseMatrix;
                                     for (int iDosePtIdx = 0; iDosePtIdx < iDoseMatrixSize; iDosePtIdx++)
                                     {
-                                        arrFullDoseMatrix[iDosePtIdx, 0] = (arrFullDoseMatrix[iDosePtIdx, 0] - arrClosedMLCDoseMatrix[iDosePtIdx, 0])*fDoseScalingFactor;
+                                        arrFullDoseMatrix[iDosePtIdx, 0] = (arrFullDoseMatrix[iDosePtIdx, 0] - arrClosedMLCDoseMatrix[iDosePtIdx, 0]) * fDoseScalingFactor;
                                         if (arrFullDoseMatrix[iDosePtIdx, 0] < 0)
                                             arrFullDoseMatrix[iDosePtIdx, 0] = 0;
                                     }
 
                                     int iBeamletIdx = iCurrBeamlet - iNumBeamletsToBeCalcAtATime + i;
                                     Beamlet hBeamlet = bp.m_lstBeamlets[iBeamletIdx];
-                                    hBeamlet.m_dSumCutoffValues = doseData.m_dSumCutoffValues*fDoseScalingFactor;
+                                    hBeamlet.m_dSumCutoffValues = doseData.m_dSumCutoffValues * fDoseScalingFactor;
                                     hBeamlet.m_iNumCutoffValues = doseData.m_iNumCutoffValues;
 
                                     bool bAddLastEntry = (iBeamletIdx == bp.BeamletCount - 1);
@@ -311,7 +328,7 @@ namespace PhotonCalculateInfluenceMatrix
                     hProgress?.Message("Calculation cancelled by user.");
                     return;
                 }
-            } while (iCurrBeamlet<iMaxBeamletCount);
+            } while (iCurrBeamlet < iMaxBeamletCount);
 
             // export beam meta data
             foreach (Beam b in arrOrigBeams)
@@ -347,15 +364,15 @@ namespace PhotonCalculateInfluenceMatrix
             float[] npPtWeights = new float[iPtCnt];
             float fZ, fY, fX;
             int i = 0;
-            for(int z=0; z<iZSize; z++)
+            for (int z = 0; z < iZSize; z++)
             {
-                fZ = (float)(vOrigin.z + z*dZRes);
+                fZ = (float)(vOrigin.z + z * dZRes);
                 for (int y = 0; y < iYSize; y++)
                 {
-                    fY = (float)(vOrigin.y + y*dYRes);
+                    fY = (float)(vOrigin.y + y * dYRes);
                     for (int x = 0; x < iXSize; x++)
                     {
-                        fX = (float)(vOrigin.x + x*dXRes);
+                        fX = (float)(vOrigin.x + x * dXRes);
 
                         npPtCoords[i, 0] = fX;
                         npPtCoords[i, 1] = fY;
@@ -384,7 +401,7 @@ namespace PhotonCalculateInfluenceMatrix
                 dose_voxel_resolution_xyz_mm = new double[] { dXRes, dYRes, dZRes },
                 ct_size_xyz = new[] { hCT.XSize, hCT.YSize, hCT.ZSize },
                 cal_box_xyz_start = new[] { vOrigin.x, vOrigin.y, vOrigin.z },
-                cal_box_xyz_end = new[] { vOrigin.x + dXRes*iXSize, vOrigin.y + dYRes * iYSize, vOrigin.z + dZRes * iZSize},
+                cal_box_xyz_end = new[] { vOrigin.x + dXRes * iXSize, vOrigin.y + dYRes * iYSize, vOrigin.z + dZRes * iZSize },
                 ct_to_dose_voxel_map_File = $"{szDataFilename}/ct_to_dose_voxel_map",
                 voxel_coordinate_XYZ_mm_File = $"{szDataFilename}/voxel_coordinate_XYZ_mm",
                 opt_point_cnt = iPtCnt
@@ -436,7 +453,7 @@ namespace PhotonCalculateInfluenceMatrix
                             }
                         }
                     }
-                    catch (Exception) {}
+                    catch (Exception) { }
 
                     if (checkCancellation != null && checkCancellation())
                     {
@@ -460,7 +477,7 @@ namespace PhotonCalculateInfluenceMatrix
                     if (s.HasSegment)
                     {
                         string szStructID = s.Id;
-                        string szStandardStructName = szStructID; 
+                        string szStandardStructName = szStructID;
 
                         byte[,,] struct3DMask = Transpose<byte>(MakeSegmentMaskForStructure(hCT, s));
                         Helpers.CreateDataSet<byte>(fileId, "/" + szStructID, struct3DMask);
@@ -470,7 +487,7 @@ namespace PhotonCalculateInfluenceMatrix
                             name = szStandardStructName,
                             volume_cc = s.Volume,
                             dicom_structure_name = szStructID,
-                            fraction_of_vol_in_calc_box = 1, 
+                            fraction_of_vol_in_calc_box = 1,
                             structure_mask_3d_File = $"StructureSet_Data.h5/{szStandardStructName}"
                         });
                     }
@@ -698,6 +715,27 @@ namespace PhotonCalculateInfluenceMatrix
             return positions;
         }
 
+        /// <summary>
+        /// SFRThelper patch 1 (scratch-plan pattern): leaf pose fully open to
+        /// the jaw edges. Used as the initial static aperture for scratch
+        /// copies of non-static (fluence/DMLC) source beams, which have no
+        /// single honest aperture of their own. Mirror image of
+        /// GetClosedLeafPositions. Interim rule until the PTV-envelope
+        /// aperture fit (patch 2) replaces aperture-based beamlet pruning.
+        /// </summary>
+        public static float[,] GetOpenLeafPositions(int nLeafs, VRect<double> jaws)
+        {
+            float[,] positions = new float[2, nLeafs];
+
+            // loop through all leafs
+            for (int i = 0; i < nLeafs; i++)
+            {
+                positions[0, i] = (float)jaws.X1;
+                positions[1, i] = (float)jaws.X2;
+            }
+            return positions;
+        }
+
         public static float[,] GetLeafPositions(VRect<double> jaws, float beamletSizeX, float beamletSizeY, float[] leafWidths, int x, int y, out VRect<float> beamletSize)
         {
             int nLeafs = leafWidths.Length;
@@ -826,7 +864,7 @@ namespace PhotonCalculateInfluenceMatrix
             {
                 //NMLC.LeafPositionPair pair = leafs.GetLeafPair(i);
                 //if (!pair.IsClosed())
-                if(Math.Abs(leafs[0,i]-leafs[1, i])>fTol)
+                if (Math.Abs(leafs[0, i] - leafs[1, i]) > fTol)
                 {
                     //NMLC.LeafPositionPair staticPair = staticAperture.GetLeafPair(i);
                     //if (!staticPair.IsClosed())
@@ -866,12 +904,34 @@ namespace PhotonCalculateInfluenceMatrix
                 string energyMode = energyModeDisp.Split(sep).First();
                 string pfm = energyModeDisp.Split(sep).Count() > 1 ? energyModeDisp.Split(sep).Last() : null;
                 ExternalBeamMachineParameters extParams = new ExternalBeamMachineParameters(beam.TreatmentUnit.Id, energyMode, beam.DoseRate, beam.Technique.Id, pfm);
-                Beam copyBeam;
-                //if there is no MLC, or this is for the second loop and there is an optimal fluence
-                if (beam.MLC == null || beam.GetOptimalFluence() != null)
-                    copyBeam = plansetup.AddStaticBeam(extParams, GetJawsFromBeam(beam), beam.ControlPoints[0].CollimatorAngle, beam.ControlPoints[0].GantryAngle, beam.ControlPoints[0].PatientSupportAngle, beam.IsocenterPosition);
+
+                // SFRThelper patch 1: always create MLC-carrying copies.
+                // Upstream fell back to AddStaticBeam (jaw-only, no MLC) when the
+                // source had no MLC or carried an optimal fluence - but slot
+                // beams receive per-beamlet apertures via SetAllLeafPositions,
+                // which requires an MLC; MLC-ness is fixed at creation time.
+                // Aperture rule: a static source passes its CP0 pose through
+                // unchanged (identical to upstream behavior for those sources);
+                // a non-static source gets leaves opened to the jaws, since a
+                // dynamic sequence has no single honest aperture and its first
+                // control point is a near-closed sliver that would cage
+                // beamlet enumeration.
+                if (beam.MLC == null)
+                    throw new InvalidOperationException(
+                        $"Cannot create an influence-matrix copy of beam '{beam.Id}': " +
+                        "it has no MLC, and beamlet apertures are formed from MLC leaves.");
+
+                VRect<double> jaws = GetJawsFromBeam(beam);
+                float[,] arrInitialLeaves;
+                if (beam.MLCPlanType == MLCPlanType.Static)
+                    arrInitialLeaves = beam.ControlPoints[0].LeafPositions;
                 else
-                    copyBeam = plansetup.AddMLCBeam(extParams, beam.ControlPoints[0].LeafPositions, GetJawsFromBeam(beam), beam.ControlPoints[0].CollimatorAngle, beam.ControlPoints[0].GantryAngle, beam.ControlPoints[0].PatientSupportAngle, beam.IsocenterPosition);
+                    arrInitialLeaves = GetOpenLeafPositions(
+                        beam.ControlPoints[0].LeafPositions.GetLength(1), jaws);
+
+                Beam copyBeam = plansetup.AddMLCBeam(extParams, arrInitialLeaves, jaws,
+                    beam.ControlPoints[0].CollimatorAngle, beam.ControlPoints[0].GantryAngle,
+                    beam.ControlPoints[0].PatientSupportAngle, beam.IsocenterPosition);
 
                 copyBeam.Id = GetValidObjectId(copyBeam, beam.Id);
 
