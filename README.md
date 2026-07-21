@@ -176,4 +176,4 @@ This project is licensed under the Varian Limited Use Software License Agreement
 - https://aapm.confex.com/aapm/2025scm/meetingapp.cgi/Paper/14084
 - https://aapm.confex.com/aapm/2026scm/meetingapp.cgi/Paper/20795
 - https://aapm.confex.com/aapm/2026am/meetingapp.cgi/Paper/27218
-
+- https://aapm.onlinelibrary.wiley.com/doi/full/10.1002/acm2.70696
