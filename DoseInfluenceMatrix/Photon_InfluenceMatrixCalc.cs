@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Windows;
 using System.Text;
-using HDF5CSharp;
 using CalculateInfluenceMatrix;
 
 
@@ -95,6 +94,11 @@ namespace PhotonCalculateInfluenceMatrix
                 hProgress.Message("Exporting structure outlines and masks...");
             }
             ExportStructureOutlinesAndMasks(hPlan, planResultsPath, hProgress, checkCancellation);
+            // SFRThelper patch 12: the export above returns early on
+            // cancellation; without this check the run would proceed to
+            // create the scratch plan and start dose calculation anyway.
+            if (checkCancellation != null && checkCancellation())
+                return;
 
             // SFRThelper patch 1b (scratch-plan pattern): the clinical plan is
             // read-only from here on. All beamlet slots and dose calculations
@@ -126,222 +130,241 @@ namespace PhotonCalculateInfluenceMatrix
             scratchPlan.Id = GetValidObjectId(scratchPlan, szScratchPlanId);
             hProgress?.Message($"Scratch plan '{scratchPlan.Id}' created in course '{szCourseId}'; the clinical plan will not be modified.");
 
-            scratchPlan.SetCalculationModel(CalculationType.PhotonVolumeDose, szEclipseVolumeDoseCalcModel);
-            scratchPlan.SetCalculationOption(scratchPlan.GetCalculationModel(CalculationType.PhotonVolumeDose), "CalculationGridSizeInCM", szCalculationGridSizeInCM);
-            Dictionary<string, string> dictVals = scratchPlan.GetCalculationOptions(scratchPlan.GetCalculationModel(CalculationType.PhotonVolumeDose));//, "CalculationGridSizeInCM", out szVal);
-
-            // calculate number of beamlets for all beams and initialize them
-            Dictionary<string, MyBeamParameters> tblBeamParameters = new Dictionary<string, MyBeamParameters>();
-            bool bHalcyon = false; //TODO: bHalcyon machines are not supported
-            int iMaxBeamletCount = int.MinValue;
-
-            // The clinical treatment fields themselves are the read-only
-            // geometry source (setup fields excluded - upstream excluded them
-            // implicitly because CopyBeam refuses setup fields).
-            List<Beam> arrOrigBeams = hPlan.Beams.Where(b => !b.IsSetupField).ToList();
-
-            double dSumBeamWeights = 0;
-            foreach (Beam origBeam in arrOrigBeams)
-                dSumBeamWeights += origBeam.WeightFactor;
-
-            // will be used for dose calculation later
-            List<KeyValuePair<string, MetersetValue>> presetValues = new List<KeyValuePair<string, MetersetValue>>();
-            foreach (Beam origBeam in arrOrigBeams)
+            // SFRThelper patch 12: from here to the end of the run, every exit
+            // (completion, cancellation, exception) passes through the finally
+            // below, which reports the true outcome. No catch: exceptions
+            // propagate to the caller. The scratch plan is deliberately kept
+            // on abnormal exits (resume support).
+            bool bCompleted = false;
+            try
             {
-                VRect<double> jaws = GetJawsFromBeam(origBeam);
-                float[] arrLeafWidths = GetLeafWidths(origBeam.MLC, bHalcyon);
-                int xs = GetBeamletsCountX(jaws, beamletSizeX);
-                int ys = GetBeamletsCountY(jaws, beamletSizeY, arrLeafWidths, bHalcyon);
 
-                float[,] arrStaticLeafPositions = origBeam.ControlPoints.First().LeafPositions;
-                MyBeamParameters bp = new MyBeamParameters(jaws, arrStaticLeafPositions);
-                bp.m_ClosedMLC = GetClosedLeafPositions(arrLeafWidths.Length, jaws);
+                scratchPlan.SetCalculationModel(CalculationType.PhotonVolumeDose, szEclipseVolumeDoseCalcModel);
+                scratchPlan.SetCalculationOption(scratchPlan.GetCalculationModel(CalculationType.PhotonVolumeDose), "CalculationGridSizeInCM", szCalculationGridSizeInCM);
+                Dictionary<string, string> dictVals = scratchPlan.GetCalculationOptions(scratchPlan.GetCalculationModel(CalculationType.PhotonVolumeDose));//, "CalculationGridSizeInCM", out szVal);
 
-                int iBeamletIdx = 0;
-                VRect<float> beamletSize;
-                for (int y = 0; y < ys; y++)
+                // calculate number of beamlets for all beams and initialize them
+                Dictionary<string, MyBeamParameters> tblBeamParameters = new Dictionary<string, MyBeamParameters>();
+                bool bHalcyon = false; //TODO: bHalcyon machines are not supported
+                int iMaxBeamletCount = int.MinValue;
+
+                // The clinical treatment fields themselves are the read-only
+                // geometry source (setup fields excluded - upstream excluded them
+                // implicitly because CopyBeam refuses setup fields).
+                List<Beam> arrOrigBeams = hPlan.Beams.Where(b => !b.IsSetupField).ToList();
+
+                double dSumBeamWeights = 0;
+                foreach (Beam origBeam in arrOrigBeams)
+                    dSumBeamWeights += origBeam.WeightFactor;
+
+                // will be used for dose calculation later
+                List<KeyValuePair<string, MetersetValue>> presetValues = new List<KeyValuePair<string, MetersetValue>>();
+                foreach (Beam origBeam in arrOrigBeams)
                 {
-                    for (int x = 0; x < xs; x++)
+                    VRect<double> jaws = GetJawsFromBeam(origBeam);
+                    float[] arrLeafWidths = GetLeafWidths(origBeam.MLC, bHalcyon);
+                    int xs = GetBeamletsCountX(jaws, beamletSizeX);
+                    int ys = GetBeamletsCountY(jaws, beamletSizeY, arrLeafWidths, bHalcyon);
+
+                    float[,] arrStaticLeafPositions = origBeam.ControlPoints.First().LeafPositions;
+                    MyBeamParameters bp = new MyBeamParameters(jaws, arrStaticLeafPositions);
+                    bp.m_ClosedMLC = GetClosedLeafPositions(arrLeafWidths.Length, jaws);
+
+                    int iBeamletIdx = 0;
+                    VRect<float> beamletSize;
+                    for (int y = 0; y < ys; y++)
                     {
-                        float[,] leafs;
-                        if (!bHalcyon)
+                        for (int x = 0; x < xs; x++)
                         {
-                            leafs = GetLeafPositions(jaws, beamletSizeX, beamletSizeY, arrLeafWidths, x, y, out beamletSize);
-                        }
-                        else
-                        {
-                            leafs = GetLeafPositionsHalcyon(origBeam, jaws, beamletSizeX, beamletSizeY, arrLeafWidths, x, y, out beamletSize);
-                        }
-                        if (IsBeamletInsideAperture(leafs, arrStaticLeafPositions))
-                        {
-                            bp.m_lstBeamletMLCs.Add(leafs);
-                            bp.m_lstBeamlets.Add(new Beamlet(iBeamletIdx, origBeam.Id, beamletSize.X1, beamletSize.Y1, beamletSize.X2 - beamletSize.X1, beamletSize.Y2 - beamletSize.Y1));
-                            iBeamletIdx++;
-                        }
-                    }
-                }
-                if (iBeamletIdx >= iMaxBeamletCount)
-                    iMaxBeamletCount = iBeamletIdx + 1;
-
-                // create beamlet beams
-                for (int i = 0; i < iNumBeamletsToBeCalcAtATime; i++)
-                {
-                    Beam hCopied = CopyBeam(origBeam, scratchPlan);
-                    bp.m_lstBeamletBeam.Add(hCopied);
-
-                    presetValues.Add(new KeyValuePair<string, MetersetValue>(hCopied.Id, new MetersetValue(1, DosimeterUnit.MU)));
-                }
-
-                tblBeamParameters[origBeam.Id] = bp;
-            }
-
-            string szBeamPath = System.IO.Path.Combine(planResultsPath, "Beams");
-            if (!Directory.Exists(szBeamPath))
-                Directory.CreateDirectory(szBeamPath);
-
-            int iMaxPointCnt = 0;
-
-            List<string> lstCalcBeams = new List<string>();
-            bool bFirstDoseCalc = true;
-            float[,] arrFullDoseMatrix = null;
-            // lopp thru beamlets
-            int iCurrBeamlet = 0;
-            bool bFirstCalc = true;
-            do
-            {
-                lstCalcBeams.Clear();
-                for (int i = 0; i < iNumBeamletsToBeCalcAtATime; i++)
-                {
-                    // update MLC to cover this particular beamlet
-                    foreach (Beam origBeam in arrOrigBeams)
-                    {
-                        MyBeamParameters bp = tblBeamParameters[origBeam.Id];
-                        if (iCurrBeamlet < bp.BeamletCount)
-                        {
-                            Beam hBeamletBeam = bp.m_lstBeamletBeam[i];
-
-                            //update MLCs
-                            BeamParameters beamParams = hBeamletBeam.GetEditableParameters();
-                            if (bFirstCalc && i == 0)
-                                beamParams.SetAllLeafPositions(bp.m_ClosedMLC);
-                            else
-                                beamParams.SetAllLeafPositions(bp.m_lstBeamletMLCs[iCurrBeamlet]);
-
-                            hBeamletBeam.ApplyParameters(beamParams);
-
-                            lstCalcBeams.Add(hBeamletBeam.Id);
-                        }
-                    }
-                    if (!(bFirstCalc && i == 0))
-                        iCurrBeamlet++;
-                }
-                hProgress.Message($"Progress: Beamlet {iCurrBeamlet}/{iMaxBeamletCount}.");
-
-                if (lstCalcBeams.Count > 0)
-                {
-                    int iRetryCnt = 0;
-                    bool bSuccess = false;
-                    do
-                    {
-                        try
-                        {
-                            CalculationResult calcRes = scratchPlan.CalculateDoseWithPresetValues(presetValues);
-                            bSuccess = calcRes.Success;
-                        }
-                        catch (Exception)
-                        {
-                            bSuccess = false;
-                        }
-                        iRetryCnt++;
-
-                        if (!bSuccess && iRetryCnt < iMaxDoseCalcRetry)
-                            hProgress.Message($"Retry: Beamlet {iCurrBeamlet}/{iMaxBeamletCount}.");
-                    } while (!bSuccess && iRetryCnt < iMaxDoseCalcRetry);
-
-                    if (!bSuccess)
-                    {
-                        //app.SaveModifications();
-                        throw new ApplicationException($"Dose Calculation Failed after {iMaxDoseCalcRetry} attempts");
-                    }
-
-                    if (bFirstDoseCalc)
-                    {
-                        iMaxPointCnt = ExportOptimizationVoxels(scratchPlan, planResultsPath);
-                        bFirstDoseCalc = false;
-                    }
-
-                    // extract dose for all beams
-                    foreach (Beam b in arrOrigBeams)
-                    {
-                        MyBeamParameters bp = tblBeamParameters[b.Id];
-                        for (int i = 0; i < iNumBeamletsToBeCalcAtATime; i++)
-                        {
-                            Beam blb = bp.m_lstBeamletBeam[i];
-                            if (lstCalcBeams.Contains(blb.Id))
+                            float[,] leafs;
+                            if (!bHalcyon)
                             {
-                                BeamDose hBeamDose = blb.Dose;
-                                int iDoseMatrixSize = hBeamDose.ZSize * hBeamDose.YSize * hBeamDose.XSize;
-
-                                if (arrFullDoseMatrix == null)
-                                    arrFullDoseMatrix = new float[iDoseMatrixSize, 1];
-                                Array.Clear(arrFullDoseMatrix, 0, arrFullDoseMatrix.Length);
-
-                                double dWeight = (blb.WeightFactor / dSumBeamWeights) * blb.MetersetPerGy / 100.0;
-                                string szHDF5DataFile = System.IO.Path.Combine(szBeamPath, $"Beam_{b.Id}_Data.h5");
-
-                                DoseData doseData;
-                                float[,] arrClosedMLCDoseMatrix = null;
-                                if (bFirstCalc && i == 0)
-                                {
-                                    arrClosedMLCDoseMatrix = new float[iDoseMatrixSize, 1];
-                                    doseData = Helpers.GetDosePoints(hBeamDose, dWeight, dInfCutoffValue, ref arrClosedMLCDoseMatrix);
-                                    bp.m_arrClosedMLCDoseMatrix = arrClosedMLCDoseMatrix;
-                                }
-                                else
-                                {
-                                    doseData = Helpers.GetDosePoints(hBeamDose, dWeight, dInfCutoffValue, ref arrFullDoseMatrix);
-                                    // subtract matrix from closedMLC matrix
-                                    arrClosedMLCDoseMatrix = bp.m_arrClosedMLCDoseMatrix;
-                                    for (int iDosePtIdx = 0; iDosePtIdx < iDoseMatrixSize; iDosePtIdx++)
-                                    {
-                                        arrFullDoseMatrix[iDosePtIdx, 0] = (arrFullDoseMatrix[iDosePtIdx, 0] - arrClosedMLCDoseMatrix[iDosePtIdx, 0]) * fDoseScalingFactor;
-                                        if (arrFullDoseMatrix[iDosePtIdx, 0] < 0)
-                                            arrFullDoseMatrix[iDosePtIdx, 0] = 0;
-                                    }
-
-                                    int iBeamletIdx = iCurrBeamlet - iNumBeamletsToBeCalcAtATime + i;
-                                    Beamlet hBeamlet = bp.m_lstBeamlets[iBeamletIdx];
-                                    hBeamlet.m_dSumCutoffValues = doseData.m_dSumCutoffValues * fDoseScalingFactor;
-                                    hBeamlet.m_iNumCutoffValues = doseData.m_iNumCutoffValues;
-
-                                    bool bAddLastEntry = (iBeamletIdx == bp.BeamletCount - 1);
-                                    Helpers.WriteInfMatrixHDF5(bExportFullInfMatrix, arrFullDoseMatrix, doseData, bAddLastEntry, iMaxPointCnt, iBeamletIdx, fDoseScalingFactor, szHDF5DataFile);
-                                }
+                                leafs = GetLeafPositions(jaws, beamletSizeX, beamletSizeY, arrLeafWidths, x, y, out beamletSize);
+                            }
+                            else
+                            {
+                                leafs = GetLeafPositionsHalcyon(origBeam, jaws, beamletSizeX, beamletSizeY, arrLeafWidths, x, y, out beamletSize);
+                            }
+                            if (IsBeamletInsideAperture(leafs, arrStaticLeafPositions))
+                            {
+                                bp.m_lstBeamletMLCs.Add(leafs);
+                                bp.m_lstBeamlets.Add(new Beamlet(iBeamletIdx, origBeam.Id, beamletSize.X1, beamletSize.Y1, beamletSize.X2 - beamletSize.X1, beamletSize.Y2 - beamletSize.Y1));
+                                iBeamletIdx++;
                             }
                         }
                     }
-                    bFirstCalc = false;
+                    if (iBeamletIdx >= iMaxBeamletCount)
+                        iMaxBeamletCount = iBeamletIdx + 1;
+
+                    // create beamlet beams
+                    for (int i = 0; i < iNumBeamletsToBeCalcAtATime; i++)
+                    {
+                        Beam hCopied = CopyBeam(origBeam, scratchPlan);
+                        bp.m_lstBeamletBeam.Add(hCopied);
+
+                        presetValues.Add(new KeyValuePair<string, MetersetValue>(hCopied.Id, new MetersetValue(1, DosimeterUnit.MU)));
+                    }
+
+                    tblBeamParameters[origBeam.Id] = bp;
                 }
 
-                if (checkCancellation != null && checkCancellation())
+                string szBeamPath = System.IO.Path.Combine(planResultsPath, "Beams");
+                if (!Directory.Exists(szBeamPath))
+                    Directory.CreateDirectory(szBeamPath);
+
+                int iMaxPointCnt = 0;
+
+                List<string> lstCalcBeams = new List<string>();
+                bool bFirstDoseCalc = true;
+                float[,] arrFullDoseMatrix = null;
+                // lopp thru beamlets
+                int iCurrBeamlet = 0;
+                bool bFirstCalc = true;
+                do
                 {
-                    hProgress?.Message("Calculation cancelled by user.");
-                    return;
+                    lstCalcBeams.Clear();
+                    for (int i = 0; i < iNumBeamletsToBeCalcAtATime; i++)
+                    {
+                        // update MLC to cover this particular beamlet
+                        foreach (Beam origBeam in arrOrigBeams)
+                        {
+                            MyBeamParameters bp = tblBeamParameters[origBeam.Id];
+                            if (iCurrBeamlet < bp.BeamletCount)
+                            {
+                                Beam hBeamletBeam = bp.m_lstBeamletBeam[i];
+
+                                //update MLCs
+                                BeamParameters beamParams = hBeamletBeam.GetEditableParameters();
+                                if (bFirstCalc && i == 0)
+                                    beamParams.SetAllLeafPositions(bp.m_ClosedMLC);
+                                else
+                                    beamParams.SetAllLeafPositions(bp.m_lstBeamletMLCs[iCurrBeamlet]);
+
+                                hBeamletBeam.ApplyParameters(beamParams);
+
+                                lstCalcBeams.Add(hBeamletBeam.Id);
+                            }
+                        }
+                        if (!(bFirstCalc && i == 0))
+                            iCurrBeamlet++;
+                    }
+                    hProgress.Message($"Progress: Beamlet {iCurrBeamlet}/{iMaxBeamletCount}.");
+
+                    if (lstCalcBeams.Count > 0)
+                    {
+                        int iRetryCnt = 0;
+                        bool bSuccess = false;
+                        do
+                        {
+                            try
+                            {
+                                CalculationResult calcRes = scratchPlan.CalculateDoseWithPresetValues(presetValues);
+                                bSuccess = calcRes.Success;
+                            }
+                            catch (Exception)
+                            {
+                                bSuccess = false;
+                            }
+                            iRetryCnt++;
+
+                            if (!bSuccess && iRetryCnt < iMaxDoseCalcRetry)
+                                hProgress.Message($"Retry: Beamlet {iCurrBeamlet}/{iMaxBeamletCount}.");
+                        } while (!bSuccess && iRetryCnt < iMaxDoseCalcRetry);
+
+                        if (!bSuccess)
+                        {
+                            //app.SaveModifications();
+                            throw new ApplicationException($"Dose Calculation Failed after {iMaxDoseCalcRetry} attempts");
+                        }
+
+                        if (bFirstDoseCalc)
+                        {
+                            iMaxPointCnt = ExportOptimizationVoxels(scratchPlan, planResultsPath);
+                            bFirstDoseCalc = false;
+                        }
+
+                        // extract dose for all beams
+                        foreach (Beam b in arrOrigBeams)
+                        {
+                            MyBeamParameters bp = tblBeamParameters[b.Id];
+                            for (int i = 0; i < iNumBeamletsToBeCalcAtATime; i++)
+                            {
+                                Beam blb = bp.m_lstBeamletBeam[i];
+                                if (lstCalcBeams.Contains(blb.Id))
+                                {
+                                    BeamDose hBeamDose = blb.Dose;
+                                    int iDoseMatrixSize = hBeamDose.ZSize * hBeamDose.YSize * hBeamDose.XSize;
+
+                                    if (arrFullDoseMatrix == null)
+                                        arrFullDoseMatrix = new float[iDoseMatrixSize, 1];
+                                    Array.Clear(arrFullDoseMatrix, 0, arrFullDoseMatrix.Length);
+
+                                    double dWeight = (blb.WeightFactor / dSumBeamWeights) * blb.MetersetPerGy / 100.0;
+                                    string szHDF5DataFile = System.IO.Path.Combine(szBeamPath, $"Beam_{b.Id}_Data.h5");
+
+                                    DoseData doseData;
+                                    float[,] arrClosedMLCDoseMatrix = null;
+                                    if (bFirstCalc && i == 0)
+                                    {
+                                        arrClosedMLCDoseMatrix = new float[iDoseMatrixSize, 1];
+                                        doseData = Helpers.GetDosePoints(hBeamDose, dWeight, dInfCutoffValue, ref arrClosedMLCDoseMatrix);
+                                        bp.m_arrClosedMLCDoseMatrix = arrClosedMLCDoseMatrix;
+                                    }
+                                    else
+                                    {
+                                        doseData = Helpers.GetDosePoints(hBeamDose, dWeight, dInfCutoffValue, ref arrFullDoseMatrix);
+                                        // subtract matrix from closedMLC matrix
+                                        arrClosedMLCDoseMatrix = bp.m_arrClosedMLCDoseMatrix;
+                                        for (int iDosePtIdx = 0; iDosePtIdx < iDoseMatrixSize; iDosePtIdx++)
+                                        {
+                                            arrFullDoseMatrix[iDosePtIdx, 0] = (arrFullDoseMatrix[iDosePtIdx, 0] - arrClosedMLCDoseMatrix[iDosePtIdx, 0]) * fDoseScalingFactor;
+                                            if (arrFullDoseMatrix[iDosePtIdx, 0] < 0)
+                                                arrFullDoseMatrix[iDosePtIdx, 0] = 0;
+                                        }
+
+                                        int iBeamletIdx = iCurrBeamlet - iNumBeamletsToBeCalcAtATime + i;
+                                        Beamlet hBeamlet = bp.m_lstBeamlets[iBeamletIdx];
+                                        hBeamlet.m_dSumCutoffValues = doseData.m_dSumCutoffValues * fDoseScalingFactor;
+                                        hBeamlet.m_iNumCutoffValues = doseData.m_iNumCutoffValues;
+
+                                        bool bAddLastEntry = (iBeamletIdx == bp.BeamletCount - 1);
+                                        Helpers.WriteInfMatrixHDF5(bExportFullInfMatrix, arrFullDoseMatrix, doseData, bAddLastEntry, iMaxPointCnt, iBeamletIdx, fDoseScalingFactor, szHDF5DataFile);
+                                    }
+                                }
+                            }
+                        }
+                        bFirstCalc = false;
+                    }
+
+                    if (checkCancellation != null && checkCancellation())
+                    {
+                        hProgress?.Message("Calculation cancelled by user.");
+                        return;
+                    }
+                } while (iCurrBeamlet < iMaxBeamletCount);
+
+                // export beam meta data
+                foreach (Beam b in arrOrigBeams)
+                {
+                    hProgress.Message($"Progress: Finalizing beam {b.Id}.");
+
+                    string szHDF5DataFile = System.IO.Path.Combine(szBeamPath, $"Beam_{b.Id}_Data.h5");
+                    Helpers.WriteBeamletInfoHDF5(tblBeamParameters[b.Id], szHDF5DataFile);
+
+                    string szBeamMetaDataFile = System.IO.Path.Combine(szBeamPath, $"Beam_{b.Id}_MetaData.json");
+                    Helpers.WriteBeamMetaData(b, tblBeamParameters[b.Id], dInfCutoffValue, szBeamMetaDataFile);
                 }
-            } while (iCurrBeamlet < iMaxBeamletCount);
-
-            // export beam meta data
-            foreach (Beam b in arrOrigBeams)
-            {
-                hProgress.Message($"Progress: Finalizing beam {b.Id}.");
-
-                string szHDF5DataFile = System.IO.Path.Combine(szBeamPath, $"Beam_{b.Id}_Data.h5");
-                Helpers.WriteBeamletInfoHDF5(tblBeamParameters[b.Id], szHDF5DataFile);
-
-                string szBeamMetaDataFile = System.IO.Path.Combine(szBeamPath, $"Beam_{b.Id}_MetaData.json");
-                Helpers.WriteBeamMetaData(b, tblBeamParameters[b.Id], dInfCutoffValue, szBeamMetaDataFile);
+                bCompleted = true;
             }
-            hProgress.Message("Influence matrix calculation finished.");
+            finally
+            {
+                if (bCompleted)
+                    hProgress?.Message("Influence matrix calculation finished.");
+                else
+                    hProgress?.Message($"Run ended without completing (cancelled or failed). " +
+                        $"Scratch plan '{scratchPlan.Id}' retained in course '{szCourseId}'; " +
+                        $"partial output at '{planResultsPath}' should not be used.");
+            }
         }
 
         public static int ExportOptimizationVoxels(ExternalPlanSetup hPlanSetup, string szOutputFolder)
@@ -431,26 +454,76 @@ namespace PhotonCalculateInfluenceMatrix
 
                 string szH5OutlinesPath = System.IO.Path.Combine(szStructOutlinesFolder, $"Beam_{b.Id}_Data.h5");
                 long fileId1 = Hdf5.CreateFile(szH5OutlinesPath);
+                // SFRThelper patch 12: the cancellation return inside this loop
+                // used to skip CloseFile(fileId1); finally guarantees it.
+                try
+                {
+                    foreach (Structure s in hPlanSetup.StructureSet.Structures)
+                    {
+                        try
+                        {
+                            Point[][] arrOutlines = b.GetStructureOutlines(s, true);
+                            if (arrOutlines != null && arrOutlines.Length > 0)
+                            {
+                                for (int j = 0; j < arrOutlines.Length; j++)
+                                {
+                                    Point[] points = arrOutlines[j];
+                                    string szDatasetName = $"/BEV_structure_contour_points/{s.Id}/Segment-{j}";
+                                    double[,] arrPoints = new double[points.Length, 2];
+                                    for (int i = 0; i < points.Length; i++)
+                                    {
+                                        arrPoints[i, 0] = points[i].X;
+                                        arrPoints[i, 1] = points[i].Y;
+                                    }
+                                    Helpers.CreateDataSet<double>(fileId1, szDatasetName, arrPoints);
+                                }
+                            }
+                        }
+                        catch (Exception) { }
 
+                        if (checkCancellation != null && checkCancellation())
+                        {
+                            hProgress?.Message("Calculation cancelled by user.");
+                            return;
+                        }
+                    }
+                }
+                finally
+                {
+                    Hdf5.CloseFile(fileId1);
+                }
+            }
+
+            // Export structure masks
+            string szH5MaskPath = System.IO.Path.Combine(szOutputFolder, "StructureSet_Data.h5");
+            long fileId = Hdf5.CreateFile(szH5MaskPath);
+            List<object> lstAllStructsMetaData = new List<object>();
+            // SFRThelper patch 12: as above - the cancellation return used to
+            // skip CloseFile(fileId).
+            try
+            {
+
+                Image hCT = hPlanSetup.StructureSet.Image;
                 foreach (Structure s in hPlanSetup.StructureSet.Structures)
                 {
                     try
                     {
-                        Point[][] arrOutlines = b.GetStructureOutlines(s, true);
-                        if (arrOutlines != null && arrOutlines.Length > 0)
+                        if (s.HasSegment)
                         {
-                            for (int j = 0; j < arrOutlines.Length; j++)
+                            string szStructID = s.Id;
+                            string szStandardStructName = szStructID;
+
+                            byte[,,] struct3DMask = Transpose<byte>(MakeSegmentMaskForStructure(hCT, s));
+                            Helpers.CreateDataSet<byte>(fileId, "/" + szStructID, struct3DMask);
+
+                            lstAllStructsMetaData.Add(new
                             {
-                                Point[] points = arrOutlines[j];
-                                string szDatasetName = $"/BEV_structure_contour_points/{s.Id}/Segment-{j}";
-                                double[,] arrPoints = new double[points.Length, 2];
-                                for (int i = 0; i < points.Length; i++)
-                                {
-                                    arrPoints[i, 0] = points[i].X;
-                                    arrPoints[i, 1] = points[i].Y;
-                                }
-                                Helpers.CreateDataSet<double>(fileId1, szDatasetName, arrPoints);
-                            }
+                                name = szStandardStructName,
+                                volume_cc = s.Volume,
+                                dicom_structure_name = szStructID,
+                                fraction_of_vol_in_calc_box = 1,
+                                structure_mask_3d_File = $"StructureSet_Data.h5/{szStandardStructName}"
+                            });
                         }
                     }
                     catch (Exception) { }
@@ -461,46 +534,11 @@ namespace PhotonCalculateInfluenceMatrix
                         return;
                     }
                 }
-                Hdf5.CloseFile(fileId1);
             }
-
-            // Export structure masks
-            string szH5MaskPath = System.IO.Path.Combine(szOutputFolder, "StructureSet_Data.h5");
-            long fileId = Hdf5.CreateFile(szH5MaskPath);
-            List<object> lstAllStructsMetaData = new List<object>();
-
-            Image hCT = hPlanSetup.StructureSet.Image;
-            foreach (Structure s in hPlanSetup.StructureSet.Structures)
+            finally
             {
-                try
-                {
-                    if (s.HasSegment)
-                    {
-                        string szStructID = s.Id;
-                        string szStandardStructName = szStructID;
-
-                        byte[,,] struct3DMask = Transpose<byte>(MakeSegmentMaskForStructure(hCT, s));
-                        Helpers.CreateDataSet<byte>(fileId, "/" + szStructID, struct3DMask);
-
-                        lstAllStructsMetaData.Add(new
-                        {
-                            name = szStandardStructName,
-                            volume_cc = s.Volume,
-                            dicom_structure_name = szStructID,
-                            fraction_of_vol_in_calc_box = 1,
-                            structure_mask_3d_File = $"StructureSet_Data.h5/{szStandardStructName}"
-                        });
-                    }
-                }
-                catch (Exception) { }
-
-                if (checkCancellation != null && checkCancellation())
-                {
-                    hProgress?.Message("Calculation cancelled by user.");
-                    return;
-                }
+                Hdf5.CloseFile(fileId);
             }
-            Hdf5.CloseFile(fileId);
 
             string szMetaDataFile = System.IO.Path.Combine(szOutputFolder, "StructureSet_MetaData.json");
             CalculateInfluenceMatrix.Helpers.WriteJSONFile(lstAllStructsMetaData, szMetaDataFile);

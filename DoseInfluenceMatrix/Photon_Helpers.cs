@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using VMS.TPS.Common.Model.API;
+
 using CalculateInfluenceMatrix;
 
 namespace PhotonCalculateInfluenceMatrix
@@ -47,7 +48,7 @@ namespace PhotonCalculateInfluenceMatrix
                             iCutOffValueCnt++;
                         }
 
-                        arrFullDoseMatrix[iPtIndex,0] = (float)pointDose;
+                        arrFullDoseMatrix[iPtIndex, 0] = (float)pointDose;
                     }
                 }
             }
@@ -125,49 +126,60 @@ namespace PhotonCalculateInfluenceMatrix
                 fileId = Hdf5.OpenFile(szPath);
             else
                 fileId = Hdf5.CreateFile(szPath);
-            string szTempFile = szPath + ".tmp";
-            if (bExportFullInfMatrix)
+            // SFRThelper patch 8: this method is called once per beamlet and
+            // upstream never closed fileId - thousands of leaked handles per
+            // run, and unflushed buffers can leave the file unloadable. The
+            // finally below guarantees the handle closes on every exit path.
+            try
             {
-                bool fullMatrixExists = HDF.PInvoke.H5L.exists(fileId, "/inf_matrix_full") > 0;
-                //Log.Information($"Full matrix dataset {(fullMatrixExists ? "exists" : "does not exist")}");
-
-                if (!fullMatrixExists)
+                string szTempFile = szPath + ".tmp";
+                if (bExportFullInfMatrix)
                 {
-                    HDFCompression_Helpers.CreateInitialDataset(fileId, "/inf_matrix_full", arrFullDoseMatrix);
+                    bool fullMatrixExists = HDF.PInvoke.H5L.exists(fileId, "/inf_matrix_full") > 0;
+                    //Log.Information($"Full matrix dataset {(fullMatrixExists ? "exists" : "does not exist")}");
+
+                    if (!fullMatrixExists)
+                    {
+                        HDFCompression_Helpers.CreateInitialDataset(fileId, "/inf_matrix_full", arrFullDoseMatrix);
+                    }
+                    else
+                    {
+                        HDFCompression_Helpers.AppendToDataset(fileId, "/inf_matrix_full", arrFullDoseMatrix);
+                    }
+                }
+
+                // write sparse inf matrix
+                List<DosePoint> lstDosePoints = doseData.dosePoints;
+                int iPtCnt = lstDosePoints.Count;
+                double[,] arrSparse = new double[(bAddLastEntry ? iPtCnt + 1 : iPtCnt), 3];
+                for (int i = 0; i < iPtCnt; i++)
+                {
+                    DosePoint dp = lstDosePoints[i];
+                    arrSparse[i, 0] = dp.iPtIndex;
+                    arrSparse[i, 1] = iBeamletIdx;
+                    arrSparse[i, 2] = dp.doseValue * fDoseScalingFactor;
+                }
+                if (bAddLastEntry)
+                {
+                    arrSparse[iPtCnt, 0] = iMaxPointCnt - 1;
+                    arrSparse[iPtCnt, 1] = iBeamletIdx;
+                    arrSparse[iPtCnt, 2] = 0;
+                }
+
+                // Check if sparse matrix dataset exists
+                bool sparseMatrixExists = HDF.PInvoke.H5L.exists(fileId, "/inf_matrix_sparse") > 0;
+                if (!sparseMatrixExists)
+                {
+                    HDFCompression_Helpers.CreateInitialDataset(fileId, "/inf_matrix_sparse", arrSparse);
                 }
                 else
                 {
-                    HDFCompression_Helpers.AppendToDataset(fileId, "/inf_matrix_full", arrFullDoseMatrix);
+                    HDFCompression_Helpers.AppendToDataset(fileId, "/inf_matrix_sparse", arrSparse);
                 }
             }
-
-            // write sparse inf matrix
-            List<DosePoint> lstDosePoints = doseData.dosePoints;
-            int iPtCnt = lstDosePoints.Count;
-            double[,] arrSparse = new double[(bAddLastEntry ? iPtCnt + 1 : iPtCnt), 3];
-            for (int i = 0; i < iPtCnt; i++)
+            finally
             {
-                DosePoint dp = lstDosePoints[i];
-                arrSparse[i, 0] = dp.iPtIndex;
-                arrSparse[i, 1] = iBeamletIdx;
-                arrSparse[i, 2] = dp.doseValue*fDoseScalingFactor;
-            }
-            if (bAddLastEntry)
-            {
-                arrSparse[iPtCnt, 0] = iMaxPointCnt - 1;
-                arrSparse[iPtCnt, 1] = iBeamletIdx;
-                arrSparse[iPtCnt, 2] = 0;
-            }
-
-            // Check if sparse matrix dataset exists
-            bool sparseMatrixExists = HDF.PInvoke.H5L.exists(fileId, "/inf_matrix_sparse") > 0;
-            if (!sparseMatrixExists)
-            {
-                HDFCompression_Helpers.CreateInitialDataset(fileId, "/inf_matrix_sparse", arrSparse);
-            }
-            else
-            {
-                HDFCompression_Helpers.AppendToDataset(fileId, "/inf_matrix_sparse", arrSparse);
+                Hdf5.CloseFile(fileId);
             }
         }
         public static void WriteBeamletInfoHDF5(MyBeamParameters beamParams, string szPath)
@@ -187,11 +199,11 @@ namespace PhotonCalculateInfluenceMatrix
             float[] arrYSize = new float[iBeamletCnt];
             double[] arrSumOfCutoffValues = new double[iBeamletCnt];
             int[] arrNumCutoffValues = new int[iBeamletCnt];
-            for ( int i=0; i<iBeamletCnt; i++)
+            for (int i = 0; i < iBeamletCnt; i++)
             {
                 Beamlet bl = beamParams.m_lstBeamlets[i];
                 arrId[i] = bl.m_iIndex;
-                arrXPos[i] = bl.m_fXStart + bl.m_fXSize/2.0f;
+                arrXPos[i] = bl.m_fXStart + bl.m_fXSize / 2.0f;
                 arrYPos[i] = bl.m_fYStart + bl.m_fYSize / 2.0f;
                 arrXSize[i] = bl.m_fXSize;
                 arrYSize[i] = bl.m_fYSize;
