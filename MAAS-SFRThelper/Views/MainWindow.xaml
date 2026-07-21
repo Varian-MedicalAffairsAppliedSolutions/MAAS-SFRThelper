@@ -24,6 +24,9 @@
                     <local:ScartView DataContext="{Binding ScartViewModel}"/>
                 </TabItem>
                 <TabItem Name="RapidRodsTab" Header="RapidRods" Style="{x:Null}"/>
+                <TabItem Header="Advanced Methods" Style="{x:Null}">
+                    <local:AdvancedMethodsView DataContext="{Binding AdvancedMethodsViewModel}"/>
+                </TabItem>
             </TabControl>
 
 

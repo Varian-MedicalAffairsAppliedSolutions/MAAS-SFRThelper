@@ -8,7 +8,7 @@
     <OutputType>library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>MAAS_SFRThelper</RootNamespace>
-    <AssemblyName>MAAS-SFRThelper.esapi</AssemblyName>
+    <AssemblyName>MAAS-SFRThelper4.esapi</AssemblyName>
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <ProjectTypeGuids>{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
@@ -124,8 +124,10 @@
     <Compile Include="Models\seedPointModel.cs" />
     <Compile Include="Models\Spacing.cs" />
     <Compile Include="Services\AppConfigHelper.cs" />
+    <Compile Include="Services\BindableRunProgress.cs" />
     <Compile Include="Services\EsapiWorker.cs" />
     <Compile Include="Services\GeometricSurrogateCalculator.cs" />
+    <Compile Include="Services\IRunProgress.cs" />
     <Compile Include="Services\MayoLattice\FeasibleRegionBuilder.cs" />
     <Compile Include="Services\MayoLattice\HdbscanClustering.cs" />
     <Compile Include="Services\MayoLattice\MayoConstraints.cs" />
@@ -136,8 +138,10 @@
     <Compile Include="Services\SphereExtractor.cs" />
     <Compile Include="Services\StructureExtension.cs" />
     <Compile Include="Utilities\StructureMatchingHelper.cs" />
+    <Compile Include="ViewModels\AdvancedMethodsViewModel.cs" />
     <Compile Include="ViewModels\CoordinateConverter.cs" />
     <Compile Include="ViewModels\EvaluationViewModel.cs" />
+    <Compile Include="ViewModels\InfluenceMatrixViewModel.cs" />
     <Compile Include="ViewModels\MainViewModel.cs" />
     <Compile Include="Properties\AssemblyExpirationDate.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -145,11 +149,17 @@
     <Compile Include="ViewModels\ScartViewModel.cs" />
     <Compile Include="ViewModels\SphereDialogViewModel.cs" />
     <Compile Include="GridBlockCreator.cs" />
+    <Compile Include="Views\AdvancedMethodsView.xaml.cs">
+      <DependentUpon>AdvancedMethodsView.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Views\Converters\BoolToBlueConverter.cs" />
     <Compile Include="Views\Converters\BoolToStrikeConverter.cs" />
     <Compile Include="Views\Converters\RadiusToDiameterConverter.cs" />
     <Compile Include="Views\EvaluationView.xaml.cs">
       <DependentUpon>EvaluationView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\InfluenceMatrixView.xaml.cs">
+      <DependentUpon>InfluenceMatrixView.xaml</DependentUpon>
     </Compile>
     <Compile Include="Views\OptimizationView.xaml.cs">
       <DependentUpon>OptimizationView.xaml</DependentUpon>
@@ -170,7 +180,15 @@
     <Compile Include="Views\TextBoxOutputter.cs" />
   </ItemGroup>
   <ItemGroup>
+    <Page Include="Views\AdvancedMethodsView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="Views\EvaluationView.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\InfluenceMatrixView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

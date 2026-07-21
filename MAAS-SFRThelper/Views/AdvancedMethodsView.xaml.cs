@@ -16,15 +16,13 @@ using System.Windows.Shapes;
 namespace MAAS_SFRThelper.Views
 {
     /// <summary>
-    /// Interaction logic for OptimizationView.xaml
+    /// Interaction logic for AdvancedMethodsView.xaml
     /// </summary>
-    public partial class OptimizationView : UserControl
+    public partial class AdvancedMethodsView : UserControl
     {
-        public OptimizationView()
+        public AdvancedMethodsView()
         {
             InitializeComponent();
         }
     }
-
-
 }
