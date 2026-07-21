@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Windows;
 using System.Text;
-using HDF5CSharp;
 using CalculateInfluenceMatrix;
 
 

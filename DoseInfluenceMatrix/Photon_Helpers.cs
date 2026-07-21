@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using VMS.TPS.Common.Model.API;
-
-using HDF5CSharp;
 using CalculateInfluenceMatrix;
 
 namespace PhotonCalculateInfluenceMatrix
