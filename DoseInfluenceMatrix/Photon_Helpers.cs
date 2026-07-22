@@ -55,7 +55,7 @@ namespace PhotonCalculateInfluenceMatrix
             return new DoseData(lstBeamletDose, dSumCutOffValues, iCutOffValueCnt);
         }
 
-        public static void WriteBeamMetaData(Beam b, MyBeamParameters beamParams, double dInfMatrixCutoffValue, string szOutputFile)
+        public static void WriteBeamMetaData(Beam b, MyBeamParameters beamParams, double dInfMatrixCutoffValue, float fDoseScalingFactor, string szOutputFile)
         {
             ControlPoint firstCP = b.ControlPoints[0];
 
@@ -79,7 +79,9 @@ namespace PhotonCalculateInfluenceMatrix
                         { "height_mm_File" , $"{szFilename}/beamlets/height_mm" },
                         { "position_x_mm_File" , $"{szFilename}/beamlets/position_x_mm" },
                         { "position_y_mm_File" , $"{szFilename}/beamlets/position_y_mm" },
-                        { "MLC_leaf_idx_File" , $"{szFilename}/beamlets/MLC_leaf_idx" }
+                        { "MLC_leaf_idx_File" , $"{szFilename}/beamlets/MLC_leaf_idx" },
+                        { "grid_x_idx_File" , $"{szFilename}/beamlets/grid_x_idx" },
+                        { "grid_y_idx_File" , $"{szFilename}/beamlets/grid_y_idx" }
                     }
                 },
                 { "jaw_position" , new Dictionary<string, float>{ { "top_left_x_mm", (float)firstCP.JawPositions.X1 }, { "top_left_y_mm", (float)firstCP.JawPositions.Y1 }, { "bottom_right_x_mm", (float)firstCP.JawPositions.X2 }, {"bottom_right_y_mm", (float)firstCP.JawPositions.Y2 } } },
@@ -93,7 +95,17 @@ namespace PhotonCalculateInfluenceMatrix
                 { "influenceMatrixSparse_tol", dInfMatrixCutoffValue },
                 { "influenceMatrixFull_File", $"{szFilename}/inf_matrix_full" },
                 { "MLC_leaves_pos_y_mm_File" ,  $"{szFilename}/MLC_leaves_pos_y_mm"},
-                { "machine_name" , b.TreatmentUnit.Id}
+                { "machine_name" , b.TreatmentUnit.Id},
+                // SFRThelper patch 3: every exported file documents its own
+                // unit convention so no downstream consumer needs archaeology.
+                { "dose_units", new Dictionary<string, object> {
+                        { "column_meaning", "dose per 1 MU of this beamlet's beam (plan beam weights NOT applied)" },
+                        { "formula", "stored_value = raw_dose * MetersetPerGy / PRESET_DOSE_NORMALIZATION * DoseScalingFactor" },
+                        { "MetersetPerGy", b.MetersetPerGy },
+                        { "PRESET_DOSE_NORMALIZATION", 100.0 },
+                        { "DoseScalingFactor", fDoseScalingFactor }
+                    }
+                }
             };
             CalculateInfluenceMatrix.Helpers.WriteJSONFile(dctBeamData, szOutputFile);
         }
@@ -199,6 +211,9 @@ namespace PhotonCalculateInfluenceMatrix
             float[] arrYSize = new float[iBeamletCnt];
             double[] arrSumOfCutoffValues = new double[iBeamletCnt];
             int[] arrNumCutoffValues = new int[iBeamletCnt];
+            // SFRThelper patch 9: enumeration-grid indices per beamlet.
+            int[] arrGridX = new int[iBeamletCnt];
+            int[] arrGridY = new int[iBeamletCnt];
             for (int i = 0; i < iBeamletCnt; i++)
             {
                 Beamlet bl = beamParams.m_lstBeamlets[i];
@@ -209,12 +224,16 @@ namespace PhotonCalculateInfluenceMatrix
                 arrYSize[i] = bl.m_fYSize;
                 arrSumOfCutoffValues[i] = bl.m_dSumCutoffValues;
                 arrNumCutoffValues[i] = bl.m_iNumCutoffValues;
+                arrGridX[i] = bl.m_iGridX;
+                arrGridY[i] = bl.m_iGridY;
             }
             Helpers.CreateDataSet<int>(fileId, "/beamlets/id", arrId);
             Helpers.CreateDataSet<float>(fileId, "/beamlets/position_x_mm", arrXPos);
             Helpers.CreateDataSet<float>(fileId, "/beamlets/width_mm", arrXSize);
             Helpers.CreateDataSet<float>(fileId, "/beamlets/position_y_mm", arrYPos);
             Helpers.CreateDataSet<float>(fileId, "/beamlets/height_mm", arrYSize);
+            Helpers.CreateDataSet<int>(fileId, "/beamlets/grid_x_idx", arrGridX);
+            Helpers.CreateDataSet<int>(fileId, "/beamlets/grid_y_idx", arrGridY);
             Helpers.CreateDataSet<double>(fileId, "/beamlets/sum_cutoff_value", arrSumOfCutoffValues);
             Helpers.CreateDataSet<int>(fileId, "/beamlets/cutoff_value_cnt", arrNumCutoffValues);
 

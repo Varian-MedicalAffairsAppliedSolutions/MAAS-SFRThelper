@@ -19,7 +19,7 @@ namespace PhotonCalculateInfluenceMatrix
             m_szBeamId = beamId;
         }
 
-        public Beamlet(int idx, string beamId, float xStart, float yStart, float xSize, float ySize)
+        public Beamlet(int idx, string beamId, float xStart, float yStart, float xSize, float ySize, int gridX, int gridY)
         {
             m_iIndex = idx;
             m_szBeamId = beamId;
@@ -27,6 +27,8 @@ namespace PhotonCalculateInfluenceMatrix
             m_fYStart = yStart;
             m_fXSize = xSize;
             m_fYSize = ySize;
+            m_iGridX = gridX;
+            m_iGridY = gridY;
         }
 
         public int m_iIndex;
@@ -35,6 +37,13 @@ namespace PhotonCalculateInfluenceMatrix
         public float m_fYSize;
         public float m_fXStart;
         public float m_fYStart;
+
+        // SFRThelper patch 9: integer indices on the enumeration grid,
+        // recorded at creation time. The SetOptimalFluence round trip maps
+        // matrix columns to fluence-image pixels through these; deriving
+        // them later from mm positions invites boundary rounding errors.
+        public int m_iGridX;
+        public int m_iGridY;
 
         public double m_dSumCutoffValues;
         public int m_iNumCutoffValues;
@@ -67,12 +76,18 @@ namespace PhotonCalculateInfluenceMatrix
 
     public static class PhotonInfluenceMatrixCalc
     {
+        // SFRThelper patch 3: normalization applied to doses returned by
+        // CalculateDoseWithPresetValues before per-MU conversion. Upstream
+        // used a bare 100.0 (reads as percent -> fraction). Pinned here as a
+        // named constant; its correctness is interrogated by first-run
+        // measurement #1 (closed-field vs open-beamlet MetersetPerGy check).
+        public const double PRESET_DOSE_NORMALIZATION = 100.0;
+
         public static void Calculate(Patient hPatient, Course hCourse, ExternalPlanSetup hPlan, double dInfCutoffValue, bool bExportFullInfMatrix, int iMaxDoseCalcRetry,
-            float beamletSizeX, float beamletSizeY, int iNumBeamletsToBeCalcAtATime, string szEclipseVolumeDoseCalcModel,
+            float beamletSizeX, float beamletSizeY, string szTargetStructureId, float fTargetMarginMM, int iNumBeamletsToBeCalcAtATime, string szEclipseVolumeDoseCalcModel,
             string szCalculationGridSizeInCM, float fDoseScalingFactor, string szOutputRootFolder, DisplayProgress hProgress,
             Func<bool> checkCancellation = null)
         {
-            hPatient.BeginModifications();
             int iFieldCnt = hPlan.Beams.Count();
 
             string resultsDirPath = szOutputRootFolder + $"\\{hPatient.LastName}${hPatient.Id}";
@@ -99,6 +114,24 @@ namespace PhotonCalculateInfluenceMatrix
             // create the scratch plan and start dose calculation anyway.
             if (checkCancellation != null && checkCancellation())
                 return;
+
+            // SFRThelper patch 2: beamlet enumeration is pruned against the
+            // target structure's BEV envelope (plus margin), not against the
+            // current MLC pose - the current lattice must not cage the
+            // placement search. A null/empty target id means no pruning:
+            // every beamlet inside the jaws is extracted.
+            Structure hTargetStruct = null;
+            if (!string.IsNullOrEmpty(szTargetStructureId))
+            {
+                hTargetStruct = hPlan.StructureSet.Structures.Where(s => s.Id == szTargetStructureId).SingleOrDefault();
+                if (hTargetStruct == null)
+                    throw new ApplicationException(
+                        $"Target structure '{szTargetStructureId}' not found in structure set '{hPlan.StructureSet.Id}'.");
+            }
+
+            // SFRThelper patch 2 housekeeping: write access opens only when
+            // writing is about to begin; everything above is read-only.
+            hPatient.BeginModifications();
 
             // SFRThelper patch 1b (scratch-plan pattern): the clinical plan is
             // read-only from here on. All beamlet slots and dose calculations
@@ -153,9 +186,6 @@ namespace PhotonCalculateInfluenceMatrix
                 // implicitly because CopyBeam refuses setup fields).
                 List<Beam> arrOrigBeams = hPlan.Beams.Where(b => !b.IsSetupField).ToList();
 
-                double dSumBeamWeights = 0;
-                foreach (Beam origBeam in arrOrigBeams)
-                    dSumBeamWeights += origBeam.WeightFactor;
 
                 // will be used for dose calculation later
                 List<KeyValuePair<string, MetersetValue>> presetValues = new List<KeyValuePair<string, MetersetValue>>();
@@ -169,6 +199,12 @@ namespace PhotonCalculateInfluenceMatrix
                     float[,] arrStaticLeafPositions = origBeam.ControlPoints.First().LeafPositions;
                     MyBeamParameters bp = new MyBeamParameters(jaws, arrStaticLeafPositions);
                     bp.m_ClosedMLC = GetClosedLeafPositions(arrLeafWidths.Length, jaws);
+
+                    // SFRThelper patch 2: target envelope for this beam's BEV,
+                    // computed once; null means keep everything in the jaws.
+                    List<VRect<float>> lstEnvelopeBoxes = null;
+                    if (hTargetStruct != null)
+                        lstEnvelopeBoxes = GetTargetEnvelopeBoxes(origBeam, hTargetStruct, fTargetMarginMM);
 
                     int iBeamletIdx = 0;
                     VRect<float> beamletSize;
@@ -185,10 +221,12 @@ namespace PhotonCalculateInfluenceMatrix
                             {
                                 leafs = GetLeafPositionsHalcyon(origBeam, jaws, beamletSizeX, beamletSizeY, arrLeafWidths, x, y, out beamletSize);
                             }
-                            if (IsBeamletInsideAperture(leafs, arrStaticLeafPositions))
+                            // SFRThelper patch 2: keep-test against the target
+                            // envelope; the MLC pose no longer steers enumeration.
+                            if (IsBeamletInAnyEnvelopeBox(beamletSize, lstEnvelopeBoxes))
                             {
                                 bp.m_lstBeamletMLCs.Add(leafs);
-                                bp.m_lstBeamlets.Add(new Beamlet(iBeamletIdx, origBeam.Id, beamletSize.X1, beamletSize.Y1, beamletSize.X2 - beamletSize.X1, beamletSize.Y2 - beamletSize.Y1));
+                                bp.m_lstBeamlets.Add(new Beamlet(iBeamletIdx, origBeam.Id, beamletSize.X1, beamletSize.Y1, beamletSize.X2 - beamletSize.X1, beamletSize.Y2 - beamletSize.Y1, x, y));
                                 iBeamletIdx++;
                             }
                         }
@@ -299,7 +337,12 @@ namespace PhotonCalculateInfluenceMatrix
                                         arrFullDoseMatrix = new float[iDoseMatrixSize, 1];
                                     Array.Clear(arrFullDoseMatrix, 0, arrFullDoseMatrix.Length);
 
-                                    double dWeight = (blb.WeightFactor / dSumBeamWeights) * blb.MetersetPerGy / 100.0;
+                                    // SFRThelper patch 3: matrix columns are plan-independent
+                                    // physics - dose per 1 MU of this beamlet's beam. The
+                                    // upstream (WeightFactor / sumWeights) factor baked the
+                                    // source plan's beam weighting into the matrix; weighting
+                                    // belongs to the fluence optimizer downstream.
+                                    double dWeight = blb.MetersetPerGy / PRESET_DOSE_NORMALIZATION;
                                     string szHDF5DataFile = System.IO.Path.Combine(szBeamPath, $"Beam_{b.Id}_Data.h5");
 
                                     DoseData doseData;
@@ -352,7 +395,7 @@ namespace PhotonCalculateInfluenceMatrix
                     Helpers.WriteBeamletInfoHDF5(tblBeamParameters[b.Id], szHDF5DataFile);
 
                     string szBeamMetaDataFile = System.IO.Path.Combine(szBeamPath, $"Beam_{b.Id}_MetaData.json");
-                    Helpers.WriteBeamMetaData(b, tblBeamParameters[b.Id], dInfCutoffValue, szBeamMetaDataFile);
+                    Helpers.WriteBeamMetaData(b, tblBeamParameters[b.Id], dInfCutoffValue, fDoseScalingFactor, szBeamMetaDataFile);
                 }
                 bCompleted = true;
             }
@@ -894,6 +937,75 @@ namespace PhotonCalculateInfluenceMatrix
             float[,] positions = null; // NAperture.MLC.Halcyon.CreateMLCApertureFromCollJawPositions(beam, xPosLeft * 0.1f, xPosRight * 0.1f, yPosDown * 0.1f, yPosTop * 0.1f);
             return positions;
         }
+        /// <summary>
+        /// SFRThelper patch 2: bounding boxes of the target structure's BEV
+        /// outline segments at the isocenter plane, grown by a margin, in the
+        /// MLC (collimator) frame. Beamlet enumeration keeps any beamlet whose
+        /// rectangle intersects one of these boxes. Boxes (not exact polygons)
+        /// are deliberately over-inclusive: an extra beamlet costs dose-calc
+        /// time; a missing one silently re-cages the placement search.
+        /// NOTE: outline points are rotated by the collimator angle to move
+        /// them from the fixed BEV frame into the MLC frame; this convention
+        /// is pinned by the collimator-0 differential runs and must be
+        /// re-verified before trusting rotated-collimator plans.
+        /// </summary>
+        public static List<VRect<float>> GetTargetEnvelopeBoxes(Beam beam, Structure target, float marginMM)
+        {
+            Point[][] arrOutlines = beam.GetStructureOutlines(target, true);
+            if (arrOutlines == null || arrOutlines.Length == 0)
+                throw new ApplicationException(
+                    $"Target structure '{target.Id}' has no BEV outline for beam '{beam.Id}'.");
+
+            double dCollDeg = beam.ControlPoints[0].CollimatorAngle;
+            double dCollRad = dCollDeg * Math.PI / 180.0;
+            double dCos = Math.Cos(dCollRad);
+            double dSin = Math.Sin(dCollRad);
+
+            List<VRect<float>> lstBoxes = new List<VRect<float>>();
+            foreach (Point[] segment in arrOutlines)
+            {
+                if (segment == null || segment.Length == 0)
+                    continue;
+                double dMinX = double.MaxValue, dMaxX = double.MinValue;
+                double dMinY = double.MaxValue, dMaxY = double.MinValue;
+                foreach (Point pt in segment)
+                {
+                    // fixed BEV frame -> MLC frame (rotate by collimator angle)
+                    double x = pt.X * dCos + pt.Y * dSin;
+                    double y = -pt.X * dSin + pt.Y * dCos;
+                    if (x < dMinX) dMinX = x;
+                    if (x > dMaxX) dMaxX = x;
+                    if (y < dMinY) dMinY = y;
+                    if (y > dMaxY) dMaxY = y;
+                }
+                lstBoxes.Add(new VRect<float>(
+                    (float)(dMinX - marginMM), (float)(dMinY - marginMM),
+                    (float)(dMaxX + marginMM), (float)(dMaxY + marginMM)));
+            }
+            if (lstBoxes.Count == 0)
+                throw new ApplicationException(
+                    $"Target structure '{target.Id}' produced no usable BEV outline segments for beam '{beam.Id}'.");
+            return lstBoxes;
+        }
+
+        /// <summary>
+        /// SFRThelper patch 2: axis-aligned rectangle intersection between a
+        /// beamlet and any envelope box. A null box list means no target was
+        /// specified: keep every beamlet inside the jaws.
+        /// </summary>
+        public static bool IsBeamletInAnyEnvelopeBox(VRect<float> beamletRect, List<VRect<float>> lstBoxes)
+        {
+            if (lstBoxes == null)
+                return true;
+            foreach (VRect<float> box in lstBoxes)
+            {
+                if (beamletRect.X1 < box.X2 && beamletRect.X2 > box.X1 &&
+                    beamletRect.Y1 < box.Y2 && beamletRect.Y2 > box.Y1)
+                    return true;
+            }
+            return false;
+        }
+
         public static bool IsBeamletInsideAperture(float[,] leafs, float[,] staticAperture)
         {
             int nLeafs = leafs.GetLength(1); // halcyon ? 57 : 60; // here we're dealing with all real leaf pairs.
