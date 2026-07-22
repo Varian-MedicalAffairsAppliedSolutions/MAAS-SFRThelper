@@ -5,19 +5,41 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d"
              Background="GhostWhite"
-             d:DesignHeight="700" d:DesignWidth="720">
+             d:DesignHeight="760" d:DesignWidth="740">
 
     <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
         <Style TargetType="TextBlock">
             <Setter Property="Foreground" Value="Black"/>
         </Style>
         <Style TargetType="Label">
             <Setter Property="Foreground" Value="Black"/>
         </Style>
+        <Style x:Key="ParamBox" TargetType="TextBox">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="Width" Value="70"/>
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="Margin" Value="0,2,12,2"/>
+        </Style>
+        <Style x:Key="ParamLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,2,6,2"/>
+        </Style>
+        <Style x:Key="DeviationNote" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="DarkOrange"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+        </Style>
     </UserControl.Resources>
 
     <Grid Margin="10">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -90,12 +112,94 @@
         </Border>
 
         <!-- ================================================================ -->
-        <!-- ROW 2: RUN CONTROL (test harness - buttons become real later)    -->
+        <!-- ROW 2: EXTRACTION PARAMETERS                                     -->
         <!-- ================================================================ -->
-        <StackPanel Grid.Row="2" Margin="0,0,0,8">
+        <Border Grid.Row="2" BorderBrush="LightGray" BorderThickness="1"
+                Background="White" Padding="8" Margin="0,0,0,8">
+            <StackPanel>
+                <TextBlock Text="Parameters" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource ParamLabel}" Text="Beamlet X (mm)"/>
+                    <TextBox   Grid.Row="0" Grid.Column="1" Style="{StaticResource ParamBox}"
+                               Text="{Binding BeamletSizeX, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBlock Grid.Row="0" Grid.Column="2" Style="{StaticResource ParamLabel}" Text="Beamlet Y (mm)"/>
+                    <TextBox   Grid.Row="0" Grid.Column="3" Style="{StaticResource ParamBox}"
+                               Text="{Binding BeamletSizeY, UpdateSourceTrigger=PropertyChanged}"/>
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource ParamLabel}" Text="Target structure"/>
+                    <ComboBox  Grid.Row="1" Grid.Column="1" Width="150" Height="22" Margin="0,2,12,2"
+                               HorizontalAlignment="Left"
+                               ItemsSource="{Binding TargetStructures}"
+                               SelectedItem="{Binding SelectedTarget}"/>
+                    <TextBlock Grid.Row="1" Grid.Column="2" Style="{StaticResource ParamLabel}" Text="Target margin (mm)"/>
+                    <TextBox   Grid.Row="1" Grid.Column="3" Style="{StaticResource ParamBox}"
+                               Text="{Binding TargetMarginMM, UpdateSourceTrigger=PropertyChanged}"/>
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource ParamLabel}" Text="Cutoff (Gy/MU)"/>
+                    <TextBox   Grid.Row="2" Grid.Column="1" Style="{StaticResource ParamBox}"
+                               Text="{Binding CutoffValue, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBlock Grid.Row="2" Grid.Column="2" Style="{StaticResource ParamLabel}" Text="Dose scaling factor"/>
+                    <TextBox   Grid.Row="2" Grid.Column="3" Style="{StaticResource ParamBox}"
+                               Text="{Binding DoseScalingFactor, UpdateSourceTrigger=PropertyChanged}"/>
+
+                    <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource ParamLabel}" Text="Batch size"/>
+                    <TextBox   Grid.Row="3" Grid.Column="1" Style="{StaticResource ParamBox}"
+                               Text="{Binding BatchSize, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBlock Grid.Row="3" Grid.Column="2" Style="{StaticResource ParamLabel}" Text="Max dose calc retries"/>
+                    <TextBox   Grid.Row="3" Grid.Column="3" Style="{StaticResource ParamBox}"
+                               Text="{Binding MaxRetry, UpdateSourceTrigger=PropertyChanged}"/>
+
+                    <TextBlock Grid.Row="4" Grid.Column="0" Style="{StaticResource ParamLabel}" Text="Calc model"/>
+                    <ComboBox  Grid.Row="4" Grid.Column="1" Width="150" Height="22" Margin="0,2,12,2"
+                               HorizontalAlignment="Left"
+                               ItemsSource="{Binding CalcModels}"
+                               SelectedItem="{Binding SelectedCalcModel}"/>
+                    <TextBlock Grid.Row="4" Grid.Column="2" Style="{StaticResource ParamLabel}" Text="Grid size (cm)"/>
+                    <TextBox   Grid.Row="4" Grid.Column="3" Style="{StaticResource ParamBox}"
+                               Text="{Binding GridSizeCM, UpdateSourceTrigger=PropertyChanged}"/>
+                </Grid>
+
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,2">
+                    <CheckBox Content="Export full (dense) matrix" Foreground="Black"
+                              IsChecked="{Binding ExportFullMatrix}" Margin="0,0,20,0"/>
+                    <TextBlock Style="{StaticResource ParamLabel}" Text="Output root"/>
+                    <TextBox Background="White" Foreground="Black" Width="300" Height="22"
+                             VerticalContentAlignment="Center"
+                             Text="{Binding OutputRoot, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+
+                <TextBlock Style="{StaticResource DeviationNote}"
+                           Visibility="{Binding CutoffDeviates, Converter={StaticResource BoolToVis}}"
+                           Text="Cutoff is nonzero: sparse entries at or below this value are dropped, and the exact reconstruction identity will not hold for this export."/>
+                <TextBlock Style="{StaticResource DeviationNote}"
+                           Visibility="{Binding ScalingDeviates, Converter={StaticResource BoolToVis}}"
+                           Text="Dose scaling factor is not 1: stored values are scaled. Downstream consumers must honor the dose_units metadata."/>
+            </StackPanel>
+        </Border>
+
+        <!-- ================================================================ -->
+        <!-- ROW 3: RUN CONTROL                                               -->
+        <!-- ================================================================ -->
+        <StackPanel Grid.Row="3" Margin="0,0,0,8">
             <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                <Button Content="Run Test Workload" Width="140" Height="26"
-                        Command="{Binding RunTestCommand}" Margin="0,0,8,0"/>
+                <Button Content="Run Extraction" Width="120" Height="26" FontWeight="SemiBold"
+                        Command="{Binding RunExtractionCommand}" Margin="0,0,8,0"/>
+                <Button Content="Inspect Output" Width="110" Height="26"
+                        Command="{Binding InspectOutputCommand}" Margin="0,0,8,0"/>
                 <Button Content="Test HDF5" Width="90" Height="26"
                         Command="{Binding TestHdfCommand}" Margin="0,0,8,0"/>
                 <Button Content="Cancel" Width="90" Height="26"
@@ -110,9 +214,9 @@
         </StackPanel>
 
         <!-- ================================================================ -->
-        <!-- ROW 3: RUN LOG                                                   -->
+        <!-- ROW 4: RUN LOG                                                   -->
         <!-- ================================================================ -->
-        <TextBox Grid.Row="3" IsReadOnly="True"
+        <TextBox Grid.Row="4" IsReadOnly="True"
                  Background="White" Foreground="Black" BorderBrush="LightGray"
                  FontFamily="Consolas" FontSize="12"
                  VerticalScrollBarVisibility="Auto" TextWrapping="Wrap"

@@ -52,7 +52,7 @@ namespace CalculateInfluenceMatrix
                     // Enable compression
                     if (HDF.PInvoke.H5P.set_shuffle(dcpl) < 0)
                         throw new Exception("Failed to set shuffle filter");
-                    if (HDF.PInvoke.H5P.set_deflate(dcpl, 9) < 0)
+                    if (HDF.PInvoke.H5P.set_deflate(dcpl, 6) < 0)
                         throw new Exception("Failed to set compression");
 
                     // Select appropriate data type
@@ -196,7 +196,7 @@ namespace CalculateInfluenceMatrix
                 // Enable compression
                 if (HDF.PInvoke.H5P.set_shuffle(dcpl) < 0)
                     throw new Exception("Failed to set shuffle filter");
-                if (HDF.PInvoke.H5P.set_deflate(dcpl, 9) < 0)
+                if (HDF.PInvoke.H5P.set_deflate(dcpl, 6) < 0)
                     throw new Exception("Failed to set compression");
 
                 // Create dataset with appropriate data type
@@ -357,6 +357,111 @@ namespace CalculateInfluenceMatrix
                     HDF.PInvoke.H5D.close(datasetId);
             }
         }
+        // ================================================================
+        // SFRThelper storage patch: purpose-built machinery for appendable
+        // RANK-1 vectors (the CSR data/indices arrays). The 2-D create/append
+        // pair above grows matrices and speaks only float/double; these grow
+        // one-dimensional datasets and additionally speak int32. Same handle
+        // discipline: every id closed in finally on every path.
+        // ================================================================
+        private static long VectorTypeFor(Type t)
+        {
+            if (t == typeof(float)) return HDF.PInvoke.H5T.NATIVE_FLOAT;
+            if (t == typeof(int)) return HDF.PInvoke.H5T.NATIVE_INT32;
+            if (t == typeof(double)) return HDF.PInvoke.H5T.NATIVE_DOUBLE;
+            throw new Exception($"Appendable vectors support float, int, double - not {t.Name}");
+        }
+
+        public static void CreateAppendableVector<T>(long fileId, string datasetPath, T[] initialData) where T : struct
+        {
+            long dataspaceId = -1;
+            long dcpl = -1;
+            long datasetId = -1;
+            GCHandle handle = default;
+            try
+            {
+                ulong[] dims = new ulong[] { (ulong)initialData.Length };
+                ulong[] maxDims = new ulong[] { HDF.PInvoke.H5S.UNLIMITED };
+                dataspaceId = HDF.PInvoke.H5S.create_simple(1, dims, maxDims);
+                if (dataspaceId < 0) throw new Exception("Failed to create vector dataspace");
+
+                dcpl = HDF.PInvoke.H5P.create(HDF.PInvoke.H5P.DATASET_CREATE);
+                if (dcpl < 0) throw new Exception("Failed to create property list");
+                ulong[] chunkDims = new ulong[] { 65536 };
+                if (HDF.PInvoke.H5P.set_chunk(dcpl, 1, chunkDims) < 0)
+                    throw new Exception("Failed to set chunk size");
+                if (HDF.PInvoke.H5P.set_shuffle(dcpl) < 0)
+                    throw new Exception("Failed to set shuffle filter");
+                if (HDF.PInvoke.H5P.set_deflate(dcpl, 6) < 0)
+                    throw new Exception("Failed to set compression");
+
+                long datatype = VectorTypeFor(typeof(T));
+                datasetId = HDF.PInvoke.H5D.create(fileId, datasetPath, datatype, dataspaceId,
+                    HDF.PInvoke.H5P.DEFAULT, dcpl, HDF.PInvoke.H5P.DEFAULT);
+                if (datasetId < 0)
+                    throw new Exception($"Failed to create vector dataset {datasetPath}");
+
+                if (initialData.Length > 0)
+                {
+                    handle = GCHandle.Alloc(initialData, GCHandleType.Pinned);
+                    if (HDF.PInvoke.H5D.write(datasetId, datatype,
+                        HDF.PInvoke.H5S.ALL, HDF.PInvoke.H5S.ALL,
+                        HDF.PInvoke.H5P.DEFAULT, handle.AddrOfPinnedObject()) < 0)
+                        throw new Exception("Failed to write initial vector data");
+                }
+            }
+            finally
+            {
+                if (handle.IsAllocated) handle.Free();
+                if (datasetId >= 0) HDF.PInvoke.H5D.close(datasetId);
+                if (dataspaceId >= 0) HDF.PInvoke.H5S.close(dataspaceId);
+                if (dcpl >= 0) HDF.PInvoke.H5P.close(dcpl);
+            }
+        }
+
+        public static void AppendToVector<T>(long fileId, string datasetPath, T[] newData) where T : struct
+        {
+            if (newData == null || newData.Length == 0)
+                return;
+            long datasetId = -1, filespaceId = -1, memspaceId = -1;
+            GCHandle handle = default;
+            try
+            {
+                datasetId = HDF.PInvoke.H5D.open(fileId, datasetPath);
+                if (datasetId < 0) throw new Exception($"Failed to open dataset {datasetPath}");
+
+                filespaceId = HDF.PInvoke.H5D.get_space(datasetId);
+                ulong[] dims = new ulong[1];
+                HDF.PInvoke.H5S.get_simple_extent_dims(filespaceId, dims, null);
+                HDF.PInvoke.H5S.close(filespaceId);
+                filespaceId = -1;
+
+                ulong[] newDims = new ulong[] { dims[0] + (ulong)newData.Length };
+                if (HDF.PInvoke.H5D.set_extent(datasetId, newDims) < 0)
+                    throw new Exception("Failed to extend vector dataset");
+
+                filespaceId = HDF.PInvoke.H5D.get_space(datasetId);
+                ulong[] start = new ulong[] { dims[0] };
+                ulong[] count = new ulong[] { (ulong)newData.Length };
+                if (HDF.PInvoke.H5S.select_hyperslab(filespaceId, HDF.PInvoke.H5S.seloper_t.SET, start, null, count, null) < 0)
+                    throw new Exception("Failed to select hyperslab");
+                memspaceId = HDF.PInvoke.H5S.create_simple(1, count, null);
+
+                long datatype = VectorTypeFor(typeof(T));
+                handle = GCHandle.Alloc(newData, GCHandleType.Pinned);
+                if (HDF.PInvoke.H5D.write(datasetId, datatype, memspaceId, filespaceId,
+                    HDF.PInvoke.H5P.DEFAULT, handle.AddrOfPinnedObject()) < 0)
+                    throw new Exception("Failed to append vector data");
+            }
+            finally
+            {
+                if (handle.IsAllocated) handle.Free();
+                if (memspaceId >= 0) HDF.PInvoke.H5S.close(memspaceId);
+                if (filespaceId >= 0) HDF.PInvoke.H5S.close(filespaceId);
+                if (datasetId >= 0) HDF.PInvoke.H5D.close(datasetId);
+            }
+        }
+
         public static void VerifyCompression(string filePath, Action<string> report = null)
         {
             long fileId = -1;

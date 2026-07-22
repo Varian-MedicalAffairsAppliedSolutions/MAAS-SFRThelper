@@ -141,6 +141,7 @@
     <Compile Include="Services\MayoLattice\SliceCOMCalculator.cs" />
     <Compile Include="Services\OptimizationObjectiveCreator.cs" />
     <Compile Include="Services\PlanEligibilityService.cs" />
+    <Compile Include="Services\RunProgressDisplayAdapter.cs" />
     <Compile Include="Services\SphereExtractor.cs" />
     <Compile Include="Services\StructureExtension.cs" />
     <Compile Include="Utilities\StructureMatchingHelper.cs" />

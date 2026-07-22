@@ -59,6 +59,7 @@ namespace PhotonCalculateInfluenceMatrix
             m_lstBeamletMLCs = new List<float[,]>();
             m_lstBeamletBeam = new List<Beam>();
             m_arrClosedMLCDoseMatrix = null;
+            m_lstCsrIndPtr = new List<int> { 0 };
         }
         public int BeamletCount
         {
@@ -72,6 +73,9 @@ namespace PhotonCalculateInfluenceMatrix
         public float[,] m_ClosedMLC; // closed MLC
         public List<Beam> m_lstBeamletBeam; // beams copied from original beam. size is the same as number of beams to be calculated at a time
         public float[,] m_arrClosedMLCDoseMatrix;
+        // SFRThelper storage patch: cumulative nonzero count per beamlet
+        // (the CSR indptr), written to the H5 at beam finalization.
+        public List<int> m_lstCsrIndPtr;
     };
 
     public static class PhotonInfluenceMatrixCalc
@@ -345,17 +349,20 @@ namespace PhotonCalculateInfluenceMatrix
                                     double dWeight = blb.MetersetPerGy / PRESET_DOSE_NORMALIZATION;
                                     string szHDF5DataFile = System.IO.Path.Combine(szBeamPath, $"Beam_{b.Id}_Data.h5");
 
-                                    DoseData doseData;
                                     float[,] arrClosedMLCDoseMatrix = null;
                                     if (bFirstCalc && i == 0)
                                     {
                                         arrClosedMLCDoseMatrix = new float[iDoseMatrixSize, 1];
-                                        doseData = Helpers.GetDosePoints(hBeamDose, dWeight, dInfCutoffValue, ref arrClosedMLCDoseMatrix);
+                                        Helpers.FillDoseMatrix(hBeamDose, dWeight, ref arrClosedMLCDoseMatrix);
                                         bp.m_arrClosedMLCDoseMatrix = arrClosedMLCDoseMatrix;
                                     }
                                     else
                                     {
-                                        doseData = Helpers.GetDosePoints(hBeamDose, dWeight, dInfCutoffValue, ref arrFullDoseMatrix);
+                                        // SFRThelper patch 4: fill raw, correct (subtract
+                                        // leakage, scale, clamp), THEN harvest sparse from
+                                        // the corrected matrix - sparse and full are the
+                                        // same matrix in two encodings from here on.
+                                        Helpers.FillDoseMatrix(hBeamDose, dWeight, ref arrFullDoseMatrix);
                                         // subtract matrix from closedMLC matrix
                                         arrClosedMLCDoseMatrix = bp.m_arrClosedMLCDoseMatrix;
                                         for (int iDosePtIdx = 0; iDosePtIdx < iDoseMatrixSize; iDosePtIdx++)
@@ -365,13 +372,16 @@ namespace PhotonCalculateInfluenceMatrix
                                                 arrFullDoseMatrix[iDosePtIdx, 0] = 0;
                                         }
 
+                                        DoseData doseData = Helpers.ExtractSparsePoints(arrFullDoseMatrix, dInfCutoffValue);
+
                                         int iBeamletIdx = iCurrBeamlet - iNumBeamletsToBeCalcAtATime + i;
                                         Beamlet hBeamlet = bp.m_lstBeamlets[iBeamletIdx];
-                                        hBeamlet.m_dSumCutoffValues = doseData.m_dSumCutoffValues * fDoseScalingFactor;
+                                        // patch 4: values are already scaled by the time
+                                        // extraction sees them - no second scaling here.
+                                        hBeamlet.m_dSumCutoffValues = doseData.m_dSumCutoffValues;
                                         hBeamlet.m_iNumCutoffValues = doseData.m_iNumCutoffValues;
 
-                                        bool bAddLastEntry = (iBeamletIdx == bp.BeamletCount - 1);
-                                        Helpers.WriteInfMatrixHDF5(bExportFullInfMatrix, arrFullDoseMatrix, doseData, bAddLastEntry, iMaxPointCnt, iBeamletIdx, fDoseScalingFactor, szHDF5DataFile);
+                                        Helpers.WriteInfMatrixHDF5(bExportFullInfMatrix, bp, arrFullDoseMatrix, doseData, szHDF5DataFile);
                                     }
                                 }
                             }
@@ -392,7 +402,7 @@ namespace PhotonCalculateInfluenceMatrix
                     hProgress.Message($"Progress: Finalizing beam {b.Id}.");
 
                     string szHDF5DataFile = System.IO.Path.Combine(szBeamPath, $"Beam_{b.Id}_Data.h5");
-                    Helpers.WriteBeamletInfoHDF5(tblBeamParameters[b.Id], szHDF5DataFile);
+                    Helpers.WriteBeamletInfoHDF5(tblBeamParameters[b.Id], iMaxPointCnt, szHDF5DataFile);
 
                     string szBeamMetaDataFile = System.IO.Path.Combine(szBeamPath, $"Beam_{b.Id}_MetaData.json");
                     Helpers.WriteBeamMetaData(b, tblBeamParameters[b.Id], dInfCutoffValue, fDoseScalingFactor, szBeamMetaDataFile);
@@ -662,15 +672,37 @@ namespace PhotonCalculateInfluenceMatrix
             int iZSize = hCT.ZSize;
             byte[,,] mask_array = new byte[iXSize, iYSize, iZSize];
 
+            // SFRThelper patch 7: probe only the (x, y) columns inside the
+            // structure's own bounding box (one-voxel margin, clamped).
+            // Everything outside the box is zero by definition, and the mask
+            // array is zero-initialized - identical output, without walking
+            // the whole CT per structure. Null mesh (degenerate structure)
+            // falls back to the full grid, so behavior is never worse than
+            // upstream. Same axis-aligned assumption as the loop itself.
+            int iXStart = 0, iXEnd = iXSize, iYStart = 0, iYEnd = iYSize;
+            var hMesh = hStruct.MeshGeometry;
+            if (hMesh != null)
+            {
+                var bounds = hMesh.Bounds;
+                iXStart = (int)Math.Floor((bounds.X - hCT.Origin.x) / hCT.XRes) - 1;
+                iXEnd = (int)Math.Ceiling((bounds.X + bounds.SizeX - hCT.Origin.x) / hCT.XRes) + 2;
+                iYStart = (int)Math.Floor((bounds.Y - hCT.Origin.y) / hCT.YRes) - 1;
+                iYEnd = (int)Math.Ceiling((bounds.Y + bounds.SizeY - hCT.Origin.y) / hCT.YRes) + 2;
+                if (iXStart < 0) iXStart = 0;
+                if (iYStart < 0) iYStart = 0;
+                if (iXEnd > iXSize) iXEnd = iXSize;
+                if (iYEnd > iYSize) iYEnd = iYSize;
+            }
+
             VVector z_direction = ((iZSize - 1) * hCT.ZRes) * hCT.ZDirection;
             VVector y_step = hCT.YRes * hCT.YDirection;
 
             VVector start_x, stop;
-            for (int x = 0; x < iXSize; x++)    //) :  # scan X dimensions
+            for (int x = iXStart; x < iXEnd; x++)    //) :  # scan X dimensions
             {
-                start_x = hCT.Origin + ((x * hCT.XRes) * hCT.XDirection);
+                start_x = hCT.Origin + ((x * hCT.XRes) * hCT.XDirection) + (iYStart * hCT.YRes) * hCT.YDirection;
 
-                for (int y = 0; y < iYSize; y++)  // # scan Y dimension
+                for (int y = iYStart; y < iYEnd; y++)  // # scan Y dimension
                 {
                     stop = start_x + z_direction;
 
