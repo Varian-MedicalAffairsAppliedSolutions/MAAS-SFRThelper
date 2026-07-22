@@ -449,11 +449,48 @@ namespace PhotonCalculateInfluenceMatrix
                 }
             }
 
+            // SFRThelper patch 6: the metadata below has always advertised
+            // ct_to_dose_voxel_map, but upstream never wrote it. Built here:
+            // one entry per CT voxel, in the same z-outer / y / x-inner linear
+            // order used for dose voxels above; value = linear index of the
+            // NEAREST dose voxel (per-axis Math.Round - floor would shift
+            // every structure mask by up to a full dose voxel toward the
+            // origin corner), or -1 when the CT voxel lies outside the dose
+            // grid. Axis-aligned grids with scalar origins are assumed, the
+            // same assumption this method already makes for coordinates.
+            Image hCTForMap = hPlanSetup.StructureSet.Image;
+            int iCTX = hCTForMap.XSize, iCTY = hCTForMap.YSize, iCTZ = hCTForMap.ZSize;
+            VVector vCTOriginForMap = hCTForMap.Origin;
+            int[] arrCtToDoseMap = new int[iCTX * iCTY * iCTZ];
+            int iMapIdx = 0;
+            for (int z = 0; z < iCTZ; z++)
+            {
+                double dCTz = vCTOriginForMap.z + z * hCTForMap.ZRes;
+                int iDz = (int)Math.Round((dCTz - vOrigin.z) / dZRes);
+                for (int y = 0; y < iCTY; y++)
+                {
+                    double dCTy = vCTOriginForMap.y + y * hCTForMap.YRes;
+                    int iDy = (int)Math.Round((dCTy - vOrigin.y) / dYRes);
+                    for (int x = 0; x < iCTX; x++)
+                    {
+                        double dCTx = vCTOriginForMap.x + x * hCTForMap.XRes;
+                        int iDx = (int)Math.Round((dCTx - vOrigin.x) / dXRes);
+
+                        if (iDx >= 0 && iDx < iXSize && iDy >= 0 && iDy < iYSize && iDz >= 0 && iDz < iZSize)
+                            arrCtToDoseMap[iMapIdx] = iDz * iYSize * iXSize + iDy * iXSize + iDx;
+                        else
+                            arrCtToDoseMap[iMapIdx] = -1;
+                        iMapIdx++;
+                    }
+                }
+            }
+
             string szDataFilename = "OptimizationVoxels_Data.h5";
             string szH5Path = System.IO.Path.Combine(szOutputFolder, szDataFilename);
             long hf = Hdf5.CreateFile(szH5Path);
             Helpers.CreateDataSet<float>(hf, "/voxel_coordinate_XYZ_mm", npPtCoords);
             Helpers.CreateDataSet<float>(hf, "/voxel_weight_mm3", npPtWeights);
+            Helpers.CreateDataSet<int>(hf, "/ct_to_dose_voxel_map", arrCtToDoseMap);
             Hdf5.CloseFile(hf);
 
             // Save meta data
@@ -845,6 +882,12 @@ namespace PhotonCalculateInfluenceMatrix
             }
 
             float gapWidth = 0, yStart = 0;
+            // SFRThelper patch 11: 0 is a legal yStart (a beamlet row whose
+            // lower edge sits exactly on the midline), so "unset" needs its
+            // own flag - the upstream (yStart == 0) test overwrote the value
+            // whenever a multi-leaf beamlet started at y = 0, shifting that
+            // row's recorded rectangle by one leaf width.
+            bool bYStartSet = false;
             float parkPos = (float)jaws.X1 - 1;
 
             float fMLCHalfWidth = 0.0f;
@@ -861,8 +904,11 @@ namespace PhotonCalculateInfluenceMatrix
                 }
                 else if (gapWidth < beamletSizeY) // leaves that cover beamlet
                 {
-                    if (yStart == 0)
+                    if (!bYStartSet)
+                    {
                         yStart = fCurrLeafPosY; // half field in mm
+                        bYStartSet = true;
+                    }
 
                     positions[0, i] = xPosLeft;
                     positions[1, i] = xPosRight;
