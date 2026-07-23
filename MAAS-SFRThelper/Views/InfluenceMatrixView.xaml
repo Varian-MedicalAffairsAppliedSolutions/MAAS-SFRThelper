@@ -133,52 +133,105 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource ParamLabel}" Text="Beamlet X (mm)"/>
+                    <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource ParamLabel}"
+                               Text="Beamlet X (mm)"
+                               ToolTip="Beamlet width along leaf travel (mm) at the isocenter plane. Smaller = finer fluence resolution but more beamlets and longer runtime. Default 2.5."/>
                     <TextBox   Grid.Row="0" Grid.Column="1" Style="{StaticResource ParamBox}"
+                               ToolTip="Beamlet width along leaf travel (mm) at the isocenter plane. Smaller = finer fluence resolution but more beamlets and longer runtime. Default 2.5."
                                Text="{Binding BeamletSizeX, UpdateSourceTrigger=PropertyChanged}"/>
-                    <TextBlock Grid.Row="0" Grid.Column="2" Style="{StaticResource ParamLabel}" Text="Beamlet Y (mm)"/>
+                    <TextBlock Grid.Row="0" Grid.Column="2" Style="{StaticResource ParamLabel}"
+                               Text="Beamlet Y (mm)"
+                               ToolTip="Beamlet height (mm). Realized per whole MLC leaves, so effective height follows leaf widths (Millennium central leaves are 5 mm). Default 5."/>
                     <TextBox   Grid.Row="0" Grid.Column="3" Style="{StaticResource ParamBox}"
+                               ToolTip="Beamlet height (mm). Realized per whole MLC leaves, so effective height follows leaf widths (Millennium central leaves are 5 mm). Default 5."
                                Text="{Binding BeamletSizeY, UpdateSourceTrigger=PropertyChanged}"/>
 
-                    <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource ParamLabel}" Text="Target structure"/>
+                    <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource ParamLabel}"
+                               Text="Target structure"
+                               ToolTip="Beamlets are kept only where they intersect this structure's beam's-eye-view silhouette plus the margin. '(none)' extracts every beamlet inside the jaws: complete, largest, slowest."/>
                     <ComboBox  Grid.Row="1" Grid.Column="1" Width="150" Height="22" Margin="0,2,12,2"
                                HorizontalAlignment="Left"
+                               ToolTip="Beamlets are kept only where they intersect this structure's beam's-eye-view silhouette plus the margin. '(none)' extracts every beamlet inside the jaws: complete, largest, slowest."
                                ItemsSource="{Binding TargetStructures}"
                                SelectedItem="{Binding SelectedTarget}"/>
-                    <TextBlock Grid.Row="1" Grid.Column="2" Style="{StaticResource ParamLabel}" Text="Target margin (mm)"/>
+                    <TextBlock Grid.Row="1" Grid.Column="2" Style="{StaticResource ParamLabel}"
+                               Text="Target margin (mm)"
+                               ToolTip="Growth of the target silhouette (mm) before beamlet pruning. Peaks near the edge draw dose from just outside the silhouette; 10 mm covers typical lattice sphere radii. Over-inclusion costs runtime only."/>
                     <TextBox   Grid.Row="1" Grid.Column="3" Style="{StaticResource ParamBox}"
+                               ToolTip="Growth of the target silhouette (mm) before beamlet pruning. Peaks near the edge draw dose from just outside the silhouette; 10 mm covers typical lattice sphere radii. Over-inclusion costs runtime only."
                                Text="{Binding TargetMarginMM, UpdateSourceTrigger=PropertyChanged}"/>
 
-                    <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource ParamLabel}" Text="Cutoff (Gy/MU)"/>
+                    <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource ParamLabel}"
+                               Text="Cutoff (Gy/MU)"
+                               ToolTip="Sparse-matrix threshold in stored dose units. 0 keeps every nonzero and preserves the exact reconstruction identity (required for adjoint/optimization work). Nonzero shrinks files but drops small entries."/>
                     <TextBox   Grid.Row="2" Grid.Column="1" Style="{StaticResource ParamBox}"
+                               ToolTip="Sparse-matrix threshold in stored dose units. 0 keeps every nonzero and preserves the exact reconstruction identity (required for adjoint/optimization work). Nonzero shrinks files but drops small entries."
                                Text="{Binding CutoffValue, UpdateSourceTrigger=PropertyChanged}"/>
-                    <TextBlock Grid.Row="2" Grid.Column="2" Style="{StaticResource ParamLabel}" Text="Dose scaling factor"/>
+                    <TextBlock Grid.Row="2" Grid.Column="2" Style="{StaticResource ParamLabel}"
+                               Text="Dose scaling factor"
+                               ToolTip="Multiplies every stored matrix value after leakage subtraction. Leave at 1 unless you need site-specific scaling; whatever is used is recorded in the dose_units metadata."/>
                     <TextBox   Grid.Row="2" Grid.Column="3" Style="{StaticResource ParamBox}"
+                               ToolTip="Multiplies every stored matrix value after leakage subtraction. Leave at 1 unless you need site-specific scaling; whatever is used is recorded in the dose_units metadata."
                                Text="{Binding DoseScalingFactor, UpdateSourceTrigger=PropertyChanged}"/>
 
-                    <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource ParamLabel}" Text="Batch size"/>
+                    <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource ParamLabel}"
+                               Text="Batch size"
+                               ToolTip="Beamlet slot beams computed per dose-calculation call, per field. Larger batches amortize calculation overhead; smaller batches cancel at finer granularity."/>
                     <TextBox   Grid.Row="3" Grid.Column="1" Style="{StaticResource ParamBox}"
+                               ToolTip="Beamlet slot beams computed per dose-calculation call, per field. Larger batches amortize calculation overhead; smaller batches cancel at finer granularity."
                                Text="{Binding BatchSize, UpdateSourceTrigger=PropertyChanged}"/>
-                    <TextBlock Grid.Row="3" Grid.Column="2" Style="{StaticResource ParamLabel}" Text="Max dose calc retries"/>
+                    <TextBlock Grid.Row="3" Grid.Column="2" Style="{StaticResource ParamLabel}"
+                               Text="Max dose calc retries"
+                               ToolTip="Retry attempts per failed dose calculation before the run aborts."/>
                     <TextBox   Grid.Row="3" Grid.Column="3" Style="{StaticResource ParamBox}"
+                               ToolTip="Retry attempts per failed dose calculation before the run aborts."
                                Text="{Binding MaxRetry, UpdateSourceTrigger=PropertyChanged}"/>
 
-                    <TextBlock Grid.Row="4" Grid.Column="0" Style="{StaticResource ParamLabel}" Text="Calc model"/>
+                    <TextBlock Grid.Row="4" Grid.Column="0" Style="{StaticResource ParamLabel}"
+                               Text="Calc model"
+                               ToolTip="Photon volume dose model used on the scratch plan. The clinical plan's own model is never changed."/>
                     <ComboBox  Grid.Row="4" Grid.Column="1" Width="150" Height="22" Margin="0,2,12,2"
                                HorizontalAlignment="Left"
+                               ToolTip="Photon volume dose model used on the scratch plan. The clinical plan's own model is never changed."
                                ItemsSource="{Binding CalcModels}"
                                SelectedItem="{Binding SelectedCalcModel}"/>
-                    <TextBlock Grid.Row="4" Grid.Column="2" Style="{StaticResource ParamLabel}" Text="Grid size (cm)"/>
+                    <TextBlock Grid.Row="4" Grid.Column="2" Style="{StaticResource ParamLabel}"
+                               Text="Grid size (cm)"
+                               ToolTip="Dose calculation grid on the scratch plan (cm). Finer = more voxels (more matrix rows) and longer calculations. Default 0.25."/>
                     <TextBox   Grid.Row="4" Grid.Column="3" Style="{StaticResource ParamBox}"
+                               ToolTip="Dose calculation grid on the scratch plan (cm). Finer = more voxels (more matrix rows) and longer calculations. Default 0.25."
                                Text="{Binding GridSizeCM, UpdateSourceTrigger=PropertyChanged}"/>
                 </Grid>
 
+                <StackPanel Orientation="Horizontal" Margin="0,6,0,2">
+                    <TextBlock Style="{StaticResource ParamLabel}" Text="Override machine"
+                               ToolTip="Leave blank to use each source beam's own machine. Set this when the source plan's machine is not commissioned on THIS Eclipse (e.g. an imported TrueBeam on an Edge-only research box). Editable - type any machine name."/>
+                    <ComboBox Width="130" Height="22" Margin="0,0,12,0" IsEditable="True"
+                              HorizontalAlignment="Left"
+                              ToolTip="Leave blank to use each source beam's own machine. Set this when the source plan's machine is not commissioned on THIS Eclipse. Editable - type any machine name."
+                              ItemsSource="{Binding MachineSuggestions}"
+                              Text="{Binding OverrideMachine, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBlock Style="{StaticResource ParamLabel}" Text="Override energy"
+                               ToolTip="Leave blank to use each source beam's own energy. If overriding the machine, set an energy string valid on that machine (e.g. 6X, 10X, 6X-FFF)."/>
+                    <TextBox Background="White" Foreground="Black" Width="90" Height="22"
+                             VerticalContentAlignment="Center"
+                             ToolTip="Leave blank to use each source beam's own energy. If overriding the machine, set an energy valid on that machine (e.g. 6X, 10X, 6X-FFF)."
+                             Text="{Binding OverrideEnergy, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+
+                <TextBlock Style="{StaticResource DeviationNote}"
+                           Visibility="{Binding OverrideActive, Converter={StaticResource BoolToVis}}"
+                           Text="Machine/energy override active: the influence matrix will reflect the override machine's beam model, not the source plan's. Appropriate for pipeline development; for optimizing a real plan, extract on that plan's own commissioned machine."/>
+
                 <StackPanel Orientation="Horizontal" Margin="0,4,0,2">
                     <CheckBox Content="Export full (dense) matrix" Foreground="Black"
+                              ToolTip="Also writes the dense per-beam matrix (large files). Needed for the reconstruction/validation test; uncheck for sparse-only exports."
                               IsChecked="{Binding ExportFullMatrix}" Margin="0,0,20,0"/>
-                    <TextBlock Style="{StaticResource ParamLabel}" Text="Output root"/>
+                    <TextBlock Style="{StaticResource ParamLabel}" Text="Output root"
+                               ToolTip="Run output goes to &lt;root&gt;\&lt;LastName&gt;$&lt;PatientId&gt;\&lt;PlanId&gt;: per-beam H5 + JSON metadata, the optimization voxel grid, and structure masks."/>
                     <TextBox Background="White" Foreground="Black" Width="300" Height="22"
                              VerticalContentAlignment="Center"
+                             ToolTip="Run output goes to &lt;root&gt;\&lt;LastName&gt;$&lt;PatientId&gt;\&lt;PlanId&gt;: per-beam H5 + JSON metadata, the optimization voxel grid, and structure masks."
                              Text="{Binding OutputRoot, UpdateSourceTrigger=PropertyChanged}"/>
                 </StackPanel>
 
@@ -216,7 +269,7 @@
         <!-- ================================================================ -->
         <!-- ROW 4: RUN LOG                                                   -->
         <!-- ================================================================ -->
-        <TextBox Grid.Row="4" IsReadOnly="True"
+        <TextBox Grid.Row="4" IsReadOnly="True" MinHeight="150"
                  Background="White" Foreground="Black" BorderBrush="LightGray"
                  FontFamily="Consolas" FontSize="12"
                  VerticalScrollBarVisibility="Auto" TextWrapping="Wrap"

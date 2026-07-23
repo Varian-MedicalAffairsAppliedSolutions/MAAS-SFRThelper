@@ -68,10 +68,15 @@ namespace CalculateInfluenceMatrix
 
             int rank = data.Rank;
             ulong[] dims = new ulong[rank];
+            ulong totalElements = 1;
             for (int i = 0; i < rank; i++)
+            {
                 dims[i] = (ulong)data.GetLength(i);
+                totalElements *= dims[i];
+            }
+            int elemSize = ElementSizeFor(typeof(T));
 
-            long spaceId = -1, datasetId = -1;
+            long spaceId = -1, dcplId = -1, datasetId = -1;
             GCHandle pin = default(GCHandle);
             try
             {
@@ -79,7 +84,25 @@ namespace CalculateInfluenceMatrix
                 if (spaceId < 0)
                     throw new IOException($"HDF5: failed to create dataspace for '{datasetName}'.");
 
-                datasetId = HDF.PInvoke.H5D.create(locationId, datasetName, dtype, spaceId);
+                // Datasets above 1 MB are chunked + shuffled + gzip-6. This
+                // matters enormously for the structure masks (full-CT byte
+                // arrays, mostly zeros) and the CT-to-dose voxel map; small
+                // side datasets stay contiguous.
+                long dcplForCreate = HDF.PInvoke.H5P.DEFAULT;
+                if (totalElements * (ulong)elemSize >= (1UL << 20) && totalElements > 0)
+                {
+                    dcplId = HDF.PInvoke.H5P.create(HDF.PInvoke.H5P.DATASET_CREATE);
+                    if (dcplId < 0)
+                        throw new IOException($"HDF5: failed to create property list for '{datasetName}'.");
+                    if (HDF.PInvoke.H5P.set_chunk(dcplId, rank, ChunkFor(dims)) < 0)
+                        throw new IOException($"HDF5: failed to set chunking for '{datasetName}'.");
+                    HDF.PInvoke.H5P.set_shuffle(dcplId);
+                    HDF.PInvoke.H5P.set_deflate(dcplId, 6);
+                    dcplForCreate = dcplId;
+                }
+
+                datasetId = HDF.PInvoke.H5D.create(locationId, datasetName, dtype, spaceId,
+                    HDF.PInvoke.H5P.DEFAULT, dcplForCreate, HDF.PInvoke.H5P.DEFAULT);
                 if (datasetId < 0)
                     throw new IOException($"HDF5: failed to create dataset '{datasetName}' " +
                         "(does it already exist at this location?).");
@@ -98,9 +121,32 @@ namespace CalculateInfluenceMatrix
                     pin.Free();
                 if (datasetId >= 0)
                     HDF.PInvoke.H5D.close(datasetId);
+                if (dcplId >= 0)
+                    HDF.PInvoke.H5P.close(dcplId);
                 if (spaceId >= 0)
                     HDF.PInvoke.H5S.close(spaceId);
             }
+        }
+
+        private static ulong[] ChunkFor(ulong[] dims)
+        {
+            // Per-rank caps keeping chunks at roughly 1M elements, never
+            // exceeding the dataset extent on any axis.
+            ulong[] caps = dims.Length == 1 ? new ulong[] { 262144 }
+                         : dims.Length == 2 ? new ulong[] { 1024, 1024 }
+                         : new ulong[] { 128, 128, 16 };
+            ulong[] chunk = new ulong[dims.Length];
+            for (int i = 0; i < dims.Length; i++)
+                chunk[i] = Math.Min(dims[i] == 0 ? 1 : dims[i], caps[i]);
+            return chunk;
+        }
+
+        private static int ElementSizeFor(Type t)
+        {
+            if (t == typeof(byte)) return 1;
+            if (t == typeof(int) || t == typeof(float)) return 4;
+            if (t == typeof(double)) return 8;
+            return 8;
         }
 
         private static long NativeTypeFor(Type t)

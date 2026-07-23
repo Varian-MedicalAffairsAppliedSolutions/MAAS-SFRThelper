@@ -90,7 +90,7 @@ namespace PhotonCalculateInfluenceMatrix
         public static void Calculate(Patient hPatient, Course hCourse, ExternalPlanSetup hPlan, double dInfCutoffValue, bool bExportFullInfMatrix, int iMaxDoseCalcRetry,
             float beamletSizeX, float beamletSizeY, string szTargetStructureId, float fTargetMarginMM, int iNumBeamletsToBeCalcAtATime, string szEclipseVolumeDoseCalcModel,
             string szCalculationGridSizeInCM, float fDoseScalingFactor, string szOutputRootFolder, DisplayProgress hProgress,
-            Func<bool> checkCancellation = null)
+            Func<bool> checkCancellation = null, string szOverrideMachine = null, string szOverrideEnergy = null)
         {
             int iFieldCnt = hPlan.Beams.Count();
 
@@ -166,6 +166,11 @@ namespace PhotonCalculateInfluenceMatrix
             ExternalPlanSetup scratchPlan = CopyPlan(hPlan, dijCourse);
             scratchPlan.Id = GetValidObjectId(scratchPlan, szScratchPlanId);
             hProgress?.Message($"Scratch plan '{scratchPlan.Id}' created in course '{szCourseId}'; the clinical plan will not be modified.");
+            if (!string.IsNullOrWhiteSpace(szOverrideMachine) || !string.IsNullOrWhiteSpace(szOverrideEnergy))
+                hProgress?.Message($"MACHINE OVERRIDE: scratch beams use machine='" +
+                    (string.IsNullOrWhiteSpace(szOverrideMachine) ? "(source)" : szOverrideMachine) +
+                    "', energy='" + (string.IsNullOrWhiteSpace(szOverrideEnergy) ? "(source)" : szOverrideEnergy) +
+                    "'. The influence matrix will reflect THIS machine's beam model, not the source plan's.");
 
             // SFRThelper patch 12: from here to the end of the run, every exit
             // (completion, cancellation, exception) passes through the finally
@@ -238,10 +243,14 @@ namespace PhotonCalculateInfluenceMatrix
                     if (iBeamletIdx >= iMaxBeamletCount)
                         iMaxBeamletCount = iBeamletIdx + 1;
 
+                    hProgress?.Message($"Field {origBeam.Id}: {bp.BeamletCount} beamlets kept" +
+                        (hTargetStruct != null ? " inside target envelope" : " (no target - whole field)") +
+                        $"; creating {iNumBeamletsToBeCalcAtATime} slot beams...");
+
                     // create beamlet beams
                     for (int i = 0; i < iNumBeamletsToBeCalcAtATime; i++)
                     {
-                        Beam hCopied = CopyBeam(origBeam, scratchPlan);
+                        Beam hCopied = CopyBeam(origBeam, scratchPlan, szOverrideMachine, szOverrideEnergy);
                         bp.m_lstBeamletBeam.Add(hCopied);
 
                         presetValues.Add(new KeyValuePair<string, MetersetValue>(hCopied.Id, new MetersetValue(1, DosimeterUnit.MU)));
@@ -262,6 +271,10 @@ namespace PhotonCalculateInfluenceMatrix
                 // lopp thru beamlets
                 int iCurrBeamlet = 0;
                 bool bFirstCalc = true;
+                hProgress?.Message($"Starting dose calculations: up to {iMaxBeamletCount} beamlet indices per field, " +
+                    $"batch size {iNumBeamletsToBeCalcAtATime}. The first batch is the closed-MLC leakage baseline. " +
+                    "Each dose calculation runs for minutes with no output - the window may freeze during computation; " +
+                    "Cancel takes effect at the next batch boundary.");
                 do
                 {
                     lstCalcBeams.Clear();
@@ -277,12 +290,42 @@ namespace PhotonCalculateInfluenceMatrix
 
                                 //update MLCs
                                 BeamParameters beamParams = hBeamletBeam.GetEditableParameters();
-                                if (bFirstCalc && i == 0)
-                                    beamParams.SetAllLeafPositions(bp.m_ClosedMLC);
-                                else
-                                    beamParams.SetAllLeafPositions(bp.m_lstBeamletMLCs[iCurrBeamlet]);
-
-                                hBeamletBeam.ApplyParameters(beamParams);
+                                float[,] arrLeavesToApply = (bFirstCalc && i == 0)
+                                    ? bp.m_ClosedMLC
+                                    : bp.m_lstBeamletMLCs[iCurrBeamlet];
+                                beamParams.SetAllLeafPositions(arrLeavesToApply);
+                                try
+                                {
+                                    hBeamletBeam.ApplyParameters(beamParams);
+                                }
+                                catch (Exception exLeaf)
+                                {
+                                    // SFRThelper diagnostic: name the offending
+                                    // aperture. Reports open-leaf-pair extents and
+                                    // the min/max gap so an HD120 leaf-rule
+                                    // violation (park position, interdigitation,
+                                    // min gap) is identifiable.
+                                    int nL = arrLeavesToApply.GetLength(1);
+                                    int openCnt = 0; float minPair = float.MaxValue, maxPair = float.MinValue;
+                                    float firstOpen = -9999, lastOpen = -9999;
+                                    for (int li = 0; li < nL; li++)
+                                    {
+                                        float gap = arrLeavesToApply[1, li] - arrLeavesToApply[0, li];
+                                        if (Math.Abs(gap) > 0.01f)
+                                        {
+                                            openCnt++;
+                                            if (firstOpen < -9998) firstOpen = li;
+                                            lastOpen = li;
+                                            if (arrLeavesToApply[0, li] < minPair) minPair = arrLeavesToApply[0, li];
+                                            if (arrLeavesToApply[1, li] > maxPair) maxPair = arrLeavesToApply[1, li];
+                                        }
+                                    }
+                                    string szKind = (bFirstCalc && i == 0) ? "CLOSED-MLC baseline" : $"beamlet {iCurrBeamlet}";
+                                    throw new ApplicationException(
+                                        $"ApplyParameters (leaf positions) failed for {szKind} on beam '{hBeamletBeam.Id}': {exLeaf.Message} | " +
+                                        $"leafPairs={nL}, openPairs={openCnt}, openRange=[{firstOpen}..{lastOpen}], " +
+                                        $"openBankA_min={minPair:F1}, openBankB_max={maxPair:F1}", exLeaf);
+                                }
 
                                 lstCalcBeams.Add(hBeamletBeam.Id);
                             }
@@ -296,16 +339,29 @@ namespace PhotonCalculateInfluenceMatrix
                     {
                         int iRetryCnt = 0;
                         bool bSuccess = false;
+                        string szLastCalcMsg = "(no message)";
                         do
                         {
                             try
                             {
                                 CalculationResult calcRes = scratchPlan.CalculateDoseWithPresetValues(presetValues);
                                 bSuccess = calcRes.Success;
+                                // SFRThelper diagnostic: surface the calc result
+                                // message instead of swallowing it. A sub-second
+                                // failure is a rejection, not a computation - the
+                                // message names the cause (model not valid for the
+                                // machine, blocked field, MU out of range, ...).
+                                if (!bSuccess)
+                                {
+                                    szLastCalcMsg = string.IsNullOrEmpty(calcRes.ToString()) ? "(empty)" : calcRes.ToString();
+                                    hProgress?.Message($"  Dose calc reported failure: {szLastCalcMsg}");
+                                }
                             }
-                            catch (Exception)
+                            catch (Exception exCalc)
                             {
                                 bSuccess = false;
+                                szLastCalcMsg = exCalc.GetType().Name + ": " + exCalc.Message;
+                                hProgress?.Message($"  Dose calc threw: {szLastCalcMsg}");
                             }
                             iRetryCnt++;
 
@@ -316,11 +372,12 @@ namespace PhotonCalculateInfluenceMatrix
                         if (!bSuccess)
                         {
                             //app.SaveModifications();
-                            throw new ApplicationException($"Dose Calculation Failed after {iMaxDoseCalcRetry} attempts");
+                            throw new ApplicationException($"Dose Calculation Failed after {iMaxDoseCalcRetry} attempts. Last message: {szLastCalcMsg}");
                         }
 
                         if (bFirstDoseCalc)
                         {
+                            hProgress.Message("Exporting optimization voxel grid and CT-to-dose voxel map...");
                             iMaxPointCnt = ExportOptimizationVoxels(scratchPlan, planResultsPath);
                             bFirstDoseCalc = false;
                         }
@@ -541,6 +598,7 @@ namespace PhotonCalculateInfluenceMatrix
                 {
                     continue;
                 }
+                hProgress?.Message($"Exporting BEV structure outlines for beam {b.Id}...");
 
                 string szH5OutlinesPath = System.IO.Path.Combine(szStructOutlinesFolder, $"Beam_{b.Id}_Data.h5");
                 long fileId1 = Hdf5.CreateFile(szH5OutlinesPath);
@@ -594,8 +652,12 @@ namespace PhotonCalculateInfluenceMatrix
             {
 
                 Image hCT = hPlanSetup.StructureSet.Image;
+                int iMaskIdx = 0;
+                int iMaskCnt = hPlanSetup.StructureSet.Structures.Count();
                 foreach (Structure s in hPlanSetup.StructureSet.Structures)
                 {
+                    iMaskIdx++;
+                    hProgress?.Message($"Structure mask {iMaskIdx}/{iMaskCnt}: {s.Id}");
                     try
                     {
                         if (s.HasSegment)
@@ -854,7 +916,13 @@ namespace PhotonCalculateInfluenceMatrix
         public static float[,] GetClosedLeafPositions(int nLeafs, VRect<double> jaws)
         {
             float[,] positions = new float[2, nLeafs];
-            float parkPos = (float)jaws.X1 - 1;
+            // SFRThelper interdigitation fix (option 2): close the baseline at
+            // the field centre-line (X = 0), the same closed-leaf tip position
+            // used for non-covering leaves in GetLeafPositions. MSK parked at
+            // (jaws.X1 - 1); centre-line closing is interdigitation-safe on
+            // HD120 and keeps the leakage baseline geometrically consistent
+            // with every beamlet aperture, so per-voxel subtraction is exact.
+            float parkPos = 0.0f;
 
             // loop through all leafs
             for (int i = 0; i < nLeafs; i++)
@@ -920,7 +988,20 @@ namespace PhotonCalculateInfluenceMatrix
             // whenever a multi-leaf beamlet started at y = 0, shifting that
             // row's recorded rectangle by one leaf width.
             bool bYStartSet = false;
-            float parkPos = (float)jaws.X1 - 1;
+
+            // SFRThelper interdigitation fix (option 2): park non-covering
+            // leaf pairs CLOSED at the field centre-line (X = 0), consistently
+            // with GetClosedLeafPositions. MSK's original parked every closed
+            // leaf at (jaws.X1 - 1); on Millennium 120 (where MSK validated)
+            // that is legal because all closed leaves retract equally to the
+            // same edge. On HD120 a single open beamlet far from that edge
+            // strands the parked leaves ~a field width from their neighbours,
+            // violating interdigitation / adjacent-leaf-travel limits. Parking
+            // closed pairs at X = 0 keeps every leaf near its neighbours AND
+            // matches the closed-MLC baseline geometry exactly, so leakage
+            // subtraction stays exact (the baseline and every beamlet share
+            // the same closed-leaf tip position).
+            float parkPos = 0.0f;
 
             float fMLCHalfWidth = 0.0f;
             for (int i = 0; i < nLeafs / 2; i++)
@@ -1123,15 +1204,29 @@ namespace PhotonCalculateInfluenceMatrix
             return copyPlan;
         }
 
-        public static Beam CopyBeam(Beam beam, ExternalPlanSetup plansetup)
+        public static Beam CopyBeam(Beam beam, ExternalPlanSetup plansetup,
+            string szOverrideMachine = null, string szOverrideEnergy = null)
         {
             if (!beam.IsSetupField)
             {
-                string energyModeDisp = beam.EnergyModeDisplayName;
+                // SFRThelper machine override: on a research box the source
+                // plan's machine (e.g. an imported TrueBeam) may not be
+                // commissioned locally, so new-beam validation rejects it.
+                // The override re-hosts scratch slots on a locally available
+                // machine/energy. Geometry (jaws, angles, isocenter, leaves)
+                // is untouched; only the machine identity changes. WARNING:
+                // the resulting matrix reflects the OVERRIDE machine's beam
+                // model, not the source plan's - correct for pipeline
+                // development, not for optimizing a real plan on the source
+                // machine. The machine actually used is stamped in metadata.
+                string szMachine = string.IsNullOrWhiteSpace(szOverrideMachine)
+                    ? beam.TreatmentUnit.Id : szOverrideMachine.Trim();
+                string energyModeDisp = string.IsNullOrWhiteSpace(szOverrideEnergy)
+                    ? beam.EnergyModeDisplayName : szOverrideEnergy.Trim();
                 Char[] sep = { '-' };
                 string energyMode = energyModeDisp.Split(sep).First();
                 string pfm = energyModeDisp.Split(sep).Count() > 1 ? energyModeDisp.Split(sep).Last() : null;
-                ExternalBeamMachineParameters extParams = new ExternalBeamMachineParameters(beam.TreatmentUnit.Id, energyMode, beam.DoseRate, beam.Technique.Id, pfm);
+                ExternalBeamMachineParameters extParams = new ExternalBeamMachineParameters(szMachine, energyMode, beam.DoseRate, beam.Technique.Id, pfm);
 
                 // SFRThelper patch 1: always create MLC-carrying copies.
                 // Upstream fell back to AddStaticBeam (jaw-only, no MLC) when the
@@ -1157,9 +1252,45 @@ namespace PhotonCalculateInfluenceMatrix
                     arrInitialLeaves = GetOpenLeafPositions(
                         beam.ControlPoints[0].LeafPositions.GetLength(1), jaws);
 
-                Beam copyBeam = plansetup.AddMLCBeam(extParams, arrInitialLeaves, jaws,
-                    beam.ControlPoints[0].CollimatorAngle, beam.ControlPoints[0].GantryAngle,
-                    beam.ControlPoints[0].PatientSupportAngle, beam.IsocenterPosition);
+                Beam copyBeam;
+                try
+                {
+                    copyBeam = plansetup.AddMLCBeam(extParams, arrInitialLeaves, jaws,
+                        beam.ControlPoints[0].CollimatorAngle, beam.ControlPoints[0].GantryAngle,
+                        beam.ControlPoints[0].PatientSupportAngle, beam.IsocenterPosition);
+                }
+                catch (Exception ex)
+                {
+                    // Diagnostic wrap: ESAPI's beam-creation errors are terse;
+                    // echo every parameter that went into the call so a failed
+                    // run diagnoses itself. Additionally run a bisection probe:
+                    // try AddStaticBeam with the IDENTICAL machine parameters.
+                    // If the probe succeeds, the machine/energy/doseRate/
+                    // technique tuple is valid and the failure is specific to
+                    // MLC beam creation; if it also fails, the tuple itself is
+                    // being rejected. Any probe beam is removed immediately.
+                    string szProbe;
+                    try
+                    {
+                        Beam probeBeam = plansetup.AddStaticBeam(extParams, jaws,
+                            beam.ControlPoints[0].CollimatorAngle, beam.ControlPoints[0].GantryAngle,
+                            beam.ControlPoints[0].PatientSupportAngle, beam.IsocenterPosition);
+                        plansetup.RemoveBeam(probeBeam);
+                        szProbe = "AddStaticBeam with identical parameters SUCCEEDED - " +
+                            "tuple is valid; failure is specific to MLC beam creation.";
+                    }
+                    catch (Exception exProbe)
+                    {
+                        szProbe = "AddStaticBeam with identical parameters ALSO FAILED (" +
+                            exProbe.Message + ") - the machine parameter tuple itself is rejected.";
+                    }
+                    throw new ApplicationException(
+                        $"AddMLCBeam failed for source beam '{beam.Id}': {ex.Message} | " +
+                        $"machine(used)='{szMachine}', energy(used)='{energyMode}', source_machine='{beam.TreatmentUnit.Id}', pfm='{pfm ?? "null"}', " +
+                        $"doseRate={beam.DoseRate}, technique='{beam.Technique.Id}', " +
+                        $"MLCPlanType={beam.MLCPlanType}, leafPairs={arrInitialLeaves.GetLength(1)}, " +
+                        $"jaws=[{jaws.X1:F1},{jaws.Y1:F1},{jaws.X2:F1},{jaws.Y2:F1}] | PROBE: {szProbe}", ex);
+                }
 
                 copyBeam.Id = GetValidObjectId(copyBeam, beam.Id);
 

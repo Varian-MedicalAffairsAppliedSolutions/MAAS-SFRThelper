@@ -156,6 +156,38 @@ namespace MAAS_SFRThelper.ViewModels
             set { SetProperty(ref outputRoot, value); }
         }
 
+        // Suggested machine names for the editable override combo. Free text
+        // is still allowed; this list just spares users guessing the string.
+        public List<string> MachineSuggestions { get; } = new List<string>
+        {
+            "", "Edge", "TrueBeam", "TrueBeamSTx", "Halcyon", "VitalBeam", "Clinac iX"
+        };
+
+        private string overrideMachine = "";
+        public string OverrideMachine
+        {
+            get { return overrideMachine; }
+            set
+            {
+                if (SetProperty(ref overrideMachine, value))
+                    RaisePropertyChanged(nameof(OverrideActive));
+            }
+        }
+
+        private string overrideEnergy = "";
+        public string OverrideEnergy
+        {
+            get { return overrideEnergy; }
+            set
+            {
+                if (SetProperty(ref overrideEnergy, value))
+                    RaisePropertyChanged(nameof(OverrideActive));
+            }
+        }
+
+        public bool OverrideActive =>
+            !string.IsNullOrWhiteSpace(OverrideMachine) || !string.IsNullOrWhiteSpace(OverrideEnergy);
+
         // ---------------- run state ----------------
         private bool isRunning;
         public bool IsRunning
@@ -252,43 +284,55 @@ namespace MAAS_SFRThelper.ViewModels
 
         private void RunExtraction()
         {
-            IsRunning = true;
             RunProgress.Reset();
-            try
+
+            if (string.IsNullOrWhiteSpace(OutputRoot))
             {
-                if (string.IsNullOrWhiteSpace(OutputRoot))
-                {
-                    RunProgress.Message("Output root folder is empty - set it before running.");
-                    return;
-                }
-                if (BeamletSizeX <= 0 || BeamletSizeY <= 0 || BatchSize <= 0 || MaxRetry <= 0)
-                {
-                    RunProgress.Message("Beamlet sizes, batch size, and retry count must be positive.");
-                    return;
-                }
-                if (string.IsNullOrEmpty(SelectedCalcModel))
-                {
-                    RunProgress.Message("No volume dose calculation model selected.");
-                    return;
-                }
+                RunProgress.Message("Output root folder is empty - set it before running.");
+                return;
+            }
+            if (BeamletSizeX <= 0 || BeamletSizeY <= 0 || BatchSize <= 0 || MaxRetry <= 0)
+            {
+                RunProgress.Message("Beamlet sizes, batch size, and retry count must be positive.");
+                return;
+            }
+            if (string.IsNullOrEmpty(SelectedCalcModel))
+            {
+                RunProgress.Message("No volume dose calculation model selected.");
+                return;
+            }
 
-                string targetId = (SelectedTarget == TargetNone) ? null : SelectedTarget;
+            string targetId = (SelectedTarget == TargetNone) ? null : SelectedTarget;
 
-                RunProgress.Message("=== Influence matrix extraction ===");
-                RunProgress.Message($"Beamlet {BeamletSizeX} x {BeamletSizeY} mm; target: " +
-                    (targetId ?? "none (whole field - no envelope pruning)") +
-                    $"; margin {TargetMarginMM} mm");
-                RunProgress.Message($"Batch {BatchSize}; retry {MaxRetry}; model {SelectedCalcModel}; grid {GridSizeCM} cm; " +
-                    $"full matrix: {(ExportFullMatrix ? "yes" : "no")}");
-                if (CutoffDeviates)
-                    RunProgress.Message($"WARNING: cutoff = {CutoffValue} (nonzero). The sparse matrix will drop " +
-                        "entries at or below this value; the exact reconstruction identity will NOT hold for this file.");
-                if (ScalingDeviates)
-                    RunProgress.Message($"WARNING: DoseScalingFactor = {DoseScalingFactor} (not 1). Stored values " +
-                        "are scaled; downstream consumers must honor the dose_units metadata.");
+            IsRunning = true;
+            RunProgress.Message("=== Influence matrix extraction ===");
+            RunProgress.Message($"Beamlet {BeamletSizeX} x {BeamletSizeY} mm; target: " +
+                (targetId ?? "none (whole field - no envelope pruning)") +
+                $"; margin {TargetMarginMM} mm");
+            RunProgress.Message($"Batch {BatchSize}; retry {MaxRetry}; model {SelectedCalcModel}; grid {GridSizeCM} cm; " +
+                $"full matrix: {(ExportFullMatrix ? "yes" : "no")}");
+            if (CutoffDeviates)
+                RunProgress.Message($"WARNING: cutoff = {CutoffValue} (nonzero). The sparse matrix will drop " +
+                    "entries at or below this value; the exact reconstruction identity will NOT hold for this file.");
+            if (ScalingDeviates)
+                RunProgress.Message($"WARNING: DoseScalingFactor = {DoseScalingFactor} (not 1). Stored values " +
+                    "are scaled; downstream consumers must honor the dose_units metadata.");
 
-                RunProgressDisplayAdapter adapter = new RunProgressDisplayAdapter(RunProgress);
-                _esapi.RunWithWait(sc =>
+            RunProgressDisplayAdapter adapter = new RunProgressDisplayAdapter(RunProgress);
+
+            // Fire-and-forget through the dispatcher, NOT RunWithWait:
+            // EsapiWorker's "worker" is the UI thread itself, and RunWithWait
+            // is BeginInvoke(...).Wait() - blocking the UI thread on work that
+            // pumps the same UI thread is a wait-inside-a-wait deadlock (the
+            // freeze observed on the first run). Run() queues the work onto
+            // the dispatcher's normal loop: the click handler returns, the
+            // pump keeps the window alive between computations, and Cancel
+            // is processed at pumps - the exact context the fake workload
+            // already proved. Completion and errors are handled inside the
+            // queued action, so the truthful-exit discipline is unchanged.
+            _esapi.Run(sc =>
+            {
+                try
                 {
                     PhotonInfluenceMatrixCalc.Calculate(
                         sc.Patient, sc.Course, sc.ExternalPlanSetup,
@@ -297,18 +341,21 @@ namespace MAAS_SFRThelper.ViewModels
                         targetId, TargetMarginMM,
                         BatchSize, SelectedCalcModel, GridSizeCM,
                         DoseScalingFactor, OutputRoot,
-                        adapter, () => RunProgress.CancellationRequested);
-                });
-            }
-            catch (Exception ex)
-            {
-                RunProgress.Message("=== EXTRACTION FAILED ===");
-                RunProgress.Message(ex.GetType().Name + ": " + ex.Message);
-            }
-            finally
-            {
-                IsRunning = false;
-            }
+                        adapter, () => RunProgress.CancellationRequested,
+                        string.IsNullOrWhiteSpace(OverrideMachine) ? null : OverrideMachine.Trim(),
+                        string.IsNullOrWhiteSpace(OverrideEnergy) ? null : OverrideEnergy.Trim());
+                }
+                catch (Exception ex)
+                {
+                    RunProgress.Message("=== EXTRACTION FAILED ===");
+                    for (Exception e = ex; e != null; e = e.InnerException)
+                        RunProgress.Message(e.GetType().Name + ": " + e.Message);
+                }
+                finally
+                {
+                    IsRunning = false;
+                }
+            });
         }
 
         private void InspectOutput()
