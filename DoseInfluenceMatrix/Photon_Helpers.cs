@@ -117,7 +117,11 @@ namespace PhotonCalculateInfluenceMatrix
             return new DoseData(lstBeamletDose, dSumCutOffValues, iCutOffValueCnt);
         }
 
-        public static void WriteBeamMetaData(Beam b, MyBeamParameters beamParams, double dInfMatrixCutoffValue, float fDoseScalingFactor, string szOutputFile)
+        // SFRThelper patch 13a: szScratchPrescriptionNote records which
+        // prescription the scratch plan carried during extraction (copied
+        // from source, or the nominal fallback). Provenance only - the
+        // matrix values do not depend on it.
+        public static void WriteBeamMetaData(Beam b, MyBeamParameters beamParams, double dInfMatrixCutoffValue, float fDoseScalingFactor, string szOutputFile, string szScratchPrescriptionNote = null)
         {
             ControlPoint firstCP = b.ControlPoints[0];
 
@@ -168,7 +172,12 @@ namespace PhotonCalculateInfluenceMatrix
                         { "closed_mlc_leakage_units", "per-MU, before DoseScalingFactor" },
                         { "MetersetPerGy", b.MetersetPerGy },
                         { "PRESET_DOSE_NORMALIZATION", 100.0 },
-                        { "DoseScalingFactor", fDoseScalingFactor }
+                        { "DoseScalingFactor", fDoseScalingFactor },
+                        // SFRThelper patch 13a: scratch-plan prescription
+                        // provenance. Matrix values are per-MU physics and
+                        // independent of the prescription; it exists only so
+                        // absolute dose presentation is defined during readout.
+                        { "scratch_plan_prescription", szScratchPrescriptionNote ?? "unknown (not recorded by this build)" }
                     }
                 }
             };

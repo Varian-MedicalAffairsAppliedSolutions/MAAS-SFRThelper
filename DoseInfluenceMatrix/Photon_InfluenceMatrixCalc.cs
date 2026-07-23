@@ -87,6 +87,14 @@ namespace PhotonCalculateInfluenceMatrix
         // measurement #1 (closed-field vs open-beamlet MetersetPerGy check).
         public const double PRESET_DOSE_NORMALIZATION = 100.0;
 
+        // SFRThelper: single source of truth for the run-folder convention
+        // (<root>\<LastName>$<PatientId>\<PlanId>). The app's Inspect Output
+        // calls this too, so the writer and the inspector can never drift.
+        public static string GetPlanResultsPath(string szOutputRootFolder, Patient hPatient, ExternalPlanSetup hPlan)
+        {
+            return System.IO.Path.Combine(szOutputRootFolder, hPatient.LastName + "$" + hPatient.Id, hPlan.Id);
+        }
+
         public static void Calculate(Patient hPatient, Course hCourse, ExternalPlanSetup hPlan, double dInfCutoffValue, bool bExportFullInfMatrix, int iMaxDoseCalcRetry,
             float beamletSizeX, float beamletSizeY, string szTargetStructureId, float fTargetMarginMM, int iNumBeamletsToBeCalcAtATime, string szEclipseVolumeDoseCalcModel,
             string szCalculationGridSizeInCM, float fDoseScalingFactor, string szOutputRootFolder, DisplayProgress hProgress,
@@ -94,13 +102,12 @@ namespace PhotonCalculateInfluenceMatrix
         {
             int iFieldCnt = hPlan.Beams.Count();
 
-            string resultsDirPath = szOutputRootFolder + $"\\{hPatient.LastName}${hPatient.Id}";
+            string planResultsPath = GetPlanResultsPath(szOutputRootFolder, hPatient, hPlan);
+            string resultsDirPath = System.IO.Path.GetDirectoryName(planResultsPath);
             if (!System.IO.Directory.Exists(resultsDirPath))
             {
                 System.IO.Directory.CreateDirectory(resultsDirPath);
             }
-
-            string planResultsPath = resultsDirPath + $"\\{hPlan.Id}";
             if (Directory.Exists(planResultsPath))
             {
                 Directory.Delete(planResultsPath, true);
@@ -166,6 +173,31 @@ namespace PhotonCalculateInfluenceMatrix
             ExternalPlanSetup scratchPlan = CopyPlan(hPlan, dijCourse);
             scratchPlan.Id = GetValidObjectId(scratchPlan, szScratchPlanId);
             hProgress?.Message($"Scratch plan '{scratchPlan.Id}' created in course '{szCourseId}'; the clinical plan will not be modified.");
+
+            // SFRThelper patch 13a (provenance): record which prescription the
+            // scratch plan carries. The matrix is per-MU physics and does not
+            // depend on the prescription magnitude; the prescription's only
+            // job is to make Eclipse's absolute-dose presentation defined so
+            // VoxelToDoseValue returns numbers instead of NaN. A source plan
+            // without a prescription (e.g. a bare test/phantom plan) gets a
+            // nominal one on the scratch plan inside CopyPlan.
+            bool bSourceHasPrescription = (hPlan.NumberOfFractions != null && !Double.IsNaN(hPlan.DosePerFraction.Dose));
+            string szPrescriptionNote;
+            if (bSourceHasPrescription)
+            {
+                szPrescriptionNote = $"copied from source plan: {hPlan.NumberOfFractions} x " +
+                    $"{hPlan.DosePerFraction.Dose} {hPlan.DosePerFraction.UnitAsString}";
+            }
+            else
+            {
+                szPrescriptionNote = "nominal 1 fx x 1.0 Gy (source plan has no prescription; " +
+                    "applied to scratch plan only, matrix values unaffected)";
+                hProgress?.Message("Source plan has NO prescription. A nominal 1 fx x 1 Gy prescription was applied " +
+                    "to the scratch plan so absolute dose readout is defined (without one, VoxelToDoseValue returns NaN " +
+                    "and every matrix entry silently becomes zero). Matrix values are dose-per-MU physics and are " +
+                    "unaffected by the prescription magnitude. The scratch plan also uses no plan normalization, " +
+                    "so readouts are unnormalized absolute dose.");
+            }
             if (!string.IsNullOrWhiteSpace(szOverrideMachine) || !string.IsNullOrWhiteSpace(szOverrideEnergy))
                 hProgress?.Message($"MACHINE OVERRIDE: scratch beams use machine='" +
                     (string.IsNullOrWhiteSpace(szOverrideMachine) ? "(source)" : szOverrideMachine) +
@@ -404,6 +436,27 @@ namespace PhotonCalculateInfluenceMatrix
                                     // source plan's beam weighting into the matrix; weighting
                                     // belongs to the fluence optimizer downstream.
                                     double dWeight = blb.MetersetPerGy / PRESET_DOSE_NORMALIZATION;
+
+                                    // SFRThelper patch 13b: fail fast if the readout scalars
+                                    // are undefined. NaN fails every comparison downstream
+                                    // (> cutoff, > 0, < 0 all false), so it flows through
+                                    // conversion, subtraction, clamp, and harvest without
+                                    // tripping anything and yields a structurally perfect,
+                                    // silently empty matrix - the first-light failure mode.
+                                    // Cheap scalar check, so it runs for every beamlet.
+                                    double dReadIntercept = hBeamDose.VoxelToDoseValue(0).Dose;
+                                    double dReadScale = hBeamDose.VoxelToDoseValue(1).Dose - dReadIntercept;
+                                    if (Double.IsNaN(dReadScale) || Double.IsNaN(dReadIntercept) ||
+                                        Double.IsNaN(blb.MetersetPerGy) || blb.MetersetPerGy <= 0)
+                                    {
+                                        throw new ApplicationException(
+                                            $"Dose readout is undefined for beam '{blb.Id}' (source field '{b.Id}'): " +
+                                            $"dScale={dReadScale}, dIntercept={dReadIntercept}, MetersetPerGy={blb.MetersetPerGy}. " +
+                                            "NaN here means Eclipse cannot present absolute dose. The usual cause is a plan " +
+                                            "without a prescription; patch 13a should have applied a nominal one to the scratch " +
+                                            "plan - if this fires anyway, check plan normalization and dose presentation. " +
+                                            "Aborting instead of writing an all-zero matrix.");
+                                    }
                                     string szHDF5DataFile = System.IO.Path.Combine(szBeamPath, $"Beam_{b.Id}_Data.h5");
 
                                     float[,] arrClosedMLCDoseMatrix = null;
@@ -412,14 +465,41 @@ namespace PhotonCalculateInfluenceMatrix
                                         arrClosedMLCDoseMatrix = new float[iDoseMatrixSize, 1];
                                         Helpers.FillDoseMatrix(hBeamDose, dWeight, ref arrClosedMLCDoseMatrix);
                                         bp.m_arrClosedMLCDoseMatrix = arrClosedMLCDoseMatrix;
+
+                                        // SFRThelper patch 13c: first-light diagnostics for
+                                        // the leakage baseline. Separates the failure
+                                        // families: maxRawInt = 0 -> quantisation floor /
+                                        // empty dose; NaN scalars -> units/prescription
+                                        // (patch 13b throws first); healthy raw but zero
+                                        // converted -> dWeight error.
+                                        hProgress?.Message(FormatReadoutDiagnostics("closed-MLC baseline", b.Id,
+                                                hBeamDose, dReadScale, dReadIntercept, blb.MetersetPerGy, dWeight) +
+                                            $"; maxConverted={GetMaxMatrixValue(arrClosedMLCDoseMatrix):E3} Gy/MU");
                                     }
                                     else
                                     {
+                                        // SFRThelper patch 13c: index hoisted above the fill
+                                        // so beamlet-0 diagnostics can key off it (was
+                                        // declared after ExtractSparsePoints; pure
+                                        // arithmetic, value unchanged).
+                                        int iBeamletIdx = iCurrBeamlet - iNumBeamletsToBeCalcAtATime + i;
+                                        bool bDiagBeamlet = (iBeamletIdx == 0);
+
                                         // SFRThelper patch 4: fill raw, correct (subtract
                                         // leakage, scale, clamp), THEN harvest sparse from
                                         // the corrected matrix - sparse and full are the
                                         // same matrix in two encodings from here on.
                                         Helpers.FillDoseMatrix(hBeamDose, dWeight, ref arrFullDoseMatrix);
+
+                                        // SFRThelper patch 13c: first open beamlet of each
+                                        // field gets the full diagnostic trace. dScale here
+                                        // is also the quantisation floor of this beamlet's
+                                        // dose in physical units - record it for the paper.
+                                        if (bDiagBeamlet)
+                                            hProgress?.Message(FormatReadoutDiagnostics("beamlet 0", b.Id,
+                                                    hBeamDose, dReadScale, dReadIntercept, blb.MetersetPerGy, dWeight) +
+                                                $"; maxConverted (pre-subtraction)={GetMaxMatrixValue(arrFullDoseMatrix):E3} Gy/MU");
+
                                         // subtract matrix from closedMLC matrix
                                         arrClosedMLCDoseMatrix = bp.m_arrClosedMLCDoseMatrix;
                                         for (int iDosePtIdx = 0; iDosePtIdx < iDoseMatrixSize; iDosePtIdx++)
@@ -431,7 +511,11 @@ namespace PhotonCalculateInfluenceMatrix
 
                                         DoseData doseData = Helpers.ExtractSparsePoints(arrFullDoseMatrix, dInfCutoffValue);
 
-                                        int iBeamletIdx = iCurrBeamlet - iNumBeamletsToBeCalcAtATime + i;
+                                        if (bDiagBeamlet)
+                                            hProgress?.Message($"DIAG [{b.Id} / beamlet 0]: maxAfterSubtraction=" +
+                                                $"{GetMaxMatrixValue(arrFullDoseMatrix):E3} Gy/MU; nnz={doseData.dosePoints.Count:N0}; " +
+                                                $"subCutoff count={doseData.m_iNumCutoffValues:N0}, sum={doseData.m_dSumCutoffValues:E3}");
+
                                         Beamlet hBeamlet = bp.m_lstBeamlets[iBeamletIdx];
                                         // patch 4: values are already scaled by the time
                                         // extraction sees them - no second scaling here.
@@ -462,7 +546,7 @@ namespace PhotonCalculateInfluenceMatrix
                     Helpers.WriteBeamletInfoHDF5(tblBeamParameters[b.Id], iMaxPointCnt, szHDF5DataFile);
 
                     string szBeamMetaDataFile = System.IO.Path.Combine(szBeamPath, $"Beam_{b.Id}_MetaData.json");
-                    Helpers.WriteBeamMetaData(b, tblBeamParameters[b.Id], dInfCutoffValue, fDoseScalingFactor, szBeamMetaDataFile);
+                    Helpers.WriteBeamMetaData(b, tblBeamParameters[b.Id], dInfCutoffValue, fDoseScalingFactor, szBeamMetaDataFile, szPrescriptionNote);
                 }
                 bCompleted = true;
             }
@@ -1200,8 +1284,77 @@ namespace PhotonCalculateInfluenceMatrix
             {
                 copyPlan.SetPrescription(fractions.Value, fractiondose, prescribedPercentage);
             }
+            // SFRThelper patch 13a: upstream's condition above is a silent
+            // skip - a source plan without a prescription (bare test/phantom
+            // plan) left the scratch plan without one, and ESAPI then has no
+            // defined absolute-dose presentation: VoxelToDoseValue returns
+            // NaN, and NaN fails every downstream comparison, producing a
+            // structurally valid but entirely empty matrix. MSK never hit
+            // this because clinical plans always carry a prescription; the
+            // precondition was implicit in their workflow. The influence
+            // matrix itself is per-MU physics and does not depend on the
+            // prescription magnitude, so a nominal 1 fx x 1 Gy at 100% is a
+            // pure enabling constant. Applied to the scratch plan only.
+            else
+            {
+                copyPlan.SetPrescription(1, new DoseValue(1.0, DoseValue.DoseUnit.Gy), 1.0);
+            }
 
             return copyPlan;
+        }
+
+        // SFRThelper patch 13c: first-light readout diagnostics. One line per
+        // diagnosed dose readout: the decode scalars (with the DoseValue unit
+        // string, so a cGy or Percent presentation is visible immediately),
+        // the per-MU conversion factors, and the maximum raw integer over the
+        // whole volume. Reading of the outcomes:
+        //   maxRawInt = 0                 -> quantisation floor or empty dose
+        //   NaN scalars                   -> units/prescription (13b throws)
+        //   raw healthy, converted zero   -> dWeight/units error
+        //   converted healthy, zero later -> leakage subtraction cancelling
+        private static string FormatReadoutDiagnostics(string szWhat, string szFieldId, BeamDose hDose,
+            double dScale, double dIntercept, double dMetersetPerGy, double dWeight)
+        {
+            DoseValue dvOne = hDose.VoxelToDoseValue(1);
+            return $"DIAG [{szFieldId} / {szWhat}]: dScale={dScale:E6} ({dvOne.UnitAsString}/int), " +
+                $"dIntercept={dIntercept:E6}, MetersetPerGy={dMetersetPerGy:F4}, dWeight={dWeight:F6}, " +
+                $"maxRawInt={GetMaxRawVoxel(hDose):N0}";
+        }
+
+        // SFRThelper patch 13c: maximum raw integer voxel over the volume.
+        // One extra pass over the dose grid per diagnosed beamlet only -
+        // negligible next to the dose calculation itself.
+        private static int GetMaxRawVoxel(BeamDose hDose)
+        {
+            int iX = hDose.XSize, iY = hDose.YSize, iZ = hDose.ZSize;
+            int[,] arrBuffer = new int[iX, iY];
+            int iMax = int.MinValue;
+            for (int z = 0; z < iZ; z++)
+            {
+                hDose.GetVoxels(z, arrBuffer);
+                for (int j = 0; j < iY; j++)
+                {
+                    for (int i = 0; i < iX; i++)
+                    {
+                        if (arrBuffer[i, j] > iMax)
+                            iMax = arrBuffer[i, j];
+                    }
+                }
+            }
+            return iMax;
+        }
+
+        // SFRThelper patch 13c: maximum value of a (N,1) matrix buffer.
+        private static float GetMaxMatrixValue(float[,] arrMatrix)
+        {
+            float fMax = float.MinValue;
+            int iCnt = arrMatrix.GetLength(0);
+            for (int i = 0; i < iCnt; i++)
+            {
+                if (arrMatrix[i, 0] > fMax)
+                    fMax = arrMatrix[i, 0];
+            }
+            return fMax;
         }
 
         public static Beam CopyBeam(Beam beam, ExternalPlanSetup plansetup,

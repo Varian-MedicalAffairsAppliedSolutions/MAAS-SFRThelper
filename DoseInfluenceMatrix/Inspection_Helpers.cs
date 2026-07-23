@@ -132,6 +132,24 @@ namespace CalculateInfluenceMatrix
                     report?.Invoke($"  nnz {nData:N0} ({dDensity:P2} dense); indptr consistent");
                 }
 
+                // SFRThelper: an empty matrix is a FAILURE, not a pass. With
+                // nnz = 0 every structural check above is vacuously true -
+                // this is exactly how the first-light all-zero run reported
+                // PASSED. Zero nonzeros means the extraction captured no
+                // dose at all (all values zero, or NaN upstream, since NaN
+                // fails every threshold comparison and is never harvested).
+                if (nData == 0)
+                {
+                    report?.Invoke("  FAIL: nnz = 0 - the matrix contains NO nonzero entries. " +
+                        "Structurally valid but physically empty; do not use this file. " +
+                        "Check the run log for readout diagnostics (dScale / MetersetPerGy / maxRawInt).");
+                    bOk = false;
+                }
+                else
+                {
+                    bOk &= ScanSparseDataValues(fileId, nData, report);
+                }
+
                 bool bFull = HDF.PInvoke.H5L.exists(fileId, "/inf_matrix_full") > 0;
                 bool bLeak = HDF.PInvoke.H5L.exists(fileId, "/closed_mlc_leakage") > 0;
                 report?.Invoke($"  full matrix: {(bFull ? "present" : "absent")}; closed-MLC leakage: {(bLeak ? "present" : "absent")}");
@@ -141,6 +159,80 @@ namespace CalculateInfluenceMatrix
             {
                 HDF.PInvoke.H5F.close(fileId);
             }
+        }
+
+        // SFRThelper: value-level scan of /inf_matrix_sparse/data. Reports
+        // min/max and fails on NaN, Infinity, or non-positive entries (the
+        // sparse harvest keeps only values strictly above the cutoff, and
+        // the cutoff is never negative, so any entry <= 0 is a bug). Guarded
+        // by an in-memory cap so a pathological file cannot exhaust RAM.
+        private const ulong MaxDataScanEntries = 64UL * 1024 * 1024;   // 256 MB of float32
+
+        private static bool ScanSparseDataValues(long fileId, ulong nData, Action<string> report)
+        {
+            if (nData > MaxDataScanEntries)
+            {
+                report?.Invoke($"  value scan skipped: {nData:N0} entries exceeds the " +
+                    $"{MaxDataScanEntries:N0}-entry in-memory cap (structure checks above still apply).");
+                return true;
+            }
+
+            float[] arrData = new float[nData];
+            long datasetId = HDF.PInvoke.H5D.open(fileId, "/inf_matrix_sparse/data");
+            if (datasetId < 0)
+            {
+                report?.Invoke("  FAIL: cannot open /inf_matrix_sparse/data for value scan.");
+                return false;
+            }
+            GCHandle pin = default(GCHandle);
+            try
+            {
+                pin = GCHandle.Alloc(arrData, GCHandleType.Pinned);
+                if (HDF.PInvoke.H5D.read(datasetId, HDF.PInvoke.H5T.NATIVE_FLOAT,
+                        HDF.PInvoke.H5S.ALL, HDF.PInvoke.H5S.ALL,
+                        HDF.PInvoke.H5P.DEFAULT, pin.AddrOfPinnedObject()) < 0)
+                {
+                    report?.Invoke("  FAIL: cannot read /inf_matrix_sparse/data for value scan.");
+                    return false;
+                }
+            }
+            finally
+            {
+                if (pin.IsAllocated) pin.Free();
+                HDF.PInvoke.H5D.close(datasetId);
+            }
+
+            long nNaN = 0, nInf = 0, nNonPositive = 0;
+            float fMin = float.MaxValue, fMax = float.MinValue;
+            for (long i = 0; i < (long)nData; i++)
+            {
+                float v = arrData[i];
+                if (float.IsNaN(v)) { nNaN++; continue; }
+                if (float.IsInfinity(v)) { nInf++; continue; }
+                if (v <= 0f) nNonPositive++;
+                if (v < fMin) fMin = v;
+                if (v > fMax) fMax = v;
+            }
+
+            bool bOk = true;
+            if (nNaN > 0)
+            {
+                report?.Invoke($"  FAIL: {nNaN:N0} NaN entries in sparse data (units/prescription problem upstream).");
+                bOk = false;
+            }
+            if (nInf > 0)
+            {
+                report?.Invoke($"  FAIL: {nInf:N0} Infinity entries in sparse data (dWeight near zero upstream?).");
+                bOk = false;
+            }
+            if (nNonPositive > 0)
+            {
+                report?.Invoke($"  FAIL: {nNonPositive:N0} entries <= 0 in sparse data (harvest should keep only values above the cutoff).");
+                bOk = false;
+            }
+            if (bOk)
+                report?.Invoke($"  data values: min={fMin:E3}, max={fMax:E3} (finite, positive)");
+            return bOk;
         }
 
         private static ulong GetVectorLength(long fileId, string szDataset, Action<string> report)

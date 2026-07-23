@@ -24,6 +24,13 @@ namespace MAAS_SFRThelper.ViewModels
 
         private readonly EsapiWorker _esapi;
 
+        // Handoff v2 deferred item 2: the folder the last run in this session
+        // actually wrote to, captured at launch while the source plan is
+        // still the live context. Inspect Output prefers this over deriving
+        // the folder from the live plan context, which after a run can be
+        // the scratch plan (zD_...) and points at the wrong directory.
+        private string _lastRunFolder = null;
+
         public BindableRunProgress RunProgress { get; }
 
         // ---------------- eligibility ----------------
@@ -334,6 +341,12 @@ namespace MAAS_SFRThelper.ViewModels
             {
                 try
                 {
+                    // Capture the run folder NOW, while the source plan is the
+                    // live context, using the library's own path convention -
+                    // writer and inspector share one function and cannot drift.
+                    _lastRunFolder = PhotonInfluenceMatrixCalc.GetPlanResultsPath(
+                        OutputRoot, sc.Patient, sc.ExternalPlanSetup);
+
                     PhotonInfluenceMatrixCalc.Calculate(
                         sc.Patient, sc.Course, sc.ExternalPlanSetup,
                         CutoffValue, ExportFullMatrix, MaxRetry,
@@ -364,21 +377,30 @@ namespace MAAS_SFRThelper.ViewModels
             RunProgress.Reset();
             try
             {
-                string runFolder = null;
-                _esapi.RunWithWait(sc =>
+                string runFolder = _lastRunFolder;
+                if (runFolder != null)
                 {
-                    if (sc.Patient != null && sc.ExternalPlanSetup != null)
+                    RunProgress.Message("Inspecting the folder written by this session's run.");
+                }
+                else
+                {
+                    // No run this session: fall back to deriving the folder
+                    // from the live plan context via the library's shared
+                    // path helper (single source of truth for the convention).
+                    _esapi.RunWithWait(sc =>
                     {
-                        // Mirrors the library's folder convention exactly:
-                        // <root>\<LastName>$<PatientId>\<PlanId>
-                        runFolder = Path.Combine(OutputRoot,
-                            $"{sc.Patient.LastName}${sc.Patient.Id}", sc.ExternalPlanSetup.Id);
+                        if (sc.Patient != null && sc.ExternalPlanSetup != null)
+                            runFolder = PhotonInfluenceMatrixCalc.GetPlanResultsPath(
+                                OutputRoot, sc.Patient, sc.ExternalPlanSetup);
+                    });
+                    if (runFolder == null)
+                    {
+                        RunProgress.Message("No plan in context - cannot locate a run folder.");
+                        return;
                     }
-                });
-                if (runFolder == null)
-                {
-                    RunProgress.Message("No plan in context - cannot locate a run folder.");
-                    return;
+                    RunProgress.Message("No run in this session - deriving the folder from the live plan " +
+                        "context. If the active plan is a scratch plan (zD_...), open the source plan " +
+                        "and inspect again.");
                 }
                 Inspection_Helpers.InspectRunFolder(runFolder, RunProgress.Message);
             }
