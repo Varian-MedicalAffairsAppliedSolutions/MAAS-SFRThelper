@@ -121,7 +121,10 @@ namespace PhotonCalculateInfluenceMatrix
         // prescription the scratch plan carried during extraction (copied
         // from source, or the nominal fallback). Provenance only - the
         // matrix values do not depend on it.
-        public static void WriteBeamMetaData(Beam b, MyBeamParameters beamParams, double dInfMatrixCutoffValue, float fDoseScalingFactor, string szOutputFile, string szScratchPrescriptionNote = null)
+        // SFRThelper patch 14.2: szReadoutModeNote records how presented
+        // dose was converted to Gy per MU (absolute honored, or the
+        // relative(%)/MetersetPerGy derivation).
+        public static void WriteBeamMetaData(Beam b, MyBeamParameters beamParams, double dInfMatrixCutoffValue, float fDoseScalingFactor, string szOutputFile, string szScratchPrescriptionNote = null, string szReadoutModeNote = null)
         {
             ControlPoint firstCP = b.ControlPoints[0];
 
@@ -164,14 +167,16 @@ namespace PhotonCalculateInfluenceMatrix
                 { "closedMLCLeakage_File", $"{szFilename}/closed_mlc_leakage" },
                 { "MLC_leaves_pos_y_mm_File" ,  $"{szFilename}/MLC_leaves_pos_y_mm"},
                 { "machine_name" , b.TreatmentUnit.Id},
-                // SFRThelper patch 3: every exported file documents its own
-                // unit convention so no downstream consumer needs archaeology.
+                // SFRThelper patch 3 (units rewritten by patch 14): every
+                // exported file documents its own unit convention so no
+                // downstream consumer needs archaeology.
                 { "dose_units", new Dictionary<string, object> {
-                        { "column_meaning", "dose per 1 MU of this beamlet's beam (plan beam weights NOT applied)" },
-                        { "formula", "stored_value = (raw_dose / (MetersetPerGy / PRESET_DOSE_NORMALIZATION) - closed_mlc_leakage) * DoseScalingFactor" },
-                        { "closed_mlc_leakage_units", "per-MU, before DoseScalingFactor" },
+                        { "column_meaning", "dose in Gy per 1 MU of this beamlet's beam (plan beam weights NOT applied)" },
+                        { "formula", "stored_value = (Gy_per_MU - closed_mlc_leakage) * DoseScalingFactor; Gy_per_MU obtained per 'dose_readout'" },
+                        { "closed_mlc_leakage_units", "Gy per MU, before DoseScalingFactor" },
+                        { "dose_readout", szReadoutModeNote ?? "unknown (not recorded by this build)" },
                         { "MetersetPerGy", b.MetersetPerGy },
-                        { "PRESET_DOSE_NORMALIZATION", 100.0 },
+                        { "PRESET_METERSET_MU", PhotonInfluenceMatrixCalc.PRESET_METERSET_MU },
                         { "DoseScalingFactor", fDoseScalingFactor },
                         // SFRThelper patch 13a: scratch-plan prescription
                         // provenance. Matrix values are per-MU physics and

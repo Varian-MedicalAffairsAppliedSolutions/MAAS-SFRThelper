@@ -249,17 +249,19 @@
         <!-- ================================================================ -->
         <StackPanel Grid.Row="3" Margin="0,0,0,8">
             <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                <Button Content="Run Extraction" Width="120" Height="26" FontWeight="SemiBold"
+                <Button Content="Calculate Influence Matrix" Width="170" Height="26" FontWeight="SemiBold"
                         Command="{Binding RunExtractionCommand}" Margin="0,0,8,0"/>
                 <Button Content="Inspect Output" Width="110" Height="26"
                         Command="{Binding InspectOutputCommand}" Margin="0,0,8,0"/>
-                <Button Content="Test HDF5" Width="90" Height="26"
-                        Command="{Binding TestHdfCommand}" Margin="0,0,8,0"/>
+                <!-- Test HDF5 removed: native-DLL deployment risk retired
+                     (handoff deferred item 3). Smoke-test service retained
+                     in Services\HdfSmokeTest.cs for future bring-ups. -->
                 <Button Content="Cancel" Width="90" Height="26"
                         Command="{Binding CancelCommand}"/>
             </StackPanel>
             <Grid>
                 <ProgressBar Height="18" Minimum="0" Maximum="100"
+                             IsIndeterminate="{Binding IsInspecting}"
                              Value="{Binding RunProgress.Percent, Mode=OneWay}"/>
                 <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
                            Text="{Binding RunProgress.Percent, StringFormat={}{0:F0}%}"/>

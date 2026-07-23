@@ -80,12 +80,16 @@ namespace PhotonCalculateInfluenceMatrix
 
     public static class PhotonInfluenceMatrixCalc
     {
-        // SFRThelper patch 3: normalization applied to doses returned by
-        // CalculateDoseWithPresetValues before per-MU conversion. Upstream
-        // used a bare 100.0 (reads as percent -> fraction). Pinned here as a
-        // named constant; its correctness is interrogated by first-run
-        // measurement #1 (closed-field vs open-beamlet MetersetPerGy check).
-        public const double PRESET_DOSE_NORMALIZATION = 100.0;
+        // SFRThelper patch 14 (supersedes patch 3's normalization pin): the
+        // scratch plan now reads out in absolute Gy, so the only conversion
+        // left is dividing by the meterset each beamlet was calculated with.
+        // This constant is that meterset, and it is also the value preset on
+        // every slot beam - one constant, so the two can never drift.
+        // PRESET_DOSE_NORMALIZATION (100.0) and the /(MetersetPerGy/100)
+        // formula are retired: they de-normalized the relative(%)-presentation
+        // readout, measured at first light (2026-07-23 run) to produce
+        // exactly 1e4 x Gy/MU. Measurement #1 in the ledger.
+        public const double PRESET_METERSET_MU = 1.0;
 
         // SFRThelper: single source of truth for the run-folder convention
         // (<root>\<LastName>$<PatientId>\<PlanId>). The app's Inspect Output
@@ -198,6 +202,14 @@ namespace PhotonCalculateInfluenceMatrix
                     "unaffected by the prescription magnitude. The scratch plan also uses no plan normalization, " +
                     "so readouts are unnormalized absolute dose.");
             }
+
+            // SFRThelper patch 14: force absolute dose presentation on the
+            // scratch plan so every readout is in physical units (Gy).
+            // Relative presentation is a per-beam shape normalized to the
+            // reference-point dose; the retired %-formula existed to undo
+            // that. Each readout still verifies the unit it actually got
+            // (see the patch 14 guard in the readout loop).
+            scratchPlan.DoseValuePresentation = DoseValuePresentation.Absolute;
             if (!string.IsNullOrWhiteSpace(szOverrideMachine) || !string.IsNullOrWhiteSpace(szOverrideEnergy))
                 hProgress?.Message($"MACHINE OVERRIDE: scratch beams use machine='" +
                     (string.IsNullOrWhiteSpace(szOverrideMachine) ? "(source)" : szOverrideMachine) +
@@ -285,7 +297,9 @@ namespace PhotonCalculateInfluenceMatrix
                         Beam hCopied = CopyBeam(origBeam, scratchPlan, szOverrideMachine, szOverrideEnergy);
                         bp.m_lstBeamletBeam.Add(hCopied);
 
-                        presetValues.Add(new KeyValuePair<string, MetersetValue>(hCopied.Id, new MetersetValue(1, DosimeterUnit.MU)));
+                        // SFRThelper patch 14: preset meterset comes from the
+                        // same constant the per-MU division uses.
+                        presetValues.Add(new KeyValuePair<string, MetersetValue>(hCopied.Id, new MetersetValue(PRESET_METERSET_MU, DosimeterUnit.MU)));
                     }
 
                     tblBeamParameters[origBeam.Id] = bp;
@@ -299,6 +313,12 @@ namespace PhotonCalculateInfluenceMatrix
 
                 List<string> lstCalcBeams = new List<string>();
                 bool bFirstDoseCalc = true;
+                // SFRThelper patch 14.1: one-shot flag for the presentation
+                // readback diagnostic logged on the first post-calc re-assert.
+                bool bPresentationReadbackLogged = false;
+                // SFRThelper patch 14.2: readout mode determined at the first
+                // unit probe, logged once, and stamped into beam metadata.
+                string szReadoutModeNote = null;
                 float[,] arrFullDoseMatrix = null;
                 // lopp thru beamlets
                 int iCurrBeamlet = 0;
@@ -407,6 +427,26 @@ namespace PhotonCalculateInfluenceMatrix
                             throw new ApplicationException($"Dose Calculation Failed after {iMaxDoseCalcRetry} attempts. Last message: {szLastCalcMsg}");
                         }
 
+                        // SFRThelper patch 14.1: re-assert absolute presentation
+                        // AFTER every dose calculation, immediately before
+                        // readout. Setting it once at scratch-plan creation was
+                        // not enough - first light of patch 14 showed the
+                        // readout still in '%': either the calculation resets
+                        // the presentation, or assignment before any dose
+                        // exists never takes hold. Asserting here, when the
+                        // dose objects it governs actually exist, is the
+                        // cheapest placement that is correct under both
+                        // explanations. The patch 13b/14 unit guard remains
+                        // the enforcement; this line is the cure.
+                        scratchPlan.DoseValuePresentation = DoseValuePresentation.Absolute;
+                        if (!bPresentationReadbackLogged)
+                        {
+                            bPresentationReadbackLogged = true;
+                            hProgress?.Message($"Presentation readback after re-assert: plan reports " +
+                                $"'{scratchPlan.DoseValuePresentation}'. The readout dispatches on the unit it " +
+                                "actually receives (patch 14.2); see the 'Dose readout mode' line below.");
+                        }
+
                         if (bFirstDoseCalc)
                         {
                             hProgress.Message("Exporting optimization voxel grid and CT-to-dose voxel map...");
@@ -430,32 +470,69 @@ namespace PhotonCalculateInfluenceMatrix
                                         arrFullDoseMatrix = new float[iDoseMatrixSize, 1];
                                     Array.Clear(arrFullDoseMatrix, 0, arrFullDoseMatrix.Length);
 
-                                    // SFRThelper patch 3: matrix columns are plan-independent
-                                    // physics - dose per 1 MU of this beamlet's beam. The
-                                    // upstream (WeightFactor / sumWeights) factor baked the
-                                    // source plan's beam weighting into the matrix; weighting
-                                    // belongs to the fluence optimizer downstream.
-                                    double dWeight = blb.MetersetPerGy / PRESET_DOSE_NORMALIZATION;
-
-                                    // SFRThelper patch 13b: fail fast if the readout scalars
-                                    // are undefined. NaN fails every comparison downstream
-                                    // (> cutoff, > 0, < 0 all false), so it flows through
-                                    // conversion, subtraction, clamp, and harvest without
-                                    // tripping anything and yields a structurally perfect,
-                                    // silently empty matrix - the first-light failure mode.
-                                    // Cheap scalar check, so it runs for every beamlet.
+                                    // SFRThelper patch 14 (replaces the patch 3 formula):
+                                    // dWeight means "divide presented dose down to Gy per
+                                    // MU". Its value depends on the unit Eclipse actually
+                                    // presents, dispatched below (patch 14.2).
+                                    //
+                                    // SFRThelper patch 14.2 (fallback for 14): this
+                                    // environment honors DoseValuePresentation on the plan
+                                    // (readback says Absolute) but VoxelToDoseValue for
+                                    // BEAM dose still returns percent. So the readout
+                                    // dispatches on the unit it actually got:
+                                    //   Gy   -> value = presented / PRESET_METERSET_MU
+                                    //   cGy  -> same, with cGy->Gy (x0.01)
+                                    //   %    -> value = presented / (100 * MetersetPerGy)
+                                    // The % branch is the reference-point derivation
+                                    // (P = 100*D/D_ref, MetersetPerGy = preset/D_ref):
+                                    // D_ref cancels, and so does the preset meterset -
+                                    // relative dose is a shape, so this branch stays
+                                    // correct even if PRESET_METERSET_MU changes.
+                                    // Anything else (Unknown, NaN) aborts: wrong-unit
+                                    // values pass every downstream comparison silently.
+                                    DoseValue dvProbe = hBeamDose.VoxelToDoseValue(1);
                                     double dReadIntercept = hBeamDose.VoxelToDoseValue(0).Dose;
-                                    double dReadScale = hBeamDose.VoxelToDoseValue(1).Dose - dReadIntercept;
-                                    if (Double.IsNaN(dReadScale) || Double.IsNaN(dReadIntercept) ||
-                                        Double.IsNaN(blb.MetersetPerGy) || blb.MetersetPerGy <= 0)
+                                    double dReadScale = dvProbe.Dose - dReadIntercept;
+                                    bool bRelativeReadout = false;
+                                    double dWeight;
+                                    if (dvProbe.Unit == DoseValue.DoseUnit.Gy)
+                                        dWeight = PRESET_METERSET_MU;
+                                    else if (dvProbe.Unit == DoseValue.DoseUnit.cGy)
+                                        dWeight = PRESET_METERSET_MU * 100.0;
+                                    else if (dvProbe.Unit == DoseValue.DoseUnit.Percent)
+                                    {
+                                        bRelativeReadout = true;
+                                        if (Double.IsNaN(blb.MetersetPerGy) || blb.MetersetPerGy <= 0)
+                                            throw new ApplicationException(
+                                                $"Relative(%) readout for beam '{blb.Id}' needs a valid MetersetPerGy " +
+                                                $"for the Gy conversion, but it is {blb.MetersetPerGy}. Aborting.");
+                                        dWeight = 100.0 * blb.MetersetPerGy;
+                                    }
+                                    else
                                     {
                                         throw new ApplicationException(
-                                            $"Dose readout is undefined for beam '{blb.Id}' (source field '{b.Id}'): " +
-                                            $"dScale={dReadScale}, dIntercept={dReadIntercept}, MetersetPerGy={blb.MetersetPerGy}. " +
-                                            "NaN here means Eclipse cannot present absolute dose. The usual cause is a plan " +
-                                            "without a prescription; patch 13a should have applied a nominal one to the scratch " +
-                                            "plan - if this fires anyway, check plan normalization and dose presentation. " +
-                                            "Aborting instead of writing an all-zero matrix.");
+                                            $"Dose readout unit '{dvProbe.UnitAsString}' for beam '{blb.Id}' " +
+                                            $"(source field '{b.Id}') is not Gy, cGy, or %. dScale={dReadScale}, " +
+                                            $"dIntercept={dReadIntercept}. Aborting instead of writing a matrix " +
+                                            "in unknown units.");
+                                    }
+                                    if (Double.IsNaN(dReadScale) || Double.IsNaN(dReadIntercept))
+                                    {
+                                        throw new ApplicationException(
+                                            $"Dose readout scalars are NaN for beam '{blb.Id}' (source field '{b.Id}'): " +
+                                            $"dScale={dReadScale}, dIntercept={dReadIntercept}, unit='{dvProbe.UnitAsString}'. " +
+                                            "Usual cause: no prescription (patch 13a). Aborting instead of writing an " +
+                                            "all-zero matrix.");
+                                    }
+                                    if (szReadoutModeNote == null)
+                                    {
+                                        szReadoutModeNote = bRelativeReadout
+                                            ? "Relative(%): DoseValuePresentation is not honored for beam dose in this " +
+                                              "environment; Gy_per_MU = presented_percent / (100 * MetersetPerGy) " +
+                                              "(reference-point normalization cancels; independent of preset meterset)"
+                                            : $"Absolute ({dvProbe.UnitAsString}): Gy_per_MU = presented dose / meterset, " +
+                                              $"PRESET_METERSET_MU = {PRESET_METERSET_MU}";
+                                        hProgress?.Message("Dose readout mode: " + szReadoutModeNote);
                                     }
                                     string szHDF5DataFile = System.IO.Path.Combine(szBeamPath, $"Beam_{b.Id}_Data.h5");
 
@@ -472,9 +549,12 @@ namespace PhotonCalculateInfluenceMatrix
                                         // empty dose; NaN scalars -> units/prescription
                                         // (patch 13b throws first); healthy raw but zero
                                         // converted -> dWeight error.
+                                        float fMaxBaseline = GetMaxMatrixValue(arrClosedMLCDoseMatrix);
                                         hProgress?.Message(FormatReadoutDiagnostics("closed-MLC baseline", b.Id,
                                                 hBeamDose, dReadScale, dReadIntercept, blb.MetersetPerGy, dWeight) +
-                                            $"; maxConverted={GetMaxMatrixValue(arrClosedMLCDoseMatrix):E3} Gy/MU");
+                                            $"; maxConverted={fMaxBaseline:E3} Gy/MU");
+                                        ReportPresentationMeasurement(scratchPlan, blb, hBeamDose,
+                                            bRelativeReadout, dReadScale / dWeight, fMaxBaseline, hProgress);
                                     }
                                     else
                                     {
@@ -496,9 +576,14 @@ namespace PhotonCalculateInfluenceMatrix
                                         // is also the quantisation floor of this beamlet's
                                         // dose in physical units - record it for the paper.
                                         if (bDiagBeamlet)
+                                        {
+                                            float fMaxBeamlet0 = GetMaxMatrixValue(arrFullDoseMatrix);
                                             hProgress?.Message(FormatReadoutDiagnostics("beamlet 0", b.Id,
                                                     hBeamDose, dReadScale, dReadIntercept, blb.MetersetPerGy, dWeight) +
-                                                $"; maxConverted (pre-subtraction)={GetMaxMatrixValue(arrFullDoseMatrix):E3} Gy/MU");
+                                                $"; maxConverted (pre-subtraction)={fMaxBeamlet0:E3} Gy/MU");
+                                            ReportPresentationMeasurement(scratchPlan, blb, hBeamDose,
+                                                bRelativeReadout, dReadScale / dWeight, fMaxBeamlet0, hProgress);
+                                        }
 
                                         // subtract matrix from closedMLC matrix
                                         arrClosedMLCDoseMatrix = bp.m_arrClosedMLCDoseMatrix;
@@ -546,7 +631,7 @@ namespace PhotonCalculateInfluenceMatrix
                     Helpers.WriteBeamletInfoHDF5(tblBeamParameters[b.Id], iMaxPointCnt, szHDF5DataFile);
 
                     string szBeamMetaDataFile = System.IO.Path.Combine(szBeamPath, $"Beam_{b.Id}_MetaData.json");
-                    Helpers.WriteBeamMetaData(b, tblBeamParameters[b.Id], dInfCutoffValue, fDoseScalingFactor, szBeamMetaDataFile, szPrescriptionNote);
+                    Helpers.WriteBeamMetaData(b, tblBeamParameters[b.Id], dInfCutoffValue, fDoseScalingFactor, szBeamMetaDataFile, szPrescriptionNote, szReadoutModeNote);
                 }
                 bCompleted = true;
             }
@@ -1355,6 +1440,66 @@ namespace PhotonCalculateInfluenceMatrix
                     fMax = arrMatrix[i, 0];
             }
             return fMax;
+        }
+
+        // SFRThelper patch 14 (measurement #1), reworked by 14.2. Two modes:
+        //
+        // Absolute readout (Gy/cGy honored): flip to Relative, read the decode
+        // scalar, reproduce the retired %-formula per raw integer, and print
+        // the ratio against the pipeline's Gy-per-int - predicted 1.0E+004.
+        // A genuine cross-presentation measurement.
+        //
+        // Relative(%) readout: flipping presentations proves nothing (both
+        // sides would read the same numbers - the ratio becomes an algebraic
+        // identity, not a measurement). Instead print the one-time MANUAL
+        // verification: open the scratch plan in Eclipse, display the named
+        // slot beam's dose in absolute mode, and compare its max against the
+        // predicted value. Agreement pins the %-derivation to ground truth.
+        //
+        // Runs only for diagnosed beamlets; any failure is reported and
+        // skipped - the measurement is optional, run integrity is not.
+        private static void ReportPresentationMeasurement(ExternalPlanSetup hScratchPlan, Beam blb,
+            BeamDose hBeamDose, bool bRelativeReadout, double dPipelineGyPerInt, float fMaxConvertedGyPerMU,
+            DisplayProgress hProgress)
+        {
+            try
+            {
+                if (bRelativeReadout)
+                {
+                    hProgress?.Message($"MEASUREMENT #1 [{blb.Id}]: pipeline is in relative(%) readout mode; " +
+                        $"pipeline scale = {dPipelineGyPerInt:E6} Gy/int. Manual verification (one-time): open " +
+                        $"scratch plan '{hScratchPlan.Id}' in Eclipse, show beam '{blb.Id}' dose in ABSOLUTE " +
+                        $"display; its 3D max should read ~{fMaxConvertedGyPerMU * PRESET_METERSET_MU:E3} Gy " +
+                        $"(= maxConverted x {PRESET_METERSET_MU} MU preset). Agreement confirms the " +
+                        "percent-to-Gy derivation against Eclipse's own ground truth.");
+                    return;
+                }
+
+                double dRelScalePerInt;
+                string szRelUnit;
+                hScratchPlan.DoseValuePresentation = DoseValuePresentation.Relative;
+                try
+                {
+                    DoseValue dvRel = hBeamDose.VoxelToDoseValue(1);
+                    dRelScalePerInt = dvRel.Dose - hBeamDose.VoxelToDoseValue(0).Dose;
+                    szRelUnit = dvRel.UnitAsString;
+                }
+                finally
+                {
+                    hScratchPlan.DoseValuePresentation = DoseValuePresentation.Absolute;
+                }
+                double dLegacyPerInt = dRelScalePerInt * 100.0 / blb.MetersetPerGy;
+                double dRatio = dLegacyPerInt / dPipelineGyPerInt;
+                hProgress?.Message($"MEASUREMENT #1 [{blb.Id}]: relative dScale={dRelScalePerInt:E6} {szRelUnit}/int; " +
+                    $"legacy-formula value/int={dLegacyPerInt:E6}; absolute value/int={dPipelineGyPerInt:E6} Gy; " +
+                    $"ratio legacy/absolute={dRatio:E4} (predicted 1.0000E+004)");
+            }
+            catch (Exception ex)
+            {
+                hProgress?.Message($"MEASUREMENT #1 [{blb.Id}]: comparison unavailable " +
+                    $"({ex.Message}); skipping (pipeline output unaffected).");
+                try { hScratchPlan.DoseValuePresentation = DoseValuePresentation.Absolute; } catch { }
+            }
         }
 
         public static Beam CopyBeam(Beam beam, ExternalPlanSetup plansetup,

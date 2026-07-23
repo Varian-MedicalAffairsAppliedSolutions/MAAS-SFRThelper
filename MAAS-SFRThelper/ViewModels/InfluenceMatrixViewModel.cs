@@ -205,7 +205,6 @@ namespace MAAS_SFRThelper.ViewModels
                 if (SetProperty(ref isRunning, value))
                 {
                     RunExtractionCommand.RaiseCanExecuteChanged();
-                    TestHdfCommand.RaiseCanExecuteChanged();
                     InspectOutputCommand.RaiseCanExecuteChanged();
                     CancelCommand.RaiseCanExecuteChanged();
                     RefreshEligibilityCommand.RaiseCanExecuteChanged();
@@ -213,8 +212,16 @@ namespace MAAS_SFRThelper.ViewModels
             }
         }
 
+        // Busy flag for Inspect Output: drives the progress bar's
+        // indeterminate mode, since inspection has no meaningful percent.
+        private bool isInspecting;
+        public bool IsInspecting
+        {
+            get { return isInspecting; }
+            private set { SetProperty(ref isInspecting, value); }
+        }
+
         public DelegateCommand RunExtractionCommand { get; }
-        public DelegateCommand TestHdfCommand { get; }
         public DelegateCommand InspectOutputCommand { get; }
         public DelegateCommand CancelCommand { get; }
         public DelegateCommand RefreshEligibilityCommand { get; }
@@ -225,7 +232,6 @@ namespace MAAS_SFRThelper.ViewModels
             RunProgress = new BindableRunProgress();
 
             RunExtractionCommand = new DelegateCommand(RunExtraction, () => IsEligible && !IsRunning);
-            TestHdfCommand = new DelegateCommand(RunHdfSmokeTest, () => !IsRunning);
             InspectOutputCommand = new DelegateCommand(InspectOutput, () => !IsRunning);
             CancelCommand = new DelegateCommand(() => RunProgress.RequestCancel(), () => IsRunning);
             RefreshEligibilityCommand = new DelegateCommand(RefreshEligibility, () => !IsRunning);
@@ -312,11 +318,16 @@ namespace MAAS_SFRThelper.ViewModels
             string targetId = (SelectedTarget == TargetNone) ? null : SelectedTarget;
 
             IsRunning = true;
-            RunProgress.Message("=== Influence matrix extraction ===");
+            RunProgress.Message("=== Influence matrix calculation ===");
             RunProgress.Message($"Beamlet {BeamletSizeX} x {BeamletSizeY} mm; target: " +
                 (targetId ?? "none (whole field - no envelope pruning)") +
                 $"; margin {TargetMarginMM} mm");
+            // Cutoff and scaling are echoed unconditionally so the log always
+            // records the values the run ACTUALLY used - a binding hiccup in
+            // the textbox (e.g. an unparseable entry silently leaving the old
+            // value in place) becomes visible here instead of hiding.
             RunProgress.Message($"Batch {BatchSize}; retry {MaxRetry}; model {SelectedCalcModel}; grid {GridSizeCM} cm; " +
+                $"cutoff {CutoffValue} Gy/MU; scaling {DoseScalingFactor}; " +
                 $"full matrix: {(ExportFullMatrix ? "yes" : "no")}");
             if (CutoffDeviates)
                 RunProgress.Message($"WARNING: cutoff = {CutoffValue} (nonzero). The sparse matrix will drop " +
@@ -374,6 +385,7 @@ namespace MAAS_SFRThelper.ViewModels
         private void InspectOutput()
         {
             IsRunning = true;
+            IsInspecting = true;
             RunProgress.Reset();
             try
             {
@@ -410,30 +422,13 @@ namespace MAAS_SFRThelper.ViewModels
             }
             finally
             {
+                IsInspecting = false;
                 IsRunning = false;
             }
         }
 
-        private void RunHdfSmokeTest()
-        {
-            IsRunning = true;
-            RunProgress.Reset();
-            try
-            {
-                bool ok = HdfSmokeTest.Run(RunProgress);
-                RunProgress.Message(ok
-                    ? "=== HDF5 SMOKE TEST PASSED ==="
-                    : "=== HDF5 SMOKE TEST FAILED ===");
-            }
-            catch (Exception ex)
-            {
-                RunProgress.Message("=== HDF5 SMOKE TEST FAILED (unexpected) ===");
-                RunProgress.Message(ex.GetType().Name + ": " + ex.Message);
-            }
-            finally
-            {
-                IsRunning = false;
-            }
-        }
+        // Test HDF5 removed (handoff deferred item 3): native-DLL deployment
+        // risk is retired; HdfSmokeTest.cs stays in Services should it ever
+        // be needed for a new environment bring-up.
     }
 }
