@@ -99,24 +99,28 @@ namespace PhotonCalculateInfluenceMatrix
             return System.IO.Path.Combine(szOutputRootFolder, hPatient.LastName + "$" + hPatient.Id, hPlan.Id);
         }
 
+        // SFRThelper: every run writes into its own timestamped subfolder.
+        // Runs can no longer clobber previous outputs (a measurement run on
+        // 2026-07-23 silently destroyed the keeper matrices by reusing the
+        // plan folder). The app captures this path at launch and passes it
+        // in, so writer and inspector agree on the exact folder.
+        public static string CreateRunFolderPath(string szOutputRootFolder, Patient hPatient, ExternalPlanSetup hPlan)
+        {
+            return System.IO.Path.Combine(GetPlanResultsPath(szOutputRootFolder, hPatient, hPlan),
+                "run_" + DateTime.Now.ToString("yyyyMMdd_HHmmss"));
+        }
+
         public static void Calculate(Patient hPatient, Course hCourse, ExternalPlanSetup hPlan, double dInfCutoffValue, bool bExportFullInfMatrix, int iMaxDoseCalcRetry,
             float beamletSizeX, float beamletSizeY, string szTargetStructureId, float fTargetMarginMM, int iNumBeamletsToBeCalcAtATime, string szEclipseVolumeDoseCalcModel,
             string szCalculationGridSizeInCM, float fDoseScalingFactor, string szOutputRootFolder, DisplayProgress hProgress,
-            Func<bool> checkCancellation = null, string szOverrideMachine = null, string szOverrideEnergy = null)
+            Func<bool> checkCancellation = null, string szOverrideMachine = null, string szOverrideEnergy = null, string szRunFolder = null)
         {
             int iFieldCnt = hPlan.Beams.Count();
 
-            string planResultsPath = GetPlanResultsPath(szOutputRootFolder, hPatient, hPlan);
-            string resultsDirPath = System.IO.Path.GetDirectoryName(planResultsPath);
-            if (!System.IO.Directory.Exists(resultsDirPath))
-            {
-                System.IO.Directory.CreateDirectory(resultsDirPath);
-            }
-            if (Directory.Exists(planResultsPath))
-            {
-                Directory.Delete(planResultsPath, true);
-                System.Threading.Thread.Sleep(5000);
-            }
+            // SFRThelper: unique timestamped run folder (see
+            // CreateRunFolderPath). The old delete-and-recreate of the plan
+            // folder is gone - it destroyed previous runs' outputs.
+            string planResultsPath = szRunFolder ?? CreateRunFolderPath(szOutputRootFolder, hPatient, hPlan);
             Directory.CreateDirectory(planResultsPath);
             if (hProgress != null)
             {
@@ -319,6 +323,7 @@ namespace PhotonCalculateInfluenceMatrix
                 // SFRThelper patch 14.2: readout mode determined at the first
                 // unit probe, logged once, and stamped into beam metadata.
                 string szReadoutModeNote = null;
+                bool bRelativeReadoutMode = false;
                 float[,] arrFullDoseMatrix = null;
                 // lopp thru beamlets
                 int iCurrBeamlet = 0;
@@ -526,6 +531,7 @@ namespace PhotonCalculateInfluenceMatrix
                                     }
                                     if (szReadoutModeNote == null)
                                     {
+                                        bRelativeReadoutMode = bRelativeReadout;
                                         szReadoutModeNote = bRelativeReadout
                                             ? "Relative(%): DoseValuePresentation is not honored for beam dose in this " +
                                               "environment; Gy_per_MU = presented_percent / (100 * MetersetPerGy) " +
@@ -621,6 +627,62 @@ namespace PhotonCalculateInfluenceMatrix
                         return;
                     }
                 } while (iCurrBeamlet < iMaxBeamletCount);
+
+                // SFRThelper: FINAL-STATE CHECK (measurement #1, completed-run
+                // form). After the loop the slot beams retain the LAST batch's
+                // dose, and the scratch plan is kept after the run - so a
+                // finished run supports the Eclipse ground-truth comparison
+                // with no cancel gymnastics. Three UI observables, each
+                // pinning one leg of the unit chain:
+                //   (a) relative field-dose max  -> raw readout <-> display;
+                //   (b) absolute field-dose max  -> the percent <-> Gy anchor
+                //       (100% = total prescription, observed 2026-07-23:
+                //       400.4% <-> 4.004 Gy at 1 Gy nominal Rx);
+                //   (c) Fields-panel MU          -> MetersetPerGy against
+                //       Eclipse's own renormalization arithmetic (observed:
+                //       MU column = equal split of Rx across slot beams;
+                //       displayed dose and displayed MU use DIFFERENT
+                //       normalizations, so dose/MU is NOT comparable).
+                try
+                {
+                    if (bRelativeReadoutMode)
+                    {
+                        int nTotalSlots = 0;
+                        foreach (Beam b in arrOrigBeams)
+                            nTotalSlots += tblBeamParameters[b.Id].m_lstBeamletBeam.Count;
+
+                        double dRxGy = double.NaN;
+                        DoseValue dvRx = scratchPlan.TotalDose;
+                        if (!Double.IsNaN(dvRx.Dose))
+                            dRxGy = (dvRx.Unit == DoseValue.DoseUnit.cGy) ? dvRx.Dose * 0.01 : dvRx.Dose;
+
+                        foreach (Beam b in arrOrigBeams)
+                        {
+                            Beam hSlot0 = tblBeamParameters[b.Id].m_lstBeamletBeam[0];
+                            BeamDose hSlotDose = hSlot0.Dose;
+                            if (hSlotDose == null)
+                                continue;
+                            double dInt0 = hSlotDose.VoxelToDoseValue(0).Dose;
+                            double dScl0 = hSlotDose.VoxelToDoseValue(1).Dose - dInt0;
+                            double dPmax = GetMaxRawVoxel(hSlotDose) * dScl0 + dInt0;   // presented %
+                            double dM = hSlot0.MetersetPerGy;
+                            double dGyPerMU = dPmax / (100.0 * dM);
+                            hProgress?.Message(
+                                $"FINAL-STATE CHECK [slot '{hSlot0.Id}', final-batch aperture]: derived max = " +
+                                $"{dGyPerMU:E3} Gy/MU (presented max {dPmax:F1}%, MetersetPerGy {dM:F1}). " +
+                                $"Eclipse verification on the retained scratch plan: " +
+                                $"(a) Show Field Dose for '{hSlot0.Id}', RELATIVE display: max ~ {dPmax:F1}%; " +
+                                $"(b) ABSOLUTE display: max ~ {dPmax / 100.0 * dRxGy:F4} Gy (100% = {dRxGy:F2} Gy prescription); " +
+                                $"(c) Fields panel MU ~ {dRxGy * dM / nTotalSlots:F0} MU (if Eclipse splits the " +
+                                $"prescription equally across the {nTotalSlots} slot beams, as observed). " +
+                                "Agreement on (a)-(c) pins raw readout, the %-to-Gy anchor, and MetersetPerGy respectively.");
+                        }
+                    }
+                }
+                catch (Exception exFinalState)
+                {
+                    hProgress?.Message("FINAL-STATE CHECK unavailable: " + exFinalState.Message);
+                }
 
                 // export beam meta data
                 foreach (Beam b in arrOrigBeams)
@@ -1466,12 +1528,11 @@ namespace PhotonCalculateInfluenceMatrix
             {
                 if (bRelativeReadout)
                 {
-                    hProgress?.Message($"MEASUREMENT #1 [{blb.Id}]: pipeline is in relative(%) readout mode; " +
-                        $"pipeline scale = {dPipelineGyPerInt:E6} Gy/int. Manual verification (one-time): open " +
-                        $"scratch plan '{hScratchPlan.Id}' in Eclipse, show beam '{blb.Id}' dose in ABSOLUTE " +
-                        $"display; its 3D max should read ~{fMaxConvertedGyPerMU * PRESET_METERSET_MU:E3} Gy " +
-                        $"(= maxConverted x {PRESET_METERSET_MU} MU preset). Agreement confirms the " +
-                        "percent-to-Gy derivation against Eclipse's own ground truth.");
+                    hProgress?.Message($"MEASUREMENT #1 [{blb.Id}]: relative(%) readout; pipeline scale = " +
+                        $"{dPipelineGyPerInt:E6} Gy/int. Note: slot-beam dose is OVERWRITTEN by later batches, " +
+                        "so after a completed run do not compare Eclipse against this batch - use the " +
+                        "FINAL-STATE CHECK lines printed at completion (or cancel at the first batch boundary " +
+                        "to preserve this batch's dose).");
                     return;
                 }
 

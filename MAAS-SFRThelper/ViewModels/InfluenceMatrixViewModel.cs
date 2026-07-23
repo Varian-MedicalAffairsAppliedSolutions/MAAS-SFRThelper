@@ -96,7 +96,10 @@ namespace MAAS_SFRThelper.ViewModels
             set { SetProperty(ref targetMarginMM, value); }
         }
 
-        private double cutoffValue = 0.0;
+        // Default 1e-6 Gy/MU (was 0.0): cutoff 0 keeps float-dust residuals
+        // and produced 70%-dense gigabyte files; 1e-6 measured 4.5% density
+        // at unchanged physics. Set 0 explicitly for identity-exact output.
+        private double cutoffValue = 1.0e-6;
         public double CutoffValue
         {
             get { return cutoffValue; }
@@ -149,7 +152,9 @@ namespace MAAS_SFRThelper.ViewModels
             set { SetProperty(ref gridSizeCM, value); }
         }
 
-        private bool exportFullMatrix = true;
+        // Default OFF (was ON): the dense export is a validation tool
+        // (~1.5 GB per beam) and should be opted into, not stumbled into.
+        private bool exportFullMatrix = false;
         public bool ExportFullMatrix
         {
             get { return exportFullMatrix; }
@@ -219,6 +224,21 @@ namespace MAAS_SFRThelper.ViewModels
         {
             get { return isInspecting; }
             private set { SetProperty(ref isInspecting, value); }
+        }
+
+        // Raised when a calculation run finishes (success, failure, or
+        // cancellation). The view uses it to complete a deferred window close.
+        public event EventHandler RunEnded;
+
+        // Called by the view when the user tries to close the window during
+        // an active run: request cancellation and log; the window closes via
+        // RunEnded once the run stops at the next batch boundary.
+        public void RequestCloseAfterRun()
+        {
+            RunProgress.RequestCancel();
+            RunProgress.Message("Window close requested during an active run: cancellation requested; " +
+                "the window will close automatically once the run stops at the next batch boundary. " +
+                "(Forcing the window closed mid-run freezes the Eclipse script process.)");
         }
 
         public DelegateCommand RunExtractionCommand { get; }
@@ -330,8 +350,9 @@ namespace MAAS_SFRThelper.ViewModels
                 $"cutoff {CutoffValue} Gy/MU; scaling {DoseScalingFactor}; " +
                 $"full matrix: {(ExportFullMatrix ? "yes" : "no")}");
             if (CutoffDeviates)
-                RunProgress.Message($"WARNING: cutoff = {CutoffValue} (nonzero). The sparse matrix will drop " +
-                    "entries at or below this value; the exact reconstruction identity will NOT hold for this file.");
+                RunProgress.Message($"Note: cutoff = {CutoffValue} Gy/MU (nonzero, recommended default). Sparse entries " +
+                    "at or below this value are dropped; set cutoff 0 explicitly if the exact reconstruction " +
+                    "identity is required for this file.");
             if (ScalingDeviates)
                 RunProgress.Message($"WARNING: DoseScalingFactor = {DoseScalingFactor} (not 1). Stored values " +
                     "are scaled; downstream consumers must honor the dose_units metadata.");
@@ -355,7 +376,7 @@ namespace MAAS_SFRThelper.ViewModels
                     // Capture the run folder NOW, while the source plan is the
                     // live context, using the library's own path convention -
                     // writer and inspector share one function and cannot drift.
-                    _lastRunFolder = PhotonInfluenceMatrixCalc.GetPlanResultsPath(
+                    _lastRunFolder = PhotonInfluenceMatrixCalc.CreateRunFolderPath(
                         OutputRoot, sc.Patient, sc.ExternalPlanSetup);
 
                     PhotonInfluenceMatrixCalc.Calculate(
@@ -367,7 +388,8 @@ namespace MAAS_SFRThelper.ViewModels
                         DoseScalingFactor, OutputRoot,
                         adapter, () => RunProgress.CancellationRequested,
                         string.IsNullOrWhiteSpace(OverrideMachine) ? null : OverrideMachine.Trim(),
-                        string.IsNullOrWhiteSpace(OverrideEnergy) ? null : OverrideEnergy.Trim());
+                        string.IsNullOrWhiteSpace(OverrideEnergy) ? null : OverrideEnergy.Trim(),
+                        _lastRunFolder);
                 }
                 catch (Exception ex)
                 {
@@ -378,6 +400,9 @@ namespace MAAS_SFRThelper.ViewModels
                 finally
                 {
                     IsRunning = false;
+                    // Signals the view that a pending window-close (requested
+                    // mid-run) may now proceed safely.
+                    RunEnded?.Invoke(this, EventArgs.Empty);
                 }
             });
         }
@@ -410,9 +435,25 @@ namespace MAAS_SFRThelper.ViewModels
                         RunProgress.Message("No plan in context - cannot locate a run folder.");
                         return;
                     }
-                    RunProgress.Message("No run in this session - deriving the folder from the live plan " +
-                        "context. If the active plan is a scratch plan (zD_...), open the source plan " +
-                        "and inspect again.");
+                    // Runs write timestamped subfolders now: inspect the
+                    // newest one; the bare plan folder only for pre-timestamp
+                    // outputs. (If the active plan is a scratch plan (zD_...),
+                    // open the source plan and inspect again.)
+                    try
+                    {
+                        if (Directory.Exists(runFolder))
+                        {
+                            string[] runDirs = Directory.GetDirectories(runFolder, "run_*");
+                            if (runDirs.Length > 0)
+                            {
+                                Array.Sort(runDirs, StringComparer.OrdinalIgnoreCase);
+                                runFolder = runDirs[runDirs.Length - 1];
+                            }
+                        }
+                    }
+                    catch { /* fall through to the plan folder */ }
+                    RunProgress.Message("No run in this session - inspecting the newest output under the " +
+                        "live plan's folder.");
                 }
                 Inspection_Helpers.InspectRunFolder(runFolder, RunProgress.Message);
             }
