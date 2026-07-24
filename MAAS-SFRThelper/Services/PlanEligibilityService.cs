@@ -28,6 +28,21 @@ namespace MAAS_SFRThelper.Services
             checks.Add(new EligibilityCheck("External photon plan open", true,
                 $"Plan '{plan.Id}'."));
 
+            // Refuses to run on a temporary working copy left behind by a
+            // previous run (its name starts with the working-copy tag).
+            // Running on one produces a meaningless "copy of a copy" run
+            // that wastes hours (seen 2026-07-23).
+            bool bLooksLikeScratch = plan.Id.StartsWith(
+                PhotonCalculateInfluenceMatrix.PhotonInfluenceMatrixCalc.SCRATCH_PLAN_PREFIX,
+                System.StringComparison.OrdinalIgnoreCase);
+            checks.Add(new EligibilityCheck("Not a leftover working copy",
+                !bLooksLikeScratch,
+                bLooksLikeScratch
+                    ? $"'{plan.Id}' looks like a temporary working copy from a previous run " +
+                      "(the tool makes these itself and normally cleans them up). Open the " +
+                      "original plan and press Refresh."
+                    : "The open plan is not a leftover working copy."));
+
             checks.Add(new EligibilityCheck("Structure set attached",
                 plan.StructureSet != null,
                 plan.StructureSet != null

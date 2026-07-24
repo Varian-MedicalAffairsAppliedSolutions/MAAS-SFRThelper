@@ -87,6 +87,7 @@
     <Compile Include="Photon_Helpers.cs" />
     <Compile Include="Photon_InfluenceMatrixCalc.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Reconstruction_Validator.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

@@ -161,6 +161,16 @@ namespace MAAS_SFRThelper.ViewModels
             set { SetProperty(ref exportFullMatrix, value); }
         }
 
+        // When on, the run also saves the "answer key": Eclipse's one-shot
+        // dose of each real field, used later to check how closely the
+        // summed matrix reproduces the real thing. Off for everyday runs.
+        private bool exportReferenceDose = false;
+        public bool ExportReferenceDose
+        {
+            get { return exportReferenceDose; }
+            set { SetProperty(ref exportReferenceDose, value); }
+        }
+
         private string outputRoot;
         public string OutputRoot
         {
@@ -211,6 +221,7 @@ namespace MAAS_SFRThelper.ViewModels
                 {
                     RunExtractionCommand.RaiseCanExecuteChanged();
                     InspectOutputCommand.RaiseCanExecuteChanged();
+                    ValidateReconstructionCommand.RaiseCanExecuteChanged();
                     CancelCommand.RaiseCanExecuteChanged();
                     RefreshEligibilityCommand.RaiseCanExecuteChanged();
                 }
@@ -243,6 +254,7 @@ namespace MAAS_SFRThelper.ViewModels
 
         public DelegateCommand RunExtractionCommand { get; }
         public DelegateCommand InspectOutputCommand { get; }
+        public DelegateCommand ValidateReconstructionCommand { get; }
         public DelegateCommand CancelCommand { get; }
         public DelegateCommand RefreshEligibilityCommand { get; }
 
@@ -253,6 +265,7 @@ namespace MAAS_SFRThelper.ViewModels
 
             RunExtractionCommand = new DelegateCommand(RunExtraction, () => IsEligible && !IsRunning);
             InspectOutputCommand = new DelegateCommand(InspectOutput, () => !IsRunning);
+            ValidateReconstructionCommand = new DelegateCommand(ValidateReconstruction, () => !IsRunning);
             CancelCommand = new DelegateCommand(() => RunProgress.RequestCancel(), () => IsRunning);
             RefreshEligibilityCommand = new DelegateCommand(RefreshEligibility, () => !IsRunning);
 
@@ -348,11 +361,12 @@ namespace MAAS_SFRThelper.ViewModels
             // value in place) becomes visible here instead of hiding.
             RunProgress.Message($"Batch {BatchSize}; retry {MaxRetry}; model {SelectedCalcModel}; grid {GridSizeCM} cm; " +
                 $"cutoff {CutoffValue} Gy/MU; scaling {DoseScalingFactor}; " +
-                $"full matrix: {(ExportFullMatrix ? "yes" : "no")}");
+                $"full matrix: {(ExportFullMatrix ? "yes" : "no")}; reference dose: {(ExportReferenceDose ? "yes" : "no")}");
             if (CutoffDeviates)
-                RunProgress.Message($"Note: cutoff = {CutoffValue} Gy/MU (nonzero, recommended default). Sparse entries " +
-                    "at or below this value are dropped; set cutoff 0 explicitly if the exact reconstruction " +
-                    "identity is required for this file.");
+                RunProgress.Message($"Note: cutoff = {CutoffValue} Gy/MU. Entries at or below this value are zeroed " +
+                    "in the matrix before export - the sparse and full exports are the SAME thresholded matrix, " +
+                    "and the discarded mass is audited per beamlet. Set cutoff 0 explicitly for the unthresholded, " +
+                    "bit-exact matrix.");
             if (ScalingDeviates)
                 RunProgress.Message($"WARNING: DoseScalingFactor = {DoseScalingFactor} (not 1). Stored values " +
                     "are scaled; downstream consumers must honor the dose_units metadata.");
@@ -389,7 +403,8 @@ namespace MAAS_SFRThelper.ViewModels
                         adapter, () => RunProgress.CancellationRequested,
                         string.IsNullOrWhiteSpace(OverrideMachine) ? null : OverrideMachine.Trim(),
                         string.IsNullOrWhiteSpace(OverrideEnergy) ? null : OverrideEnergy.Trim(),
-                        _lastRunFolder);
+                        _lastRunFolder,
+                        ExportReferenceDose);
                 }
                 catch (Exception ex)
                 {
@@ -407,6 +422,45 @@ namespace MAAS_SFRThelper.ViewModels
             });
         }
 
+        // Finds the folder to work on: the one this session's run wrote,
+        // or - if no run happened in this window - the newest run folder
+        // belonging to the open plan.
+        private string ResolveRunFolder()
+        {
+            string runFolder = _lastRunFolder;
+            if (runFolder != null)
+            {
+                RunProgress.Message("Using the folder written by this session's run.");
+                return runFolder;
+            }
+            _esapi.RunWithWait(sc =>
+            {
+                if (sc.Patient != null && sc.ExternalPlanSetup != null)
+                    runFolder = PhotonInfluenceMatrixCalc.GetPlanResultsPath(
+                        OutputRoot, sc.Patient, sc.ExternalPlanSetup);
+            });
+            if (runFolder == null)
+            {
+                RunProgress.Message("No plan open - cannot find a run folder.");
+                return null;
+            }
+            try
+            {
+                if (Directory.Exists(runFolder))
+                {
+                    string[] runDirs = Directory.GetDirectories(runFolder, "run_*");
+                    if (runDirs.Length > 0)
+                    {
+                        Array.Sort(runDirs, StringComparer.OrdinalIgnoreCase);
+                        runFolder = runDirs[runDirs.Length - 1];
+                    }
+                }
+            }
+            catch { /* fall back to the plan folder itself */ }
+            RunProgress.Message("No run in this session - using the newest output folder for the open plan.");
+            return runFolder;
+        }
+
         private void InspectOutput()
         {
             IsRunning = true;
@@ -414,52 +468,41 @@ namespace MAAS_SFRThelper.ViewModels
             RunProgress.Reset();
             try
             {
-                string runFolder = _lastRunFolder;
-                if (runFolder != null)
-                {
-                    RunProgress.Message("Inspecting the folder written by this session's run.");
-                }
-                else
-                {
-                    // No run this session: fall back to deriving the folder
-                    // from the live plan context via the library's shared
-                    // path helper (single source of truth for the convention).
-                    _esapi.RunWithWait(sc =>
-                    {
-                        if (sc.Patient != null && sc.ExternalPlanSetup != null)
-                            runFolder = PhotonInfluenceMatrixCalc.GetPlanResultsPath(
-                                OutputRoot, sc.Patient, sc.ExternalPlanSetup);
-                    });
-                    if (runFolder == null)
-                    {
-                        RunProgress.Message("No plan in context - cannot locate a run folder.");
-                        return;
-                    }
-                    // Runs write timestamped subfolders now: inspect the
-                    // newest one; the bare plan folder only for pre-timestamp
-                    // outputs. (If the active plan is a scratch plan (zD_...),
-                    // open the source plan and inspect again.)
-                    try
-                    {
-                        if (Directory.Exists(runFolder))
-                        {
-                            string[] runDirs = Directory.GetDirectories(runFolder, "run_*");
-                            if (runDirs.Length > 0)
-                            {
-                                Array.Sort(runDirs, StringComparer.OrdinalIgnoreCase);
-                                runFolder = runDirs[runDirs.Length - 1];
-                            }
-                        }
-                    }
-                    catch { /* fall through to the plan folder */ }
-                    RunProgress.Message("No run in this session - inspecting the newest output under the " +
-                        "live plan's folder.");
-                }
+                string runFolder = ResolveRunFolder();
+                if (runFolder == null)
+                    return;
                 Inspection_Helpers.InspectRunFolder(runFolder, RunProgress.Message);
             }
             catch (Exception ex)
             {
                 RunProgress.Message("Inspection failed: " + ex.GetType().Name + ": " + ex.Message);
+            }
+            finally
+            {
+                IsInspecting = false;
+                IsRunning = false;
+            }
+        }
+
+        // The "grader": adds up all the small pieces of the saved matrix and
+        // compares the total against the answer key saved by the reference
+        // checkbox, then reports how close they are and writes the CSV files
+        // used for figures. Works purely on files; Eclipse is not involved.
+        private void ValidateReconstruction()
+        {
+            IsRunning = true;
+            IsInspecting = true;
+            RunProgress.Reset();
+            try
+            {
+                string runFolder = ResolveRunFolder();
+                if (runFolder == null)
+                    return;
+                Reconstruction_Validator.ValidateRunFolder(runFolder, RunProgress.Message);
+            }
+            catch (Exception ex)
+            {
+                RunProgress.Message("Grading failed: " + ex.GetType().Name + ": " + ex.Message);
             }
             finally
             {

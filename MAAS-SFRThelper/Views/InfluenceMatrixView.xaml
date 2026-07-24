@@ -227,6 +227,9 @@
                     <CheckBox Content="Export full (dense) matrix" Foreground="Black"
                               ToolTip="Also writes the dense per-beam matrix (large files). Needed for the reconstruction/validation test; uncheck for sparse-only exports."
                               IsChecked="{Binding ExportFullMatrix}" Margin="0,0,20,0"/>
+                    <CheckBox Content="Export reference dose (validation)" Foreground="Black"
+                              ToolTip="Also saves the 'answer key': Eclipse's one-shot dose of each real field, computed at the start of the run and stored next to the matrix files. Used to check how closely the summed matrix reproduces the real field. Adds one extra dose calculation per field; leave off for everyday runs."
+                              IsChecked="{Binding ExportReferenceDose}" Margin="0,0,20,0"/>
                     <TextBlock Style="{StaticResource ParamLabel}" Text="Output root"
                                ToolTip="Run output goes to &lt;root&gt;\&lt;LastName&gt;$&lt;PatientId&gt;\&lt;PlanId&gt;: per-beam H5 + JSON metadata, the optimization voxel grid, and structure masks."/>
                     <TextBox Background="White" Foreground="Black" Width="300" Height="22"
@@ -237,7 +240,7 @@
 
                 <TextBlock Style="{StaticResource DeviationNote}"
                            Visibility="{Binding CutoffDeviates, Converter={StaticResource BoolToVis}}"
-                           Text="Cutoff is nonzero: sparse entries at or below this value are dropped, and the exact reconstruction identity will not hold for this export."/>
+                           Text="Cutoff is nonzero: entries at or below this value are zeroed in the matrix before export (sparse and full exports are identical; discarded mass audited per beamlet). Cutoff 0 = unthresholded matrix."/>
                 <TextBlock Style="{StaticResource DeviationNote}"
                            Visibility="{Binding ScalingDeviates, Converter={StaticResource BoolToVis}}"
                            Text="Dose scaling factor is not 1: stored values are scaled. Downstream consumers must honor the dose_units metadata."/>
@@ -253,6 +256,9 @@
                         Command="{Binding RunExtractionCommand}" Margin="0,0,8,0"/>
                 <Button Content="Inspect Output" Width="110" Height="26"
                         Command="{Binding InspectOutputCommand}" Margin="0,0,8,0"/>
+                <Button Content="Validate Reconstruction" Width="150" Height="26"
+                        ToolTip="The grader: adds up all the pieces of the saved matrix and compares the total against the answer key (needs a run made with 'Export reference dose' ticked). Reports how close they are and writes CSV files for figures."
+                        Command="{Binding ValidateReconstructionCommand}" Margin="0,0,8,0"/>
                 <!-- Test HDF5 removed: native-DLL deployment risk retired
                      (handoff deferred item 3). Smoke-test service retained
                      in Services\HdfSmokeTest.cs for future bring-ups. -->

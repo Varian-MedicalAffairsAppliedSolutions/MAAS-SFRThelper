@@ -48,6 +48,18 @@ namespace PhotonCalculateInfluenceMatrix
         // SFRThelper patch 4: harvest sparse entries from an already-corrected
         // matrix. The cutoff is the caller's (UI-controlled) value; with
         // cutoff = 0 the sparse set is exactly the nonzeros of the matrix.
+        // SFRThelper patch 15: the cutoff defines the matrix, it does not fork
+        // it. Sub-cutoff entries are ZEROED in the matrix during this pass, so
+        // the sparse harvest and the (optional) full export that follows are
+        // the same thresholded matrix in two encodings - the reconstruction
+        // identity sparse == full holds by construction at ANY cutoff. The
+        // discarded mass stays audited per beamlet (count/sum below). Upstream
+        // MSK thresholded the sparse harvest only, on RAW pre-leakage dose, at
+        // tol 0.5 legacy units (~5E-5 Gy/MU, ~5% of a beamlet peak): their
+        // sparse and full differed by both threshold and physics. Cutoff 0
+        // remains the unthresholded, bit-exact escape hatch. The closed-MLC
+        // leakage dataset is deliberately NOT thresholded: it reconstructs the
+        // raw beam dose (column + leakage), a different object.
         public static DoseData ExtractSparsePoints(float[,] arrDoseMatrix, double dCutoffValue)
         {
             List<DosePoint> lstBeamletDose = new List<DosePoint>();
@@ -65,9 +77,29 @@ namespace PhotonCalculateInfluenceMatrix
                 {
                     dSumCutOffValues += pointDose;
                     iCutOffValueCnt++;
+                    arrDoseMatrix[iPtIndex, 0] = 0f;   // patch 15: threshold the matrix itself
                 }
             }
             return new DoseData(lstBeamletDose, dSumCutOffValues, iCutOffValueCnt);
+        }
+
+        // SFRThelper patch 16: saves the reference dose ("answer key") files -
+        // one data file with the dose values for every point in the grid, in
+        // the same point ordering the matrix files use, plus a small text
+        // file describing what it is and how it was made.
+        public static void WriteReferenceDoseFiles(float[,] arrDose, Dictionary<string, object> meta, string szH5File, string szJsonFile)
+        {
+            long fileId = Hdf5.CreateFile(szH5File);
+            try
+            {
+                Hdf5.WriteDatasetFromArray<float>(fileId, "reference_dose", arrDose);
+            }
+            finally
+            {
+                Hdf5.CloseFile(fileId);
+            }
+            System.IO.File.WriteAllText(szJsonFile, string.Empty);   // start clean even if a stale file exists
+            CalculateInfluenceMatrix.Helpers.WriteJSONFile(meta, szJsonFile);
         }
 
         public static DoseData GetDosePoints(BeamDose hDose, double dWeight, double dCutoffValue, ref float[,] arrFullDoseMatrix)
@@ -163,6 +195,12 @@ namespace PhotonCalculateInfluenceMatrix
                 { "influenceMatrixSparse_File", $"{szFilename}/inf_matrix_sparse" },
                 { "influenceMatrixSparse_format", "CSC of (voxels x beamlets): data float32, indices int32 (voxel index), indptr int32 (num_beamlets+1), shape int32[2] = [num_voxels, num_beamlets]" },
                 { "influenceMatrixSparse_tol", dInfMatrixCutoffValue },
+                // SFRThelper patch 15: the tol above defines the matrix, not
+                // just the sparse encoding - sub-cutoff entries are zeroed
+                // before BOTH exports, so sparse and full are the same matrix
+                // and sparse == full holds at any tol. Discarded mass is
+                // audited per beamlet (sub_cutoff count/sum in beamlet info).
+                { "matrix_thresholding", "entries <= tol zeroed in the matrix before export; sparse and full encodings are identical; tol 0 = unthresholded; closed_mlc_leakage is never thresholded" },
                 { "influenceMatrixFull_File", $"{szFilename}/inf_matrix_full" },
                 { "closedMLCLeakage_File", $"{szFilename}/closed_mlc_leakage" },
                 { "MLC_leaves_pos_y_mm_File" ,  $"{szFilename}/MLC_leaves_pos_y_mm"},
@@ -172,7 +210,7 @@ namespace PhotonCalculateInfluenceMatrix
                 // downstream consumer needs archaeology.
                 { "dose_units", new Dictionary<string, object> {
                         { "column_meaning", "dose in Gy per 1 MU of this beamlet's beam (plan beam weights NOT applied)" },
-                        { "formula", "stored_value = (Gy_per_MU - closed_mlc_leakage) * DoseScalingFactor; Gy_per_MU obtained per 'dose_readout'" },
+                        { "formula", "stored_value = (Gy_per_MU - closed_mlc_leakage) * DoseScalingFactor; Gy_per_MU = beam dose in Gy divided by that beam's own machine units (independent of plan scaling and of how many beams the working plan holds)" },
                         { "closed_mlc_leakage_units", "Gy per MU, before DoseScalingFactor" },
                         { "dose_readout", szReadoutModeNote ?? "unknown (not recorded by this build)" },
                         { "MetersetPerGy", b.MetersetPerGy },

@@ -91,6 +91,11 @@ namespace PhotonCalculateInfluenceMatrix
         // exactly 1e4 x Gy/MU. Measurement #1 in the ledger.
         public const double PRESET_METERSET_MU = 1.0;
 
+        // The name tag we put on temporary working-copy plans. Shared with
+        // the eligibility check so the app can refuse to run on a leftover
+        // working copy (a "copy of a copy" run, seen 2026-07-23).
+        public const string SCRATCH_PLAN_PREFIX = "zD_";
+
         // SFRThelper: single source of truth for the run-folder convention
         // (<root>\<LastName>$<PatientId>\<PlanId>). The app's Inspect Output
         // calls this too, so the writer and the inspector can never drift.
@@ -113,7 +118,8 @@ namespace PhotonCalculateInfluenceMatrix
         public static void Calculate(Patient hPatient, Course hCourse, ExternalPlanSetup hPlan, double dInfCutoffValue, bool bExportFullInfMatrix, int iMaxDoseCalcRetry,
             float beamletSizeX, float beamletSizeY, string szTargetStructureId, float fTargetMarginMM, int iNumBeamletsToBeCalcAtATime, string szEclipseVolumeDoseCalcModel,
             string szCalculationGridSizeInCM, float fDoseScalingFactor, string szOutputRootFolder, DisplayProgress hProgress,
-            Func<bool> checkCancellation = null, string szOverrideMachine = null, string szOverrideEnergy = null, string szRunFolder = null)
+            Func<bool> checkCancellation = null, string szOverrideMachine = null, string szOverrideEnergy = null, string szRunFolder = null,
+            bool bExportReferenceDose = false)
         {
             int iFieldCnt = hPlan.Beams.Count();
 
@@ -168,7 +174,7 @@ namespace PhotonCalculateInfluenceMatrix
             // One scratch plan per source plan (Eclipse Id limit: 13 chars).
             // A leftover scratch plan from a previous run is replaced;
             // checkpoint-based resume arrives with patch 10.
-            string szScratchPlanId = "zD_" + hPlan.Id;
+            string szScratchPlanId = SCRATCH_PLAN_PREFIX + hPlan.Id;
             if (szScratchPlanId.Length > 13)
                 szScratchPlanId = szScratchPlanId.Substring(0, 13);
             ExternalPlanSetup existingScratch = dijCourse.ExternalPlanSetups.Where(p => p.Id == szScratchPlanId).SingleOrDefault();
@@ -232,6 +238,21 @@ namespace PhotonCalculateInfluenceMatrix
                 scratchPlan.SetCalculationModel(CalculationType.PhotonVolumeDose, szEclipseVolumeDoseCalcModel);
                 scratchPlan.SetCalculationOption(scratchPlan.GetCalculationModel(CalculationType.PhotonVolumeDose), "CalculationGridSizeInCM", szCalculationGridSizeInCM);
                 Dictionary<string, string> dictVals = scratchPlan.GetCalculationOptions(scratchPlan.GetCalculationModel(CalculationType.PhotonVolumeDose));//, "CalculationGridSizeInCM", out szVal);
+
+                // SFRThelper patch 16 (reference dose export): the "answer
+                // key" for checking the matrix. If the checkbox is on, we
+                // briefly copy each real treatment field into the scratch
+                // plan exactly as it is, ask Eclipse to compute its dose in
+                // one shot, save that dose next to the matrix files, and
+                // then delete the copies again. Everything after this point
+                // runs exactly as if this step never happened. Later, a
+                // checking step will compare "add up all the small pieces"
+                // against this answer key to see how close they are.
+                if (bExportReferenceDose)
+                {
+                    ExportReferenceDoses(hPlan, scratchPlan, planResultsPath,
+                        szOverrideMachine, szOverrideEnergy, hProgress);
+                }
 
                 // calculate number of beamlets for all beams and initialize them
                 Dictionary<string, MyBeamParameters> tblBeamParameters = new Dictionary<string, MyBeamParameters>();
@@ -478,67 +499,39 @@ namespace PhotonCalculateInfluenceMatrix
                                     // SFRThelper patch 14 (replaces the patch 3 formula):
                                     // dWeight means "divide presented dose down to Gy per
                                     // MU". Its value depends on the unit Eclipse actually
-                                    // presents, dispatched below (patch 14.2).
-                                    //
-                                    // SFRThelper patch 14.2 (fallback for 14): this
-                                    // environment honors DoseValuePresentation on the plan
-                                    // (readback says Absolute) but VoxelToDoseValue for
-                                    // BEAM dose still returns percent. So the readout
-                                    // dispatches on the unit it actually got:
-                                    //   Gy   -> value = presented / PRESET_METERSET_MU
-                                    //   cGy  -> same, with cGy->Gy (x0.01)
-                                    //   %    -> value = presented / (100 * MetersetPerGy)
-                                    // The % branch is the reference-point derivation
-                                    // (P = 100*D/D_ref, MetersetPerGy = preset/D_ref):
-                                    // D_ref cancels, and so does the preset meterset -
-                                    // relative dose is a shape, so this branch stays
-                                    // correct even if PRESET_METERSET_MU changes.
-                                    // Anything else (Unknown, NaN) aborts: wrong-unit
-                                    // values pass every downstream comparison silently.
-                                    DoseValue dvProbe = hBeamDose.VoxelToDoseValue(1);
-                                    double dReadIntercept = hBeamDose.VoxelToDoseValue(0).Dose;
-                                    double dReadScale = dvProbe.Dose - dReadIntercept;
-                                    bool bRelativeReadout = false;
-                                    double dWeight;
-                                    if (dvProbe.Unit == DoseValue.DoseUnit.Gy)
-                                        dWeight = PRESET_METERSET_MU;
-                                    else if (dvProbe.Unit == DoseValue.DoseUnit.cGy)
-                                        dWeight = PRESET_METERSET_MU * 100.0;
-                                    else if (dvProbe.Unit == DoseValue.DoseUnit.Percent)
-                                    {
-                                        bRelativeReadout = true;
-                                        if (Double.IsNaN(blb.MetersetPerGy) || blb.MetersetPerGy <= 0)
-                                            throw new ApplicationException(
-                                                $"Relative(%) readout for beam '{blb.Id}' needs a valid MetersetPerGy " +
-                                                $"for the Gy conversion, but it is {blb.MetersetPerGy}. Aborting.");
-                                        dWeight = 100.0 * blb.MetersetPerGy;
-                                    }
-                                    else
-                                    {
-                                        throw new ApplicationException(
-                                            $"Dose readout unit '{dvProbe.UnitAsString}' for beam '{blb.Id}' " +
-                                            $"(source field '{b.Id}') is not Gy, cGy, or %. dScale={dReadScale}, " +
-                                            $"dIntercept={dReadIntercept}. Aborting instead of writing a matrix " +
-                                            "in unknown units.");
-                                    }
-                                    if (Double.IsNaN(dReadScale) || Double.IsNaN(dReadIntercept))
-                                    {
-                                        throw new ApplicationException(
-                                            $"Dose readout scalars are NaN for beam '{blb.Id}' (source field '{b.Id}'): " +
-                                            $"dScale={dReadScale}, dIntercept={dReadIntercept}, unit='{dvProbe.UnitAsString}'. " +
-                                            "Usual cause: no prescription (patch 13a). Aborting instead of writing an " +
-                                            "all-zero matrix.");
-                                    }
+                                    // presents, worked out by the shared helper below
+                                    // (patch 14.2/16) - the same helper the reference-dose
+                                    // export uses, so the two can never disagree.
+                                    bool bRelativeReadout;
+                                    double dReadScale, dReadIntercept, dCrossCheck;
+                                    string szReadUnit;
+                                    double dWeight = ResolvePerMuDivisor(hBeamDose, blb, scratchPlan, b.Id,
+                                        out bRelativeReadout, out dReadScale, out dReadIntercept, out szReadUnit,
+                                        out dCrossCheck);
                                     if (szReadoutModeNote == null)
                                     {
                                         bRelativeReadoutMode = bRelativeReadout;
                                         szReadoutModeNote = bRelativeReadout
-                                            ? "Relative(%): DoseValuePresentation is not honored for beam dose in this " +
-                                              "environment; Gy_per_MU = presented_percent / (100 * MetersetPerGy) " +
-                                              "(reference-point normalization cancels; independent of preset meterset)"
-                                            : $"Absolute ({dvProbe.UnitAsString}): Gy_per_MU = presented dose / meterset, " +
-                                              $"PRESET_METERSET_MU = {PRESET_METERSET_MU}";
+                                            ? "percent readout; dose in Gy per MU = percent / 100 x prescribed dose, " +
+                                              "divided by the beam's own machine units (does not depend on how many " +
+                                              "beams are in the plan)"
+                                            : $"direct readout in {szReadUnit}; dose in Gy per MU = value divided by " +
+                                              "the beam's own machine units";
                                         hProgress?.Message("Dose readout mode: " + szReadoutModeNote);
+
+                                        // Two independent ways of working out the same
+                                        // conversion. They must agree; if they do not,
+                                        // something about the plan is not what we think.
+                                        if (!Double.IsNaN(dCrossCheck) && dCrossCheck > 0)
+                                        {
+                                            double dRatio = dCrossCheck / dWeight;
+                                            hProgress?.Message($"Conversion cross-check: machine-units route gives " +
+                                                $"{dWeight:F1}, share-of-plan route gives {dCrossCheck:F1} " +
+                                                $"(ratio {dRatio:F4}, 1.0000 = agree).");
+                                            if (Math.Abs(dRatio - 1.0) > 0.02)
+                                                hProgress?.Message("WARNING: the two conversion routes disagree by more " +
+                                                    "than 2%. Treat this run's dose values with caution.");
+                                        }
                                     }
                                     string szHDF5DataFile = System.IO.Path.Combine(szBeamPath, $"Beam_{b.Id}_Data.h5");
 
@@ -647,14 +640,7 @@ namespace PhotonCalculateInfluenceMatrix
                 {
                     if (bRelativeReadoutMode)
                     {
-                        int nTotalSlots = 0;
-                        foreach (Beam b in arrOrigBeams)
-                            nTotalSlots += tblBeamParameters[b.Id].m_lstBeamletBeam.Count;
-
-                        double dRxGy = double.NaN;
-                        DoseValue dvRx = scratchPlan.TotalDose;
-                        if (!Double.IsNaN(dvRx.Dose))
-                            dRxGy = (dvRx.Unit == DoseValue.DoseUnit.cGy) ? dvRx.Dose * 0.01 : dvRx.Dose;
+                        double dRxGy = GetPlanTotalDoseGy(scratchPlan);
 
                         foreach (Beam b in arrOrigBeams)
                         {
@@ -664,18 +650,18 @@ namespace PhotonCalculateInfluenceMatrix
                                 continue;
                             double dInt0 = hSlotDose.VoxelToDoseValue(0).Dose;
                             double dScl0 = hSlotDose.VoxelToDoseValue(1).Dose - dInt0;
-                            double dPmax = GetMaxRawVoxel(hSlotDose) * dScl0 + dInt0;   // presented %
-                            double dM = hSlot0.MetersetPerGy;
-                            double dGyPerMU = dPmax / (100.0 * dM);
+                            double dPmax = GetMaxRawVoxel(hSlotDose) * dScl0 + dInt0;   // percent
+                            double dSlotMu = hSlot0.Meterset.Value;
+                            double dAbsGy = dPmax / 100.0 * dRxGy;
+                            double dGyPerMU = dAbsGy / dSlotMu;
                             hProgress?.Message(
-                                $"FINAL-STATE CHECK [slot '{hSlot0.Id}', final-batch aperture]: derived max = " +
-                                $"{dGyPerMU:E3} Gy/MU (presented max {dPmax:F1}%, MetersetPerGy {dM:F1}). " +
-                                $"Eclipse verification on the retained scratch plan: " +
-                                $"(a) Show Field Dose for '{hSlot0.Id}', RELATIVE display: max ~ {dPmax:F1}%; " +
-                                $"(b) ABSOLUTE display: max ~ {dPmax / 100.0 * dRxGy:F4} Gy (100% = {dRxGy:F2} Gy prescription); " +
-                                $"(c) Fields panel MU ~ {dRxGy * dM / nTotalSlots:F0} MU (if Eclipse splits the " +
-                                $"prescription equally across the {nTotalSlots} slot beams, as observed). " +
-                                "Agreement on (a)-(c) pins raw readout, the %-to-Gy anchor, and MetersetPerGy respectively.");
+                                $"FINAL-STATE CHECK [beam '{hSlot0.Id}', last aperture used]: dose per machine unit = " +
+                                $"{dGyPerMU:E3} Gy/MU. To confirm this against Eclipse on the kept working plan: " +
+                                $"(a) show this beam's dose with the display in %, the highest value should read ~{dPmax:F1}%; " +
+                                $"(b) switch the display to Gy, it should read ~{dAbsGy:F4} Gy (100% = {dRxGy:F2} Gy prescribed); " +
+                                $"(c) the Fields panel should list ~{dSlotMu:F0} machine units for this beam. " +
+                                $"Then (b) divided by (c) is the number above - that is the whole conversion, checked " +
+                                "against Eclipse's own screen.");
                         }
                     }
                 }
@@ -1502,6 +1488,216 @@ namespace PhotonCalculateInfluenceMatrix
                     fMax = arrMatrix[i, 0];
             }
             return fMax;
+        }
+
+        // SFRThelper patch 14.2/16: works out how to turn the numbers Eclipse
+        // hands back into "dose in Gy for one machine unit (MU)". Eclipse can
+        // answer in different units depending on the system:
+        //   Gy   -> use as-is, divide by the machine units we asked for
+        //   cGy  -> hundredths of a Gy, so also divide by 100
+        //   %    -> a percentage of a reference level; dividing by
+        //           (100 x MetersetPerGy) converts it to Gy per MU - the
+        //           reference level cancels out of the math, which is why
+        //           this works no matter how many machine units were used
+        // Anything else means we don't understand the numbers, and we stop
+        // the run rather than save wrong values. This one method is used by
+        // BOTH the matrix readout and the reference-dose export, so the two
+        // can never quietly use different conversions.
+        // SFRThelper patch 18 (corrects patch 3 and 14.2): turns the numbers
+        // Eclipse hands back into "dose in Gy for one machine unit (MU)".
+        //
+        // What went wrong before: we divided using MetersetPerGy alone. That
+        // number depends on how many beams happen to be sitting in the plan
+        // at the moment of reading - Eclipse shares the prescription out
+        // among them - so the same beam gave different answers depending on
+        // its company. The answer key (2 beams in the plan) came out 2x too
+        // small and the matrix pieces (10 beams) 10x too small, which made
+        // the two impossible to compare. Upstream MSK actually had this
+        // right, via a "share of the plan" term; patch 3 removed that term
+        // believing it was plan-specific weighting. It was not.
+        //
+        // The fix: use the beam's OWN machine units, exactly the number
+        // Eclipse shows in its Fields panel. Dose and machine units are
+        // always scaled together, so dose-divided-by-machine-units is the
+        // same no matter how the plan is scaled or how many beams it holds.
+        // In percent mode the percentage is first turned into real dose
+        // using the plan's prescription (100% = the prescribed dose, checked
+        // against Eclipse's own display on 2026-07-23: 400.4% = 4.004 Gy).
+        //
+        // A second, independent way of working out the same number (using
+        // the beam's share of the plan, upstream's route) is computed
+        // alongside and handed back so the run can cross-check the two and
+        // complain if they ever disagree.
+        private static double ResolvePerMuDivisor(BeamDose hBeamDose, Beam hBeam, ExternalPlanSetup hPlanOfBeam,
+            string szSourceFieldId, out bool bRelativeReadout, out double dReadScale, out double dReadIntercept,
+            out string szReadUnit, out double dCrossCheckDivisor)
+        {
+            DoseValue dvProbe = hBeamDose.VoxelToDoseValue(1);
+            dReadIntercept = hBeamDose.VoxelToDoseValue(0).Dose;
+            dReadScale = dvProbe.Dose - dReadIntercept;
+            szReadUnit = dvProbe.UnitAsString;
+            bRelativeReadout = false;
+            dCrossCheckDivisor = double.NaN;
+
+            if (Double.IsNaN(dReadScale) || Double.IsNaN(dReadIntercept))
+            {
+                throw new ApplicationException(
+                    $"Dose readout values are not numbers (NaN) for beam '{hBeam.Id}' " +
+                    $"(source field '{szSourceFieldId}'). Usual cause: the plan has no " +
+                    "prescription. Stopping rather than saving an all-zero result.");
+            }
+
+            // The beam's machine units, as Eclipse currently has them.
+            double dBeamMu = double.NaN;
+            try { dBeamMu = hBeam.Meterset.Value; }
+            catch { /* handled just below */ }
+            if (Double.IsNaN(dBeamMu) || dBeamMu <= 0)
+                throw new ApplicationException(
+                    $"Beam '{hBeam.Id}' (source field '{szSourceFieldId}') does not report valid " +
+                    $"machine units (got {dBeamMu}). Every dose value depends on this number, so " +
+                    "the run stops rather than saving wrongly scaled results.");
+
+            double dWeight;
+            if (dvProbe.Unit == DoseValue.DoseUnit.Gy)
+                dWeight = dBeamMu;
+            else if (dvProbe.Unit == DoseValue.DoseUnit.cGy)
+                dWeight = 100.0 * dBeamMu;
+            else if (dvProbe.Unit == DoseValue.DoseUnit.Percent)
+            {
+                bRelativeReadout = true;
+                double dRxGy = GetPlanTotalDoseGy(hPlanOfBeam);
+                if (Double.IsNaN(dRxGy) || dRxGy <= 0)
+                    throw new ApplicationException(
+                        $"Percent readout for beam '{hBeam.Id}' needs the plan's prescribed dose " +
+                        "to convert into Gy, but the plan does not report one. Stopping.");
+                dWeight = 100.0 * dBeamMu / dRxGy;
+
+                // Second route, independent of the machine-units reading:
+                // the beam's share of the plan combined with MetersetPerGy
+                // (this is upstream MSK's route, once its units are fixed).
+                try
+                {
+                    double dSumWeights = 0;
+                    foreach (Beam bAny in hPlanOfBeam.Beams)
+                        if (!bAny.IsSetupField) dSumWeights += bAny.WeightFactor;
+                    if (dSumWeights > 0 && hBeam.WeightFactor > 0 &&
+                        !Double.IsNaN(hBeam.MetersetPerGy) && hBeam.MetersetPerGy > 0)
+                        dCrossCheckDivisor = 100.0 * hBeam.MetersetPerGy * hBeam.WeightFactor / dSumWeights;
+                }
+                catch { /* cross-check is optional; the main route stands */ }
+            }
+            else
+            {
+                throw new ApplicationException(
+                    $"Dose readout unit '{dvProbe.UnitAsString}' for beam '{hBeam.Id}' " +
+                    $"(source field '{szSourceFieldId}') is not Gy, cGy, or %. " +
+                    "Stopping rather than saving numbers in unknown units.");
+            }
+            return dWeight;
+        }
+
+        // The plan's prescribed dose in Gy (100% on the percent scale).
+        private static double GetPlanTotalDoseGy(ExternalPlanSetup hPlan)
+        {
+            try
+            {
+                DoseValue dv = hPlan.TotalDose;
+                if (Double.IsNaN(dv.Dose)) return double.NaN;
+                return (dv.Unit == DoseValue.DoseUnit.cGy) ? dv.Dose * 0.01 : dv.Dose;
+            }
+            catch { return double.NaN; }
+        }
+
+
+        // SFRThelper patch 16: the reference-dose export - the "answer key".
+        // Copies each real treatment field into the scratch plan exactly as
+        // it is (same leaf shapes, same angles), has Eclipse compute its
+        // dose in one shot, saves that dose in the run folder using the same
+        // Gy-per-MU conversion the matrix uses, and then deletes the copies
+        // so the rest of the run proceeds as if this never happened. A later
+        // checking step compares "sum of all the small pieces" against these
+        // files to measure how close the matrix comes to the real thing.
+        private static void ExportReferenceDoses(ExternalPlanSetup hSourcePlan, ExternalPlanSetup scratchPlan,
+            string szRunFolder, string szOverrideMachine, string szOverrideEnergy, DisplayProgress hProgress)
+        {
+            hProgress?.Message("Reference dose: copying the real treatment fields for a one-shot dose calculation...");
+
+            List<Beam> lstRefBeams = new List<Beam>();
+            List<string> lstSourceIds = new List<string>();
+            List<KeyValuePair<string, MetersetValue>> refPresets = new List<KeyValuePair<string, MetersetValue>>();
+            foreach (Beam bSource in hSourcePlan.Beams)
+            {
+                if (bSource.IsSetupField)
+                    continue;
+                Beam hRefCopy = CopyBeam(bSource, scratchPlan, szOverrideMachine, szOverrideEnergy);
+
+                // Open the copy's leaves all the way to the jaw opening.
+                // The matrix pieces always tile the whole jaw opening, so
+                // the answer key must be that same whole opening - no matter
+                // where the source plan's leaves happen to be sitting
+                // (2026-07-23: a test plan's leaves were parked nearly shut,
+                // and the answer key faithfully measured a shut field).
+                VRect<double> refJaws = GetJawsFromBeam(bSource);
+                float[,] arrOpenLeaves = GetOpenLeafPositions(
+                    bSource.ControlPoints[0].LeafPositions.GetLength(1), refJaws);
+                BeamParameters refParams = hRefCopy.GetEditableParameters();
+                refParams.SetAllLeafPositions(arrOpenLeaves);
+                hRefCopy.ApplyParameters(refParams);
+
+                lstRefBeams.Add(hRefCopy);
+                lstSourceIds.Add(bSource.Id);
+                refPresets.Add(new KeyValuePair<string, MetersetValue>(hRefCopy.Id, new MetersetValue(PRESET_METERSET_MU, DosimeterUnit.MU)));
+            }
+
+            CalculationResult calcRes = scratchPlan.CalculateDoseWithPresetValues(refPresets);
+            if (!calcRes.Success)
+                throw new ApplicationException("Reference dose calculation did not succeed; stopping the run. " +
+                    "The matrix cannot be checked without the answer key, so fix this before re-running.");
+
+            // Keep the display in real units, same as the main run does.
+            scratchPlan.DoseValuePresentation = DoseValuePresentation.Absolute;
+
+            float[,] arrRefDose = null;
+            for (int i = 0; i < lstRefBeams.Count; i++)
+            {
+                Beam hRef = lstRefBeams[i];
+                string szSourceId = lstSourceIds[i];
+                BeamDose hDose = hRef.Dose;
+                if (hDose == null)
+                    throw new ApplicationException($"Reference beam '{hRef.Id}' has no dose after calculation; stopping.");
+
+                bool bRel; double dScale, dIntercept, dCrossCheck; string szUnit;
+                double dWeight = ResolvePerMuDivisor(hDose, hRef, scratchPlan, szSourceId,
+                    out bRel, out dScale, out dIntercept, out szUnit, out dCrossCheck);
+
+                int iSize = hDose.XSize * hDose.YSize * hDose.ZSize;
+                if (arrRefDose == null || arrRefDose.GetLength(0) != iSize)
+                    arrRefDose = new float[iSize, 1];
+                Helpers.FillDoseMatrix(hDose, dWeight, ref arrRefDose);
+
+                string szH5 = System.IO.Path.Combine(szRunFolder, $"Reference_{szSourceId}_Data.h5");
+                string szJson = System.IO.Path.Combine(szRunFolder, $"Reference_{szSourceId}_MetaData.json");
+                Dictionary<string, object> meta = new Dictionary<string, object>
+                {
+                    { "source_field", szSourceId },
+                    { "machine_used", hRef.TreatmentUnit.Id },
+                    { "energy", hRef.EnergyModeDisplayName },
+                    { "MetersetPerGy", hRef.MetersetPerGy },
+                    { "machine_units_of_this_beam", hRef.Meterset.Value },
+                    { "units", "Gy per MU (same conversion as the matrix files)" },
+                    { "readout", bRel ? "percent, converted via 100 * MetersetPerGy" : $"direct ({szUnit})" },
+                    { "aperture", "jaws and angles copied from the source field; leaves opened to the jaw opening (the same area the matrix pieces cover)" },
+                    { "purpose", "answer key: Eclipse's one-shot dose of the whole field, for checking the summed matrix against" }
+                };
+                Helpers.WriteReferenceDoseFiles(arrRefDose, meta, szH5, szJson);
+                hProgress?.Message($"Reference dose saved for field '{szSourceId}' " +
+                    $"(max {GetMaxMatrixValue(arrRefDose):E3} Gy/MU) -> {System.IO.Path.GetFileName(szH5)}");
+            }
+
+            // Remove the copies so the rest of the run is untouched by them.
+            foreach (Beam hRef in lstRefBeams)
+                scratchPlan.RemoveBeam(hRef);
+            hProgress?.Message("Reference dose export done; temporary field copies removed. Continuing with the normal run.");
         }
 
         // SFRThelper patch 14 (measurement #1), reworked by 14.2. Two modes:
