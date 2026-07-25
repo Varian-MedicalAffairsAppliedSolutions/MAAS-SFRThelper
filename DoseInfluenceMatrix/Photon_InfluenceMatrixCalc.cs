@@ -47,6 +47,20 @@ namespace PhotonCalculateInfluenceMatrix
 
         public double m_dSumCutoffValues;
         public int m_iNumCutoffValues;
+
+        // SFRThelper patch 19: clamp visibility. Count and signed sum of
+        // the negative marginals zeroed by the subtraction loop's clamp -
+        // previously invisible in every output (the cutoff counters above
+        // only see 0 < dose <= cutoff). Same post-scale per-MU units as
+        // the matrix columns. Exported to /beamlets/clamped_value_cnt and
+        // /beamlets/sum_clamped_value.
+        public int m_iNumClampedValues;
+        public double m_dSumClampedValues;
+
+        // SFRThelper patch 21: where this pose parked its closed leaf
+        // pairs (BEV-X mm). Constant in FixedInField mode; per-beamlet
+        // under AdaptiveNearJaw. Exported to /beamlets/park_position_mm.
+        public float m_fParkPos = float.NaN;
     }
 
     public class MyBeamParameters
@@ -291,9 +305,10 @@ namespace PhotonCalculateInfluenceMatrix
                         for (int x = 0; x < xs; x++)
                         {
                             float[,] leafs;
+                            float fParkUsed = float.NaN;
                             if (!bHalcyon)
                             {
-                                leafs = GetLeafPositions(jaws, beamletSizeX, beamletSizeY, arrLeafWidths, x, y, out beamletSize);
+                                leafs = GetLeafPositions(jaws, beamletSizeX, beamletSizeY, arrLeafWidths, x, y, out beamletSize, out fParkUsed);
                             }
                             else
                             {
@@ -304,7 +319,12 @@ namespace PhotonCalculateInfluenceMatrix
                             if (IsBeamletInAnyEnvelopeBox(beamletSize, lstEnvelopeBoxes))
                             {
                                 bp.m_lstBeamletMLCs.Add(leafs);
-                                bp.m_lstBeamlets.Add(new Beamlet(iBeamletIdx, origBeam.Id, beamletSize.X1, beamletSize.Y1, beamletSize.X2 - beamletSize.X1, beamletSize.Y2 - beamletSize.Y1, x, y));
+                                Beamlet hNewBeamlet = new Beamlet(iBeamletIdx, origBeam.Id, beamletSize.X1, beamletSize.Y1, beamletSize.X2 - beamletSize.X1, beamletSize.Y2 - beamletSize.Y1, x, y);
+                                // patch 21: record where this pose parked its
+                                // closed pairs, exported per beamlet so the
+                                // analysis can test for park-side residuals.
+                                hNewBeamlet.m_fParkPos = fParkUsed;
+                                bp.m_lstBeamlets.Add(hNewBeamlet);
                                 iBeamletIdx++;
                             }
                         }
@@ -330,6 +350,13 @@ namespace PhotonCalculateInfluenceMatrix
                     tblBeamParameters[origBeam.Id] = bp;
                 }
 
+                // SFRThelper patch 21b: validate EVERY leaf pose against
+                // Eclipse now, in seconds, before any dose calculation. An
+                // infeasible geometry (park mode, span, interdigitation,
+                // whatever the machine model objects to) fails here with the
+                // pose named, instead of 35 minutes into the run.
+                PreflightPoseValidation(arrOrigBeams, tblBeamParameters, hProgress);
+
                 string szBeamPath = System.IO.Path.Combine(planResultsPath, "Beams");
                 if (!Directory.Exists(szBeamPath))
                     Directory.CreateDirectory(szBeamPath);
@@ -353,6 +380,21 @@ namespace PhotonCalculateInfluenceMatrix
                     $"batch size {iNumBeamletsToBeCalcAtATime}. The first batch is the closed-MLC leakage baseline. " +
                     "Each dose calculation runs for minutes with no output - the window may freeze during computation; " +
                     "Cancel takes effect at the next batch boundary.");
+                // SFRThelper patch 20/21: the parking geometry is an
+                // experimental variable - print it so every run log states
+                // which geometry produced its numbers. No silent changes.
+                if (PARK_MODE == ParkMode.AdaptiveNearJaw)
+                    hProgress?.Message("PARK MODE (patch 21): ADAPTIVE NEAR-JAW - each pose parks its closed " +
+                        "pairs behind whichever jaw gives the smaller bank span (baseline parks at X1-1). The tip " +
+                        "junction sits under jaw tungsten for every pose; prediction on record: NO park-line notch " +
+                        "anywhere in the reconstruction, baseline max drops to leaf-body scale (~2-3% of the open beam).");
+                else
+                    hProgress?.Message($"PARK MODE (patch 20/21): FIXED IN-FIELD - closed leaf pairs parked at BEV-X = " +
+                        $"{PARK_POSITION_MM:+0.0;-0.0} mm for the baseline AND all beamlet poses. " +
+                        (Math.Abs(PARK_POSITION_MM) < 0.01
+                            ? "This is the pre-patch-21 production value (field centre-line); expect the known park-line notch at X = 0."
+                            : "THIS IS A PARK-SHIFT EXPERIMENT - not a production geometry. " +
+                              "Prediction on record: the reconstruction notch relocates to this coordinate."));
                 do
                 {
                     lstCalcBeams.Clear();
@@ -585,12 +627,28 @@ namespace PhotonCalculateInfluenceMatrix
                                         }
 
                                         // subtract matrix from closedMLC matrix
+                                        // SFRThelper patch 19 (clamp visibility): the line that
+                                        // zeroes negative marginals below is inherited from MSK
+                                        // and has never reported what it removes - clamped mass
+                                        // is invisible in every output (the sub-cutoff counters
+                                        // only see 0 < dose <= cutoff). Count it and keep the
+                                        // signed sum per beamlet. Behaviour is UNCHANGED this
+                                        // run - measure first, fix after the park-shift verdict.
+                                        // Park-theory signature to look for: near-zero clamped
+                                        // mass for beamlets whose aperture touches the park
+                                        // line, large stripe-concentrated mass for the rest.
                                         arrClosedMLCDoseMatrix = bp.m_arrClosedMLCDoseMatrix;
+                                        int iClampedCnt = 0;
+                                        double dClampedSum = 0.0;
                                         for (int iDosePtIdx = 0; iDosePtIdx < iDoseMatrixSize; iDosePtIdx++)
                                         {
                                             arrFullDoseMatrix[iDosePtIdx, 0] = (arrFullDoseMatrix[iDosePtIdx, 0] - arrClosedMLCDoseMatrix[iDosePtIdx, 0]) * fDoseScalingFactor;
                                             if (arrFullDoseMatrix[iDosePtIdx, 0] < 0)
+                                            {
+                                                iClampedCnt++;
+                                                dClampedSum += arrFullDoseMatrix[iDosePtIdx, 0];
                                                 arrFullDoseMatrix[iDosePtIdx, 0] = 0;
+                                            }
                                         }
 
                                         DoseData doseData = Helpers.ExtractSparsePoints(arrFullDoseMatrix, dInfCutoffValue);
@@ -598,13 +656,18 @@ namespace PhotonCalculateInfluenceMatrix
                                         if (bDiagBeamlet)
                                             hProgress?.Message($"DIAG [{b.Id} / beamlet 0]: maxAfterSubtraction=" +
                                                 $"{GetMaxMatrixValue(arrFullDoseMatrix):E3} Gy/MU; nnz={doseData.dosePoints.Count:N0}; " +
-                                                $"subCutoff count={doseData.m_iNumCutoffValues:N0}, sum={doseData.m_dSumCutoffValues:E3}");
+                                                $"subCutoff count={doseData.m_iNumCutoffValues:N0}, sum={doseData.m_dSumCutoffValues:E3}; " +
+                                                $"clamped negatives (patch 19): {iClampedCnt:N0} points, mass={dClampedSum:E3}");
 
                                         Beamlet hBeamlet = bp.m_lstBeamlets[iBeamletIdx];
                                         // patch 4: values are already scaled by the time
                                         // extraction sees them - no second scaling here.
                                         hBeamlet.m_dSumCutoffValues = doseData.m_dSumCutoffValues;
                                         hBeamlet.m_iNumCutoffValues = doseData.m_iNumCutoffValues;
+                                        // patch 19: clamp stats ride the same vehicle as the
+                                        // cutoff stats and are exported beside them.
+                                        hBeamlet.m_iNumClampedValues = iClampedCnt;
+                                        hBeamlet.m_dSumClampedValues = dClampedSum;
 
                                         Helpers.WriteInfMatrixHDF5(bExportFullInfMatrix, bp, arrFullDoseMatrix, doseData, szHDF5DataFile);
                                     }
@@ -674,6 +737,27 @@ namespace PhotonCalculateInfluenceMatrix
                 foreach (Beam b in arrOrigBeams)
                 {
                     hProgress.Message($"Progress: Finalizing beam {b.Id}.");
+
+                    // SFRThelper patch 19: field-level clamp totals, printed
+                    // where they cannot be missed. Under the park mechanism
+                    // the total clamped mass per field should roughly account
+                    // for the stripe deficit; near-zero totals would refute
+                    // the clamp's role regardless of where the notch sits.
+                    long lClampCnt = 0;
+                    double dClampSum = 0.0;
+                    int iBeamletsWithClamp = 0;
+                    foreach (Beamlet blStats in tblBeamParameters[b.Id].m_lstBeamlets)
+                    {
+                        lClampCnt += blStats.m_iNumClampedValues;
+                        dClampSum += blStats.m_dSumClampedValues;
+                        if (blStats.m_iNumClampedValues > 0)
+                            iBeamletsWithClamp++;
+                    }
+                    hProgress?.Message($"CLAMP TOTALS [beam '{b.Id}'] (patch 19): " +
+                        $"{lClampCnt:N0} negative points zeroed across {iBeamletsWithClamp} of " +
+                        $"{tblBeamParameters[b.Id].BeamletCount} beamlets, total clamped mass {dClampSum:E3} " +
+                        "(post-scale per-MU units). Per-beamlet detail in /beamlets/clamped_value_cnt " +
+                        "and /beamlets/sum_clamped_value.");
 
                     string szHDF5DataFile = System.IO.Path.Combine(szBeamPath, $"Beam_{b.Id}_Data.h5");
                     Helpers.WriteBeamletInfoHDF5(tblBeamParameters[b.Id], iMaxPointCnt, szHDF5DataFile);
@@ -1130,16 +1214,121 @@ namespace PhotonCalculateInfluenceMatrix
                 return jaws;
             }
         }
+        // SFRThelper patch 21 (adaptive near-jaw parking): which parking
+        // strategy the closed leaf pairs use, for the baseline AND every
+        // beamlet pose.
+        //   FixedInField   - all closed pairs tip-to-tip at PARK_POSITION_MM.
+        //                    Production geometry before this patch. The tip
+        //                    junction then sits IN the field and its leak
+        //                    (~10-15% locally) rides the baseline; the
+        //                    subtract-then-clamp arithmetic converts it into
+        //                    the park-line notch (measured -16%, k=2.46 at
+        //                    the centre boundary; relocated and deepened to
+        //                    k~3.0 at +25 in the 2026-07-24 park-shift run -
+        //                    conviction).
+        //   AdaptiveNearJaw- per beamlet, closed pairs park behind whichever
+        //                    jaw gives the smaller worst-bank span:
+        //                    left (X1-1) if (x2_b - X1) <= (X2 - x1_b),
+        //                    else right (X2+1). The all-closed baseline
+        //                    parks at X1-1 (its span is zero regardless).
+        //                    The junction then glows UNDER jaw tungsten -
+        //                    invisible in-field - so the baseline is
+        //                    featureless and the subtraction has no seam to
+        //                    mishandle. Worst adaptive span ~ half field + 1
+        //                    (~76-86 mm here), under the ~105 mm limit the
+        //                    park-shift run already proved acceptable. Which
+        //                    side a closed row's single covering leaf enters
+        //                    from differs between poses, but in-field each
+        //                    closed row is one leaf body thick either way
+        //                    (banks are symmetric), so baseline and pose
+        //                    backdrops still match.
+        // The pose preflight (patch 21b) validates every pose against
+        // Eclipse BEFORE any dose calculation, so an infeasible mode fails
+        // in seconds, loudly, not 35 minutes in.
+        public enum ParkMode { FixedInField, AdaptiveNearJaw }
+        public const ParkMode PARK_MODE = ParkMode.AdaptiveNearJaw;
+
+        // Used only when PARK_MODE == FixedInField. Reverted to the
+        // production centre-line value after the +25.0f park-shift
+        // experiment (patch 20, 2026-07-24, run_20260724_205557) concluded:
+        // notch relocated with the park in both fields, k = 3.04/2.97,
+        // clamp-mass valley at the park column - mechanism convicted.
+        public const float PARK_POSITION_MM = 0.0f;
+
+        // SFRThelper patch 21b: pose preflight. Applies the closed-MLC
+        // baseline pose and every beamlet pose to slot beam 0 of each field
+        // through the exact production path (GetEditableParameters /
+        // SetAllLeafPositions / ApplyParameters), before any dose
+        // calculation is requested. Eclipse's own machine model is the
+        // judge - no reimplemented span/interdigitation rules to drift out
+        // of date. Any rejection aborts the run with the pose, its tile,
+        // its park, and Eclipse's reason. Runs in every mode: it is the
+        // feasibility instrument for AdaptiveNearJaw and a permanent
+        // cheap guard for everything else.
+        private static void PreflightPoseValidation(List<Beam> arrOrigBeams,
+            Dictionary<string, MyBeamParameters> tblBeamParameters, DisplayProgress hProgress)
+        {
+            hProgress?.Message($"POSE PREFLIGHT (patch 21b): applying every leaf pose to Eclipse " +
+                $"before any dose calculation (park mode: {PARK_MODE})...");
+            List<string> lstFailures = new List<string>();
+            foreach (Beam origBeam in arrOrigBeams)
+            {
+                MyBeamParameters bp = tblBeamParameters[origBeam.Id];
+                if (bp.m_lstBeamletBeam.Count == 0)
+                {
+                    lstFailures.Add($"[{origBeam.Id}] no slot beams to validate against.");
+                    continue;
+                }
+                Beam hProbe = bp.m_lstBeamletBeam[0];
+                int iOk = 0, iTotal = bp.BeamletCount + 1;
+                for (int iPose = -1; iPose < bp.BeamletCount; iPose++)
+                {
+                    float[,] arrPose = (iPose < 0) ? bp.m_ClosedMLC : bp.m_lstBeamletMLCs[iPose];
+                    string szKind = (iPose < 0)
+                        ? "CLOSED-MLC baseline"
+                        : $"beamlet {iPose} (tile x=[{bp.m_lstBeamlets[iPose].m_fXStart:F0}," +
+                          $"{bp.m_lstBeamlets[iPose].m_fXStart + bp.m_lstBeamlets[iPose].m_fXSize:F0}], " +
+                          $"park {bp.m_lstBeamlets[iPose].m_fParkPos:F1} mm)";
+                    try
+                    {
+                        BeamParameters hPoseParams = hProbe.GetEditableParameters();
+                        hPoseParams.SetAllLeafPositions(arrPose);
+                        hProbe.ApplyParameters(hPoseParams);
+                        iOk++;
+                    }
+                    catch (Exception exPose)
+                    {
+                        lstFailures.Add($"[{origBeam.Id}] {szKind}: {exPose.Message}");
+                    }
+                }
+                hProgress?.Message($"POSE PREFLIGHT [{origBeam.Id}]: {iOk}/{iTotal} poses valid.");
+            }
+            if (lstFailures.Count > 0)
+            {
+                throw new ApplicationException(
+                    $"POSE PREFLIGHT FAILED: {lstFailures.Count} pose(s) rejected by Eclipse. Run aborted " +
+                    "BEFORE any dose calculation - no machine time spent. The reasons below name the violated " +
+                    "constraint; if the park mode is AdaptiveNearJaw, report them and fall back to " +
+                    "PARK_MODE = ParkMode.FixedInField (one line). Rejected: " +
+                    string.Join(" || ", lstFailures));
+            }
+        }
+
         public static float[,] GetClosedLeafPositions(int nLeafs, VRect<double> jaws)
         {
             float[,] positions = new float[2, nLeafs];
-            // SFRThelper interdigitation fix (option 2): close the baseline at
-            // the field centre-line (X = 0), the same closed-leaf tip position
-            // used for non-covering leaves in GetLeafPositions. MSK parked at
-            // (jaws.X1 - 1); centre-line closing is interdigitation-safe on
-            // HD120 and keeps the leakage baseline geometrically consistent
-            // with every beamlet aperture, so per-voxel subtraction is exact.
-            float parkPos = 0.0f;
+            // Closed baseline pose: every pair tip-to-tip at the park
+            // position. AdaptiveNearJaw (patch 21): park at X1 - 1, under
+            // the left jaw - the all-closed pose has zero bank span (every
+            // tip at the same coordinate), so the side is free; left is
+            // fixed for determinism and mirrors MSK's original. The tip
+            // junction then leaks under jaw tungsten, invisible in-field,
+            // and the baseline is featureless body transmission.
+            // FixedInField: PARK_POSITION_MM, junction in-field (see the
+            // ParkMode comment for the measured consequences).
+            float parkPos = (PARK_MODE == ParkMode.AdaptiveNearJaw)
+                ? (float)(jaws.X1 - 1.0)
+                : PARK_POSITION_MM;
 
             // loop through all leafs
             for (int i = 0; i < nLeafs; i++)
@@ -1171,7 +1360,7 @@ namespace PhotonCalculateInfluenceMatrix
             return positions;
         }
 
-        public static float[,] GetLeafPositions(VRect<double> jaws, float beamletSizeX, float beamletSizeY, float[] leafWidths, int x, int y, out VRect<float> beamletSize)
+        public static float[,] GetLeafPositions(VRect<double> jaws, float beamletSizeX, float beamletSizeY, float[] leafWidths, int x, int y, out VRect<float> beamletSize, out float parkUsed)
         {
             int nLeafs = leafWidths.Length;
             float[,] positions = new float[2, nLeafs];
@@ -1206,19 +1395,31 @@ namespace PhotonCalculateInfluenceMatrix
             // row's recorded rectangle by one leaf width.
             bool bYStartSet = false;
 
-            // SFRThelper interdigitation fix (option 2): park non-covering
-            // leaf pairs CLOSED at the field centre-line (X = 0), consistently
-            // with GetClosedLeafPositions. MSK's original parked every closed
-            // leaf at (jaws.X1 - 1); on Millennium 120 (where MSK validated)
-            // that is legal because all closed leaves retract equally to the
-            // same edge. On HD120 a single open beamlet far from that edge
-            // strands the parked leaves ~a field width from their neighbours,
-            // violating interdigitation / adjacent-leaf-travel limits. Parking
-            // closed pairs at X = 0 keeps every leaf near its neighbours AND
-            // matches the closed-MLC baseline geometry exactly, so leakage
-            // subtraction stays exact (the baseline and every beamlet share
-            // the same closed-leaf tip position).
-            float parkPos = 0.0f;
+            // SFRThelper patch 21: park choice for this beamlet's
+            // non-covering pairs. AdaptiveNearJaw: behind whichever jaw
+            // keeps the worst bank span smaller. Parking left puts every
+            // closed tip at X1-1, so bank B's span is x2_b - (X1-1);
+            // parking right puts them at X2+1, so bank A's span is
+            // (X2+1) - x1_b. Pick the smaller. The tip junction then sits
+            // under jaw tungsten for every pose - no in-field seam, so the
+            // closed-MLC baseline subtraction has nothing sharp to
+            // mishandle (the fixed in-field park demonstrably did: notch
+            // conviction, run_20260724_205557).
+            // FixedInField: the shared constant, same for every pose.
+            float parkPos;
+            if (PARK_MODE == ParkMode.AdaptiveNearJaw)
+            {
+                double dSpanIfLeft = xPosRight - (jaws.X1 - 1.0);
+                double dSpanIfRight = (jaws.X2 + 1.0) - xPosLeft;
+                parkPos = (dSpanIfLeft <= dSpanIfRight)
+                    ? (float)(jaws.X1 - 1.0)
+                    : (float)(jaws.X2 + 1.0);
+            }
+            else
+            {
+                parkPos = PARK_POSITION_MM;
+            }
+            parkUsed = parkPos;
 
             float fMLCHalfWidth = 0.0f;
             for (int i = 0; i < nLeafs / 2; i++)

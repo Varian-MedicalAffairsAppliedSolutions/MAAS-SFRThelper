@@ -180,11 +180,17 @@ namespace PhotonCalculateInfluenceMatrix
                         { "height_mm_File" , $"{szFilename}/beamlets/height_mm" },
                         { "position_x_mm_File" , $"{szFilename}/beamlets/position_x_mm" },
                         { "position_y_mm_File" , $"{szFilename}/beamlets/position_y_mm" },
+                        { "position_convention" , "position_x_mm / position_y_mm are beamlet rectangle CENTRES (edges = position +/- size/2), inherited from the MSK format" },
                         { "MLC_leaf_idx_File" , $"{szFilename}/beamlets/MLC_leaf_idx" },
                         { "grid_x_idx_File" , $"{szFilename}/beamlets/grid_x_idx" },
-                        { "grid_y_idx_File" , $"{szFilename}/beamlets/grid_y_idx" }
+                        { "grid_y_idx_File" , $"{szFilename}/beamlets/grid_y_idx" },
+                        { "sum_clamped_value_File" , $"{szFilename}/beamlets/sum_clamped_value" },
+                        { "clamped_value_cnt_File" , $"{szFilename}/beamlets/clamped_value_cnt" },
+                        { "clamp_stats_meaning" , "patch 19: count and signed sum of negative (beamlet - closed_mlc_leakage) marginals zeroed by the subtraction clamp, per beamlet, post-scale per-MU units" }
                     }
                 },
+                { "closed_leaf_park_mode" , PhotonInfluenceMatrixCalc.PARK_MODE.ToString() },
+                { "closed_leaf_park_position_mm" , (PhotonInfluenceMatrixCalc.PARK_MODE == PhotonInfluenceMatrixCalc.ParkMode.FixedInField) ? (object)PhotonInfluenceMatrixCalc.PARK_POSITION_MM : "adaptive: per-beamlet, see beamlets/park_position_mm; baseline parks at X1-1 (under the left jaw)" },
                 { "jaw_position" , new Dictionary<string, float>{ { "top_left_x_mm", (float)firstCP.JawPositions.X1 }, { "top_left_y_mm", (float)firstCP.JawPositions.Y1 }, { "bottom_right_x_mm", (float)firstCP.JawPositions.X2 }, {"bottom_right_y_mm", (float)firstCP.JawPositions.Y2 } } },
                 { "BEV_structure_contour_points_File" , $"{szFilename}/BEV_structure_contour_points"},
                 { "MLC_name" ,  b.MLC.Name},
@@ -337,6 +343,15 @@ namespace PhotonCalculateInfluenceMatrix
             float[] arrYSize = new float[iBeamletCnt];
             double[] arrSumOfCutoffValues = new double[iBeamletCnt];
             int[] arrNumCutoffValues = new int[iBeamletCnt];
+            // SFRThelper patch 19: clamp visibility - per-beamlet count and
+            // signed sum of negative marginals zeroed by the subtraction
+            // clamp, exported beside the cutoff stats they were hiding
+            // behind. Units: post-scale per-MU, same as the matrix columns.
+            double[] arrSumClampedValues = new double[iBeamletCnt];
+            int[] arrNumClampedValues = new int[iBeamletCnt];
+            // SFRThelper patch 21: per-beamlet park position (BEV-X mm) -
+            // constant in FixedInField mode, per-pose under AdaptiveNearJaw.
+            float[] arrParkPos = new float[iBeamletCnt];
             // SFRThelper patch 9: enumeration-grid indices per beamlet.
             int[] arrGridX = new int[iBeamletCnt];
             int[] arrGridY = new int[iBeamletCnt];
@@ -344,12 +359,22 @@ namespace PhotonCalculateInfluenceMatrix
             {
                 Beamlet bl = beamParams.m_lstBeamlets[i];
                 arrId[i] = bl.m_iIndex;
+                // NOTE (convention, verified against MSK original): the
+                // exported position_x_mm / position_y_mm are the rectangle
+                // CENTRES, not corners - edges = position +/- size/2. A
+                // reader that treats position as the left edge misplaces
+                // every column boundary by half a beamlet (this exact
+                // misreading produced a wrong boundary verdict on
+                // 2026-07-24; do not repeat it).
                 arrXPos[i] = bl.m_fXStart + bl.m_fXSize / 2.0f;
                 arrYPos[i] = bl.m_fYStart + bl.m_fYSize / 2.0f;
                 arrXSize[i] = bl.m_fXSize;
                 arrYSize[i] = bl.m_fYSize;
                 arrSumOfCutoffValues[i] = bl.m_dSumCutoffValues;
                 arrNumCutoffValues[i] = bl.m_iNumCutoffValues;
+                arrSumClampedValues[i] = bl.m_dSumClampedValues;
+                arrNumClampedValues[i] = bl.m_iNumClampedValues;
+                arrParkPos[i] = bl.m_fParkPos;
                 arrGridX[i] = bl.m_iGridX;
                 arrGridY[i] = bl.m_iGridY;
             }
@@ -373,6 +398,10 @@ namespace PhotonCalculateInfluenceMatrix
                 Helpers.CreateDataSet<float>(fileId, "/closed_mlc_leakage", beamParams.m_arrClosedMLCDoseMatrix);
             Helpers.CreateDataSet<double>(fileId, "/beamlets/sum_cutoff_value", arrSumOfCutoffValues);
             Helpers.CreateDataSet<int>(fileId, "/beamlets/cutoff_value_cnt", arrNumCutoffValues);
+            // SFRThelper patch 19: the clamp stats, beside the cutoff stats.
+            Helpers.CreateDataSet<double>(fileId, "/beamlets/sum_clamped_value", arrSumClampedValues);
+            Helpers.CreateDataSet<int>(fileId, "/beamlets/clamped_value_cnt", arrNumClampedValues);
+            Helpers.CreateDataSet<float>(fileId, "/beamlets/park_position_mm", arrParkPos);
 
             Hdf5.CloseFile(fileId);
         }
